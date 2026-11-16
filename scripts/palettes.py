@@ -23,8 +23,10 @@ import sys; sys.path.insert(0, str(Path(__file__).parent))
 def argb(h): return 0xFF000000 | int(h.lstrip("#"), 16)
 def hexs(a): return "#%06X" % (a & 0xFFFFFF)
 
-def scheme(seed, variant='expressive'):
-    s = VARIANTS[variant](Hct.from_int(argb(seed)), True, 0.0)
+import os
+SCHEME = os.environ.get("MG_SCHEME", "dark")      # "dark" (default) or "light"; set by package.py --scheme / install.sh --scheme
+def scheme(seed, variant='expressive', dark=None):
+    s = VARIANTS[variant](Hct.from_int(argb(seed)), (SCHEME != "light") if dark is None else dark, 0.0)
     return {r: hexs(getattr(M, r).get_hct(s).to_int()) for r in ROLES}
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
 PY   ?= .venv/bin/python
+SCHEME ?= dark
 RES  ?= 1920x1080
 
 .PHONY: venv package screenshots install uninstall clean
 venv:            ## create the build virtualenv
 	python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 package:         ## render scenes + per-resolution bundles into dist/material-grub (a few minutes)
-	$(PY) scripts/package.py
+	$(PY) scripts/package.py --scheme $(SCHEME)
 screenshots:     ## boot the theme in QEMU/OVMF and write docs/screenshots/*.png
 	$(PY) scripts/make_screenshots.py
 install: package ## install on this machine (needs sudo); RES=1920x1200 make install

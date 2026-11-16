@@ -1,11 +1,14 @@
 """Assemble the distributable package: dist/material-grub/{scenes,res,classes.json,rules.json,bin}"""
 import json, os, re, shutil, sys
 from pathlib import Path
+def opt(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
+if opt("--scheme"):    # light | dark: read by palettes.py (also in the worker processes)
+    if opt("--scheme") not in ("light", "dark"): sys.exit("--scheme must be light or dark")
+    os.environ["MG_SCHEME"] = opt("--scheme")
 sys.path.insert(0, str(Path(__file__).parent))
 import build_theme as B, catalog as C
 ROOT = B.ROOT; PKG = ROOT / "dist/material-grub"
 RES_ALL = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split()
-def opt(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 # --res WxH[,WxH...] builds only those resolutions and the scene sets they need (the 2160-high sets are 4x the size of the 1080-high ones)
 RES = opt("--res", "").split(",") if opt("--res") else RES_ALL
 SETS = list(dict.fromkeys(B.aspect_for(*map(int, r.split("x"))) for r in RES))
@@ -23,7 +26,7 @@ if __name__ == "__main__":
     shutil.rmtree(PKG, ignore_errors=True); PKG.mkdir(parents=True)
     with ProcessPoolExecutor(max_workers=min(len(SETS), os.cpu_count() or 1)) as ex: list(ex.map(prepare, SETS))
     for asp in SETS:
-        shutil.copytree(ROOT / "build/scenes" / asp / "icons", PKG / "scenes" / asp / "icons"); shutil.copytree(ROOT / "build/scenes" / asp / "bg", PKG / "scenes" / asp / "bg")
+        shutil.copytree(B.SCENES / asp / "icons", PKG / "scenes" / asp / "icons"); shutil.copytree(B.SCENES / asp / "bg", PKG / "scenes" / asp / "bg")
     with ProcessPoolExecutor(max_workers=min(len(RES), os.cpu_count() or 1)) as ex: list(ex.map(bundle, RES))
     (PKG / "classes.json").write_text(json.dumps({k: v for k, v in C.CLASSES.items()}, indent=1))
     rules = []   # title -> canonical key, most specific first
@@ -45,6 +48,7 @@ if __name__ == "__main__":
         m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
     for k, g in extra.items():
         m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
+    (PKG / "scheme.txt").write_text(B.R.SCHEME + "\n")
     (PKG / "palettes.json").write_text(json.dumps({k: v for k, v in B.R.PAL.items()}))
     shutil.copytree(ROOT / "install/bin", PKG / "bin"); shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
     print("package at", PKG)

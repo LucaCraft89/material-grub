@@ -3,15 +3,17 @@
 #
 #   sudo ./install.sh                 # auto-detects resolution, installs missing dependencies, builds and installs
 #   sudo ./install.sh --res 1920x1200 # force a resolution
+#   sudo ./install.sh --scheme light  # light Material 3 scheme instead of the default dark one
 #   sudo ./install.sh --uninstall
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
 #            --keep-build  keep the temporary build dir     --force  ignore the NixOS / immutable-system checks
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-RES=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
+RES=""; SCHEME=dark; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
 while [ $# -gt 0 ]; do
   case $1 in
     --res) RES=${2:?--res needs WxH}; shift;;
+    --scheme) SCHEME=${2:?--scheme needs light or dark}; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
     --no-deps) DEPS=0;; --stage-only) STAGE=1;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
     -h|--help) sed -n 2,9p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2;;
@@ -151,9 +153,10 @@ ok "build environment ready"
 
 # ---------- [4/6] render ----------
 step "Rendering the theme (the long step: about 1-3 minutes on a modern CPU, up to 6 on a slow one)"
+info "colour scheme: $SCHEME"
 info "drawing the scene set for $BUILD_RES (native 2160-high design for 4K-class screens), then its theme bundle"
 GSF_FONT=$(ls "$BUILD"/fonts/GoogleSansFlex*.ttf | head -n1); export GSF_FONT PYTHONUNBUFFERED=1
-.venv/bin/python scripts/package.py --res "$BUILD_RES" >build.log 2>&1 &
+.venv/bin/python scripts/package.py --res "$BUILD_RES" --scheme "$SCHEME" >build.log 2>&1 &
 PKGPID=$!
 sleep 3; ITEMS=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' build.log | head -n1); ITEMS=${ITEMS:-109}
 wait_job "$PKGPID" build.log "rendering scenes" "$ITEMS" || { tail -n 25 build.log >&2; die "Build failed (log above)."; }

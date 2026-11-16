@@ -12,6 +12,7 @@ state = Path(arg("--state", "/var/lib/material-grub/entries.json"))
 entries = json.loads(state.read_text()) if state.exists() else []
 classes = json.loads((pkg / "classes.json").read_text()); pal = json.loads((pkg / "palettes.json").read_text())
 titles = json.loads((pkg / "titles.json").read_text())
+LIGHT = (pkg / "scheme.txt").read_text().strip() == "light" if (pkg / "scheme.txt").exists() else False
 aspect = (theme / ".aspect").read_text().strip(); FONT = str(pkg / "fonts/GoogleSansFlex-VF.ttf")
 WIN, SYS = {"windows10", "windows11"}, {"firmware", "reboot", "shutdown"}
 bgs = sorted((pkg / "scenes" / aspect / "bg").glob("*.png"))
@@ -94,7 +95,7 @@ def draw_rail(canvas, p, groups, sel):
         if k == sel: d.rounded_rectangle([(RW - SLOT) // 2 * SS, sy * SS, ((RW + SLOT) // 2) * SS - 1, (sy + SLOT) * SS - 1], radius=u(26) * SS, fill=hexc(p["primaryContainer"]) + (255,))
     layer = layer.resize((RW, Hr), Image.LANCZOS)
     for k, sy in slots:
-        layer.alpha_composite(glyph(k, u(40), hexc(p["onPrimaryContainer"]) + (255,) if k == sel else (244, 244, 247, 235)), ((RW - u(40)) // 2, sy + (SLOT - u(40)) // 2))
+        layer.alpha_composite(glyph(k, u(40), hexc(p["onPrimaryContainer"]) + (255,) if k == sel else (hexc(p["onSurfaceVariant"]) + (255,) if LIGHT else (244, 244, 247, 235))), ((RW - u(40)) // 2, sy + (SLOT - u(40)) // 2))
     canvas.alpha_composite(layer, (LM, top))
 
 def render(e, groups):

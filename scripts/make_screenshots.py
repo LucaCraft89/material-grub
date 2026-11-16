@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Generate real GRUB screenshots (QEMU + OVMF) from the built package. Needs: dist/material-grub (scripts/package.py).
-usage: make_screenshots.py [WxH ...]   (default: 1920x1080 2560x1080)  -> docs/screenshots/"""
+usage: make_screenshots.py [WxH ...]   (default: 1920x1080 2560x1080)  -> docs/screenshots/
+       make_screenshots.py --light     (needs a package built with --scheme light) -> light-*.png"""
 import shutil, subprocess, sys
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent; PKG = ROOT / "dist/material-grub"; OUT = ROOT / "docs/screenshots"
@@ -49,7 +50,9 @@ def shoot(res, keys, names):
         subprocess.run(["magick", ROOT / f"build/tree-{i}.png", "-strip", "-define", "png:compression-level=9", OUT / f"{n}.png"], check=True)
 
 if __name__ == "__main__":
-    resl = sys.argv[1:] or ["1920x1080", "2560x1080"]
+    resl = [a for a in sys.argv[1:] if not a.startswith("--")] or ["1920x1080", "2560x1080"]
+    if "--light" in sys.argv:
+        shoot("1920x1080", ["down", "down", "down", "down"], ["light-fedora", "_adv", "light-windows", "light-arch", "_ubuntu"]); sys.exit(0)
     if "1920x1080" in resl:
         # shot 0 = initial, then one per key. "_" names are navigation steps that are not kept.
         keys = ["down", "ret", "down", "down", "esc", "down", "down", "down", "down", "down", "down"]
