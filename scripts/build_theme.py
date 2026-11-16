@@ -9,7 +9,7 @@ from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = R.ROOT
-ASPECTS = {"16x9": 1920, "16x10": 1728, "21x9": 2560}   # design width at 1080 high
+ASPECTS = {"16x9": 1920, "16x10": 1728, "21x9": 2560, "32x9": 3840}   # design width at 1080 high
 HI_FROM = 1800   # screens at least this high get a native 2160-high scene set ("<aspect>@2") instead of a 2x upscale of the 1080 one
 def aspect_for(w, h):
     base = min(ASPECTS, key=lambda k: abs(ASPECTS[k] / 1080 - w / h)); return base + "@2" if h >= HI_FROM else base
@@ -20,7 +20,11 @@ def use_set(a):   # select the scene set to render: design width (at 1080 high) 
 opt = lambda n, d=None: sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 WD = 1920  # set per aspect in scene()
 
-INK_TRACK, INK_FILL, INK_TEXT = "#49454F", "#E6E1E5", "#CAC4D0"
+LIGHT = R.SCHEME == "light"
+# theme colours are global (GRUB cannot recolour per entry), so these are neutral M3 greys chosen per scheme
+INK_TRACK, INK_FILL, INK_TEXT = ("#CAC4D0", "#49454F", "#49454F") if LIGHT else ("#49454F", "#E6E1E5", "#CAC4D0")
+SCENES = ROOT / ("build/scenes-light" if LIGHT else "build/scenes")   # separate render cache per scheme
+DESKTOP, RAWNAME = ("#F6F4F7", "#5F5B66") if LIGHT else ("#0D1411", "#6E7681")
 
 def scene(entry, hero=True):
     key = entry[0]; p = R.PAL[key]
@@ -53,14 +57,14 @@ def font(name, wght, wdth, size):
                     "-o", str(OUT / f"{name}.pf2"), str(tmp)], check=True)
 
 def ensure_bg(aspect):
-    use_set(aspect); d = ROOT / "build/scenes" / aspect / "bg"; d.mkdir(parents=True, exist_ok=True)
+    use_set(aspect); d = SCENES / aspect / "bg"; d.mkdir(parents=True, exist_ok=True)
     for e in R.ENTRIES:
         f = d / f"{e[0]}.png"
         if not f.exists() or "--rescene" in sys.argv: scene(e, hero=False).save(f, optimize=True); print("bg", aspect, e[0])
     return d
 
 def ensure_scenes(aspect, only):
-    use_set(aspect); d = ROOT / "build/scenes" / aspect / "icons"; d.mkdir(parents=True, exist_ok=True)
+    use_set(aspect); d = SCENES / aspect / "icons"; d.mkdir(parents=True, exist_ok=True)
     for e in R.ENTRIES:
         if only and e[0] not in only: continue
         f = d / f"{CLASSES[e[0]][0]}.png"
@@ -90,7 +94,7 @@ def assemble(W, H, only, pkg=None):
     FN = f"MG-Label Regular {fs}"; RN = f"MG-Raw Regular {rs}"
     (OUT / "theme.txt").write_text(f'''# Material 3 Expressive GRUB theme (generated for {W}x{H}, {aspect} scenes)
 title-text: ""
-desktop-color: "#0D1411"
+desktop-color: "{DESKTOP}"
 terminal-font: "{FN}"
 
 # raw entry name (debug/clarity): a 1-item list that only ever shows the selected entry
@@ -107,8 +111,8 @@ terminal-font: "{FN}"
   icon_height = 1
   item_font = "{RN}"
   selected_item_font = "{RN}"
-  item_color = "#6E7681"
-  selected_item_color = "#6E7681"
+  item_color = "{RAWNAME}"
+  selected_item_color = "{RAWNAME}"
   scrollbar = false
 }}
 

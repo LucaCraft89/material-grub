@@ -1,0 +1,51 @@
+name: Bug report
+description: Something looks wrong or does not boot as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! GRUB themes are hard to debug remotely, so the details below really help. Please do not post anything private.
+  - type: input
+    id: distro
+    attributes: {label: Distribution and version, placeholder: "Fedora 44 Workstation"}
+    validations: {required: true}
+  - type: input
+    id: grub
+    attributes: {label: GRUB version, description: "grub2-install --version  or  grub-install --version", placeholder: "2.12"}
+    validations: {required: true}
+  - type: input
+    id: res
+    attributes: {label: Screen resolution and GRUB_GFXMODE, placeholder: "3840x2160, GRUB_GFXMODE=3840x2160"}
+    validations: {required: true}
+  - type: dropdown
+    id: bls
+    attributes:
+      label: Does the system use BootLoaderSpec (BLS) entries?
+      description: "Fedora, RHEL and openSUSE with sdbootutil do. Check for /boot/loader/entries/*.conf"
+      options: [Yes, No, Not sure]
+    validations: {required: true}
+  - type: dropdown
+    id: boot
+    attributes:
+      label: Firmware
+      options: [UEFI, BIOS (legacy), Not sure]
+  - type: textarea
+    id: what
+    attributes: {label: What happened, description: "What did you expect, what do you see? A photo of the screen helps.", }
+    validations: {required: true}
+  - type: textarea
+    id: entries
+    attributes:
+      label: Detected entries
+      description: "Output of: sudo cat /var/lib/material-grub/entries.json"
+      render: json
+  - type: textarea
+    id: titles
+    attributes:
+      label: Entry titles as GRUB sees them
+      description: "Output of: grep -hE \"^\\s*(menuentry|submenu)\" /boot/grub*/grub.cfg; grep -h ^title /boot/loader/entries/*.conf"
+      render: shell
+  - type: input
+    id: install
+    attributes: {label: Installer command used, placeholder: "sudo ./install.sh --res 1920x1080 --scheme dark"}

@@ -1,0 +1,10 @@
+[Unit]
+Description=Re-apply Material GRUB when grub.cfg or the boot entries change (immutable system)
+[Path]
+PathChanged=/boot/grub2/grub.cfg
+PathChanged=/boot/grub/grub.cfg
+PathChanged=/boot/loader
+PathChanged=/boot/loader/entries
+PathChanged=/boot/grub2/grubenv
+[Install]
+WantedBy=multi-user.target

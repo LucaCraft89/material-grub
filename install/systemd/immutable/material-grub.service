@@ -1,0 +1,5 @@
+[Unit]
+Description=Apply Material GRUB entry classes (immutable system)
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /var/lib/material-grub/postprocess

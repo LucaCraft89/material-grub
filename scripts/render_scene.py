@@ -23,7 +23,7 @@ SC = 1  # scene scale: every design coordinate below is in 1080-high pixels and 
 def u(v): return round(v * SC)
 
 from catalog import ENTRIES, SEEDS, CLASSES
-from palettes import scheme
+from palettes import scheme, SCHEME
 PAL = {k: {"seed": v, **scheme(v)} for k, v in SEEDS.items()}
 
 IM = [shutil.which("magick")] if shutil.which("magick") else [shutil.which("convert") or "magick"]   # ImageMagick 7 / 6
