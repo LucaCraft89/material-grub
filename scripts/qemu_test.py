@@ -27,7 +27,7 @@ set theme=/boot/grub/themes/material/theme.txt
 """ + "".join(f"menuentry '{t}' --class {c.replace(' ', ' --class ')} {{ true }}\n" for t, c in entries)
 (ESP / "boot/grub/grub.cfg").write_text(cfg)
 sock = ROOT / "build/mon.sock"; sock.unlink(missing_ok=True)
-q = subprocess.Popen(["qemu-system-x86_64", "-machine", "q35", "-m", "1024", "-display", "none", "-vga", "none", "-device", f"VGA,vgamem_mb=64,xres={res.split('x')[0]},yres={res.split('x')[1]}",
+q = subprocess.Popen(["qemu-system-x86_64", "-machine", "q35", *(["-enable-kvm", "-cpu", "host"] if os.access("/dev/kvm", os.W_OK) else []), "-m", "1024", "-display", "none", "-vga", "none", "-device", f"VGA,vgamem_mb=64,xres={res.split('x')[0]},yres={res.split('x')[1]}",
     "-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/edk2/ovmf/OVMF_CODE.fd",
     "-drive", f"format=raw,file=fat:rw:{ESP}", "-monitor", f"unix:{sock},server,nowait"], stderr=subprocess.DEVNULL)
 def mon(cmd):
