@@ -28,7 +28,7 @@ sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](ht
 - **Raw entry title, always visible** (small, muted) at the bottom of the screen, so it is obvious what GRUB actually sees if parsing ever goes wrong.
 - **Case-insensitive name matching.** Entry titles are matched to a distro by name, not only by GRUB's `--class`. Unknown Linux falls back to Tux; an unknown Windows version falls back to Windows 11.
 - **Many screens, one package.** Scenes are rendered per aspect ratio (16:9, 16:10, 21:9, 32:9) and a tiny `theme.txt` is generated per resolution: 1280×720, 1920×1080, 1920×1200, 2560×1080, 2560×1440, 2880×1800, 3440×1440, 3840×1080, 3840×1600, 3840×2160, 5120×1440, 5120×2160. Screens 1800 or more pixels high (4K, 2880×1800, 5120×2160) get **native 2160-high scenes** instead of an upscaled 1080 design, so text, glyphs and the rail stay sharp.
-- **Dark (default) or light.** `sudo ./install.sh --scheme light` builds the light Material 3 Expressive scheme: neutral countdown, raw-name and progress colours, the desktop colour and the rail glyphs switch with it (contrast checked: all text at least 5:1).
+- **Dark (default) or light.** `sudo ./install.sh --scheme light` builds the light Material 3 Expressive scheme: neutral countdown, raw-name and progress colours, the desktop colour and the rail glyphs switch with it (contrast checked: all text at least 5:1; see the [gallery](#gallery)).
 - **Menu always visible.** Fedora hides the GRUB menu after a successful boot; the installer keeps it on screen.
 
 ## Gallery
@@ -48,14 +48,20 @@ sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](ht
 </tr>
 </table>
 
-Light scheme (`--scheme light`):
+Light scheme (`sudo ./install.sh --scheme light`):
 
 <table>
 <tr>
 <td><img src="docs/screenshots/light-fedora.png" alt="Fedora entry, light scheme"></td>
 <td><img src="docs/screenshots/light-windows.png" alt="Windows 11 entry, light scheme"></td>
 </tr>
+<tr>
+<td><img src="docs/screenshots/light-arch.png" alt="Arch Linux entry, light scheme"></td>
+<td><img src="docs/screenshots/light-ubuntu.png" alt="Ubuntu entry, light scheme"></td>
+</tr>
 </table>
+
+<img src="docs/screenshots/light-ultrawide-fedora.png" alt="Ultrawide 21:9 layout, light scheme" width="100%">
 
 Ultrawide (2560×1080):
 
