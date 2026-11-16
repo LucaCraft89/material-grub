@@ -19,6 +19,8 @@ def _find_font():
 FONT = _find_font()
 H = 1080
 SS = 3  # supersample for shapes
+SC = 1  # scene scale: every design coordinate below is in 1080-high pixels and goes through u() (build_theme sets SC=2 for the 2160-high sets)
+def u(v): return round(v * SC)
 
 from catalog import ENTRIES, SEEDS, CLASSES
 from palettes import scheme
@@ -112,29 +114,29 @@ def machine_logo(p, size):
 
 def panel(entry, W, ph=888, yoff=0, dyn=True, hero=True):
     key, title, sub, icon = entry; p = PAL[key]
-    pw = W - 48
-    im = fill(rrect(pw, ph, 64), p["surface"]); d = ImageDraw.Draw(im)
+    pw = W - u(48); R64 = u(64)
+    im = fill(rrect(pw, ph, R64), p["surface"]); d = ImageDraw.Draw(im)
     cx = pw // 2
     # decorative expressive shapes, clipped to panel
     deco = Image.new("RGBA", im.size, (0, 0, 0, 0))
-    paste_c(deco, fill(cookie(620), p["surfaceContainerHigh"]), cx - int(pw * .36), ph - 120)
-    paste_c(deco, fill(sunny(460), p["surfaceContainer"]), cx + int(pw * .34), ph - 60)
-    paste_c(deco, fill(clover(300), p["surfaceContainer"]), cx - int(pw * .29), 150)
-    clip = Image.new("L", im.size, 0); clip.paste(rrect(pw, ph, 64))
+    paste_c(deco, fill(cookie(u(620)), p["surfaceContainerHigh"]), cx - int(pw * .36), ph - u(120))
+    paste_c(deco, fill(sunny(u(460)), p["surfaceContainer"]), cx + int(pw * .34), ph - u(60))
+    paste_c(deco, fill(clover(u(300)), p["surfaceContainer"]), cx - int(pw * .29), u(150))
+    clip = Image.new("L", im.size, 0); clip.paste(rrect(pw, ph, R64))
     deco.putalpha(ImageChops.multiply(deco.getchannel("A"), clip))
     im.alpha_composite(deco)
     d = ImageDraw.Draw(im)
     if hero:
         # hero pill
-        pw_, ph_ = 560, 280
-        paste_c(im, fill(pill(pw_ + 40, ph_ + 40), p["surfaceContainerHigh"]), cx, 300 + yoff)
-        paste_c(im, fill(pill(pw_, ph_), p["primaryContainer"]), cx, 300 + yoff)
-        paste_c(im, tinted(icon_mask(icon, 230), p["onPrimaryContainer"]), cx, 300 + yoff)
+        pw_, ph_ = u(560), u(280)
+        paste_c(im, fill(pill(pw_ + u(40), ph_ + u(40)), p["surfaceContainerHigh"]), cx, u(300) + yoff)
+        paste_c(im, fill(pill(pw_, ph_), p["primaryContainer"]), cx, u(300) + yoff)
+        paste_c(im, tinted(icon_mask(icon, u(230)), p["onPrimaryContainer"]), cx, u(300) + yoff)
         # name + subtitle
-        tsz = 150
-        while tsz > 60 and font(tsz, 800, 135, rond=60, opsz=144).getlength(title) > pw * 0.62: tsz -= 6
-        text_c(d, (cx, 530 + yoff), title, font(tsz, 800, 135, rond=60, opsz=144), p["primary"])
-        text_c(d, (cx, 644 + yoff), sub, font(40, 420, 105), p["onSurfaceVariant"])
+        tsz = u(150)
+        while tsz > u(60) and font(tsz, 800, 135, rond=60, opsz=144).getlength(title) > pw * 0.62: tsz -= u(6)
+        text_c(d, (cx, u(530) + yoff), title, font(tsz, 800, 135, rond=60, opsz=144), p["primary"])
+        text_c(d, (cx, u(644) + yoff), sub, font(u(40), 420, 105), p["onSurfaceVariant"])
     if dyn:
         # countdown: wavy track (static preview, 62% filled)
         bw, by = 560, 695; x0 = cx - bw // 2
@@ -143,23 +145,21 @@ def panel(entry, W, ph=888, yoff=0, dyn=True, hero=True):
         d.line(pts(x0, x0 + int(bw * .62)), fill=hx(p["primary"]), width=8, joint="curve")
         d.ellipse([x0 + int(bw * .62) + 3, by - 6, x0 + int(bw * .62) + 9, by + 6], fill=hx(p["primary"]))
         text_c(d, (cx, 735), "Booting in 5s", font(24, 480, 100), p["onSurfaceVariant"])
-    # hostname chip (top-left)
-    # machine logo in flower (top-right)
-    paste_c(im, fill(cookie(230), p["primaryContainer"]), pw - 150, 140)
-    # edge chips (peek labels): top + bottom
-    c = chip(title, icon, p, h=52)
+    # machine logo in cookie (top-right)
+    paste_c(im, fill(cookie(u(230)), p["primaryContainer"]), pw - u(150), u(140))
+    c = chip(title, icon, p, h=52)    # edge label chip (mockup only)
     return im, c
 
 def key_hints(p):
     items = ["Arrows  select", "Enter  boot", "E  edit", "C  console"]
-    f = font(24, 520, 105); parts = []
+    f = font(u(24), 520, 105); parts = []; hh = u(46)
     for s in items:
-        w = int(f.getlength(s)) + 44
-        im = fill(pill(w, 46), p["surfaceContainerHigh"]); ImageDraw.Draw(im).text((w // 2, 24), s, font=f, fill=hx(p["onSurfaceVariant"]), anchor="mm")
+        w = int(f.getlength(s)) + u(44)
+        im = fill(pill(w, hh), p["surfaceContainerHigh"]); ImageDraw.Draw(im).text((w // 2, hh // 2 + u(1)), s, font=f, fill=hx(p["onSurfaceVariant"]), anchor="mm")
         parts.append(im)
-    tot = sum(i.width for i in parts) + 14 * (len(parts) - 1)
-    out = Image.new("RGBA", (tot, 46), (0, 0, 0, 0)); x = 0
-    for i in parts: out.alpha_composite(i, (x, 0)); x += i.width + 14
+    gap = u(14); tot = sum(i.width for i in parts) + gap * (len(parts) - 1)
+    out = Image.new("RGBA", (tot, hh), (0, 0, 0, 0)); x = 0
+    for i in parts: out.alpha_composite(i, (x, 0)); x += i.width + gap
     return out
 
 def mockup(W, idx):

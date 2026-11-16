@@ -4,7 +4,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import build_theme as B, catalog as C
 ROOT = B.ROOT; PKG = ROOT / "dist/material-grub"
-RES = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 3440x1440 3840x2160".split()
+RES_ALL = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 3440x1440 3840x2160".split()
+def opt(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
+# --res WxH[,WxH...] builds only those resolutions and the scene sets they need (the 2160-high sets are 4x the size of the 1080-high ones)
+RES = opt("--res", "").split(",") if opt("--res") else RES_ALL
+SETS = list(dict.fromkeys(B.aspect_for(*map(int, r.split("x"))) for r in RES))
 GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}
 
 def bundle(res):       # one resolution bundle (theme.txt, bitmap fonts, bar slices); independent per resolution
@@ -15,10 +19,10 @@ def prepare(asp):      # runs in a worker process: the three aspect-ratio scene 
 
 if __name__ == "__main__":
     from concurrent.futures import ProcessPoolExecutor
-    print(f"total {len(C.ENTRIES) * 2 * len(B.ASPECTS) + len(RES)}", flush=True)   # progress denominator for the installer
+    print(f"total {len(C.ENTRIES) * 2 * len(SETS) + len(RES)}", flush=True)   # progress denominator for the installer
     shutil.rmtree(PKG, ignore_errors=True); PKG.mkdir(parents=True)
-    with ProcessPoolExecutor(max_workers=min(len(B.ASPECTS), os.cpu_count() or 1)) as ex: list(ex.map(prepare, B.ASPECTS))
-    for asp in B.ASPECTS:
+    with ProcessPoolExecutor(max_workers=min(len(SETS), os.cpu_count() or 1)) as ex: list(ex.map(prepare, SETS))
+    for asp in SETS:
         shutil.copytree(ROOT / "build/scenes" / asp / "icons", PKG / "scenes" / asp / "icons"); shutil.copytree(ROOT / "build/scenes" / asp / "bg", PKG / "scenes" / asp / "bg")
     with ProcessPoolExecutor(max_workers=min(len(RES), os.cpu_count() or 1)) as ex: list(ex.map(bundle, RES))
     (PKG / "classes.json").write_text(json.dumps({k: v for k, v in C.CLASSES.items()}, indent=1))
@@ -38,9 +42,9 @@ if __name__ == "__main__":
     extra = {"gear": "vendor/material-symbols/settings.svg", "wrench": "vendor/material-symbols/build.svg", "kernel": "vendor/material-symbols/terminal.svg", "tag": "vendor/material-symbols/tag.svg"}
     from PIL import Image
     for k, _, _, g in C.ENTRIES:
-        m = B.R.icon_mask(g, 128); im = Image.new("RGBA", (128, 128), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
+        m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
     for k, g in extra.items():
-        m = B.R.icon_mask(g, 128); im = Image.new("RGBA", (128, 128), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
+        m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
     (PKG / "palettes.json").write_text(json.dumps({k: v for k, v in B.R.PAL.items()}))
     shutil.copytree(ROOT / "install/bin", PKG / "bin"); shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
     print("package at", PKG)

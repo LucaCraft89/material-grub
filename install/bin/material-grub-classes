@@ -101,7 +101,7 @@ if bls_confs:
                 if m: saved = m.group(1).strip(); break
             except Exception: pass
     default = next((i for i in normal if i[0].stem == saved), normal[0] if normal else None)
-    for d in ("material-top", "material-adv"): shutil.rmtree(loader / d, ignore_errors=True); (loader / d).mkdir(parents=True)
+    for d in ("material-top", "material-adv"): shutil.rmtree(loader / d, ignore_errors=True); (loader / d).mkdir(parents=True, exist_ok=True)
     def mirror(item, where, level, is_default):
         f, d = item; title = d.get("title", f.stem); key = key_of(title, [d["grub_class"]] if "grub_class" in d else [])
         kind = mgrub.kind_of(title, key); cls = mgrub.uid(level, title)

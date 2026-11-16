@@ -10,7 +10,13 @@ from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = R.ROOT
 ASPECTS = {"16x9": 1920, "16x10": 1728, "21x9": 2560}   # design width at 1080 high
-def aspect_for(w, h): return min(ASPECTS, key=lambda k: abs(ASPECTS[k] / 1080 - w / h))
+HI_FROM = 1800   # screens at least this high get a native 2160-high scene set ("<aspect>@2") instead of a 2x upscale of the 1080 one
+def aspect_for(w, h):
+    base = min(ASPECTS, key=lambda k: abs(ASPECTS[k] / 1080 - w / h)); return base + "@2" if h >= HI_FROM else base
+def set_scale(a): return 2 if a.endswith("@2") else 1
+def set_width(a): return ASPECTS[a.split("@")[0]]
+def use_set(a):   # select the scene set to render: design width (at 1080 high) and scale factor
+    global WD; WD = set_width(a); R.SC = set_scale(a); return R.SC
 opt = lambda n, d=None: sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 WD = 1920  # set per aspect in scene()
 
@@ -18,9 +24,10 @@ INK_TRACK, INK_FILL, INK_TEXT = "#49454F", "#E6E1E5", "#CAC4D0"
 
 def scene(entry, hero=True):
     key = entry[0]; p = R.PAL[key]
-    im, _ = R.panel(entry, WD + 48, ph=1080, yoff=60, dyn=False, hero=hero)     # pw == WD
-    canvas = Image.new("RGBA", (WD, 1080), R.hx(p["surface"]) + (255,)); canvas.alpha_composite(im)
-    hint = R.key_hints(p); canvas.alpha_composite(hint, ((WD - hint.width) // 2, 1080 - 120))
+    s = R.SC; Wp, Hp = WD * s, 1080 * s
+    im, _ = R.panel(entry, Wp + R.u(48), ph=Hp, yoff=R.u(60), dyn=False, hero=hero)     # pw == Wp
+    canvas = Image.new("RGBA", (Wp, Hp), R.hx(p["surface"]) + (255,)); canvas.alpha_composite(im)
+    hint = R.key_hints(p); canvas.alpha_composite(hint, ((Wp - hint.width) // 2, Hp - R.u(120)))
     return canvas.convert("RGB")
 
 OUT = None
@@ -46,16 +53,14 @@ def font(name, wght, wdth, size):
                     "-o", str(OUT / f"{name}.pf2"), str(tmp)], check=True)
 
 def ensure_bg(aspect):
-    global WD
-    WD = ASPECTS[aspect]; d = ROOT / "build/scenes" / aspect / "bg"; d.mkdir(parents=True, exist_ok=True)
+    use_set(aspect); d = ROOT / "build/scenes" / aspect / "bg"; d.mkdir(parents=True, exist_ok=True)
     for e in R.ENTRIES:
         f = d / f"{e[0]}.png"
         if not f.exists() or "--rescene" in sys.argv: scene(e, hero=False).save(f, optimize=True); print("bg", aspect, e[0])
     return d
 
 def ensure_scenes(aspect, only):
-    global WD
-    WD = ASPECTS[aspect]; d = ROOT / "build/scenes" / aspect / "icons"; d.mkdir(parents=True, exist_ok=True)
+    use_set(aspect); d = ROOT / "build/scenes" / aspect / "icons"; d.mkdir(parents=True, exist_ok=True)
     for e in R.ENTRIES:
         if only and e[0] not in only: continue
         f = d / f"{CLASSES[e[0]][0]}.png"
@@ -67,7 +72,7 @@ def assemble(W, H, only, pkg=None):
     aspect = aspect_for(W, H); src = ensure_scenes(aspect, only)
     OUT = (pkg / "res" / f"{W}x{H}") if pkg else ROOT / f"theme-{W}x{H}"
     shutil.rmtree(OUT, ignore_errors=True); OUT.mkdir(parents=True)
-    SF = H / 1080; WDs = ASPECTS[aspect]
+    SF = H / 1080; WDs = set_width(aspect)
     if not pkg:
         (OUT / "icons").mkdir()
         for e in R.ENTRIES:
