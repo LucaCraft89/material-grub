@@ -1,0 +1,26 @@
+name: Distro or colour request
+description: A distro shows the wrong icon, or you want a different seed colour
+labels: [distro]
+body:
+  - type: input
+    id: name
+    attributes: {label: Distro name, placeholder: "CachyOS"}
+    validations: {required: true}
+  - type: input
+    id: title
+    attributes:
+      label: Entry title shown by GRUB
+      description: "grep -hE \"^\\s*(menuentry|submenu)\" /boot/grub*/grub.cfg   or   grep ^title /boot/loader/entries/*.conf"
+    validations: {required: true}
+  - type: input
+    id: cls
+    attributes: {label: "--class values (if any) or ID= from /etc/os-release"}
+  - type: input
+    id: colour
+    attributes: {label: Suggested seed colour (hex), description: "Brand primary colour, with a link to its source if possible", placeholder: "#2BB5A0"}
+  - type: input
+    id: logo
+    attributes: {label: Logo (link to an SVG and its licence)}
+  - type: markdown
+    attributes:
+      value: "Prefer to do it yourself? See [docs/adding-a-distro.md](../blob/main/docs/adding-a-distro.md); it is one row in `scripts/catalog.py`."

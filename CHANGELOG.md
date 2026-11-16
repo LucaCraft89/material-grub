@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Contributor docs: `docs/adding-a-distro.md`, issue templates (bug report, distro request) and a PR template.
 - Light scheme: `sudo ./install.sh --scheme light` (`package.py --scheme light`, `make package SCHEME=light`). Dark remains the default. Separate render cache (`build/scenes-light`).
 - Native 2160-high scene sets (`16x9@2`, `16x10@2`, `21x9@2`) for screens 1800+ px high instead of a 2x upscale; every hero/pill/rail coordinate scales with scene height. Glyph masks are rendered at 512 px.
 - New resolutions: 2880x1800, 3840x1600, 5120x2160 and a 32:9 scene set (3840x1080, 5120x1440).

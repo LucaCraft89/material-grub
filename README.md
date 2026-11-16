@@ -168,7 +168,7 @@ files are never edited. **Fedora 44 is the primary target; other distros have no
 ## Customising
 
 - **Seed colours, names, aliases:** `scripts/catalog.py` is the single source of truth. Colours marked `proposed` are hand-picked, not official, and are happy to be changed (open a PR). Rebuild with `make package`.
-- **Add a distro:** add a row to `catalog.py` (key, title, subtitle, glyph, seed colour, aliases). Glyphs come from `vendor/font-logos` or any SVG. Unknown distros already fall back to Tux.
+- **Add a distro:** add a row to `catalog.py` (key, title, subtitle, glyph, seed colour, aliases); the full guide is [docs/adding-a-distro.md](docs/adding-a-distro.md). Unknown distros already fall back to Tux.
 - **Layout and shapes:** `scripts/render_scene.py` (background scene) and `install/bin/material-grub-scenes` (hero, pills, rail, drawn at config time).
 
 ## Development
@@ -179,6 +179,10 @@ make screenshots          # QEMU + OVMF run, writes docs/screenshots/
 ```
 
 Nothing in development touches your real bootloader; `scripts/make_screenshots.py` builds a throw-away ESP tree.
+
+## Contributing
+
+Bug reports and distro requests have issue templates (they ask for distro, GRUB version, resolution, BLS and `entries.json`), and PRs have a template with a test checklist. See [docs/adding-a-distro.md](docs/adding-a-distro.md) to add or fix a distro.
 
 ## Status
 
