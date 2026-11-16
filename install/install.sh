@@ -11,6 +11,12 @@ chmod +x "$D/usr/share/material-grub/bin/"*
 install -m755 "$HERE/postprocess.sh" "$D/usr/libexec/material-grub-postprocess"
 install -m755 "$HERE/05_material" "$D/etc/grub.d/05_material"
 install -m644 "$HERE"/systemd/material-grub.* "$D/etc/systemd/system/"
+if [ -z "$D" ]; then
+  B=/var/backups/material-grub; mkdir -p "$B"
+  [ -f "$B/default-grub.orig" ] || cp -a /etc/default/grub "$B/default-grub.orig"
+  for f in /boot/grub2/grub.cfg /boot/grub/grub.cfg; do [ -f "$f" ] && [ ! -f "$B/$(echo $f | tr / _).orig" ] && cp -a "$f" "$B/$(echo $f | tr / _).orig"; done
+  echo "backups in $B"
+fi
 if [ -n "$RES" ] && [ -z "$D" ]; then
   if grep -q '^GRUB_GFXMODE=' /etc/default/grub; then sed -i "s/^GRUB_GFXMODE=.*/GRUB_GFXMODE=$RES/" /etc/default/grub; else echo "GRUB_GFXMODE=$RES" >> /etc/default/grub; fi
 fi
