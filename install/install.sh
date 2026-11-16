@@ -10,6 +10,7 @@ cp -a "$PKG/." "$D/usr/share/material-grub/"
 chmod +x "$D/usr/share/material-grub/bin/"*
 install -m755 "$HERE/postprocess.sh" "$D/usr/libexec/material-grub-postprocess"
 install -m755 "$HERE/05_material" "$D/etc/grub.d/05_material"
+install -m755 "$HERE/15_material_menu" "$D/etc/grub.d/15_material_menu"
 install -m644 "$HERE"/systemd/material-grub.* "$D/etc/systemd/system/"
 if [ -z "$D" ]; then
   B=/var/backups/material-grub; mkdir -p "$B"
@@ -21,6 +22,7 @@ if [ -n "$RES" ] && [ -z "$D" ]; then
   if grep -q '^GRUB_GFXMODE=' /etc/default/grub; then sed -i "s/^GRUB_GFXMODE=.*/GRUB_GFXMODE=$RES/" /etc/default/grub; else echo "GRUB_GFXMODE=$RES" >> /etc/default/grub; fi
 fi
 if [ -z "$D" ] && [ $RUN = 1 ]; then
+  command -v grub2-editenv >/dev/null && grub2-editenv - unset menu_auto_hide || true
   systemctl daemon-reload; systemctl enable --now material-grub.path
   if command -v grub2-mkconfig >/dev/null; then grub2-mkconfig -o /boot/grub2/grub.cfg; else grub-mkconfig -o /boot/grub/grub.cfg; fi
   /usr/libexec/material-grub-postprocess

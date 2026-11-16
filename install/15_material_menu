@@ -1,0 +1,8 @@
+#!/bin/sh
+# /etc/grub.d/15_material_menu — always show the menu (Fedora's 12_menu_auto_hide would hide it).
+cat << EOF
+# --- Material GRUB: keep the menu visible ---
+set timeout_style=menu
+set timeout=${GRUB_TIMEOUT:-5}
+unset menu_hide_ok
+EOF
