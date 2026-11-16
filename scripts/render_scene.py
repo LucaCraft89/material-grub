@@ -1,5 +1,5 @@
 """Render M3-Expressive boot panels + a stacked mockup. usage: render_scene.py WIDTH [entry]"""
-import json, math, socket, subprocess, sys
+import json, math, os, shutil, socket, subprocess, sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageFilter
 
@@ -8,14 +8,14 @@ def _find_font():
     """Google Sans Flex variable font: $GSF_FONT, else common locations, else fontconfig."""
     import glob, os
     if os.environ.get("GSF_FONT"): return os.environ["GSF_FONT"]
-    for pat in ("~/.local/share/fonts/**/GoogleSansFlex*.ttf", "~/.fonts/**/GoogleSansFlex*.ttf", "/usr/share/fonts/**/GoogleSansFlex*.ttf", str(ROOT / "fonts/GoogleSansFlex*.ttf")):
+    for pat in (str(ROOT / "fonts/GoogleSansFlex*.ttf"), "~/.local/share/fonts/**/GoogleSansFlex*.ttf", "~/.fonts/**/GoogleSansFlex*.ttf", "/usr/share/fonts/**/GoogleSansFlex*.ttf"):
         hits = sorted(glob.glob(os.path.expanduser(pat), recursive=True))
         if hits: return hits[0]
     try:
         out = subprocess.run(["fc-match", "-f", "%{file}", "Google Sans Flex"], capture_output=True, text=True).stdout
         if "GoogleSansFlex" in out: return out
     except Exception: pass
-    raise SystemExit("Google Sans Flex not found. Download it from Google Fonts and set GSF_FONT=/path/to/GoogleSansFlex-VariableFont_*.ttf")
+    raise SystemExit("Google Sans Flex not found (expected in fonts/). Set GSF_FONT=/path/to/GoogleSansFlex-VariableFont_*.ttf")
 FONT = _find_font()
 H = 1080
 SS = 3  # supersample for shapes
@@ -24,22 +24,36 @@ from catalog import ENTRIES, SEEDS, CLASSES
 from palettes import scheme
 PAL = {k: {"seed": v, **scheme(v)} for k, v in SEEDS.items()}
 
+IM = [shutil.which("magick")] if shutil.which("magick") else [shutil.which("convert") or "magick"]   # ImageMagick 7 / 6
+
 def font(size, wght=400, wdth=100, rond=0, opsz=None):
     f = ImageFont.truetype(FONT, size)
-    f.set_variation_by_axes([opsz or min(144, max(6, size * 0.75)), wdth, wght, 0, rond, 0])
-    return f
+    want = {"optical": opsz or size * 0.75, "width": wdth, "weight": wght, "roundness": rond, "grade": 0, "slant": 0}
+    vals = []
+    for ax in f.get_variation_axes():       # look axes up by name: robust across font versions (GRAD was removed in v5)
+        n = ax["name"].decode() if isinstance(ax["name"], bytes) else ax["name"]
+        v = next((want[k] for k in want if k in n.lower()), ax["default"])
+        vals.append(min(max(v, ax["minimum"]), ax["maximum"]))
+    f.set_variation_by_axes(vals); return f
 
 def hx(c): return tuple(int(c[i:i+2], 16) for i in (1, 3, 5))
 
 _icon_cache = {}
 def icon_mask(path, size):
+    """Rasterize an SVG glyph to a size x size alpha mask (rsvg-convert preferred; ImageMagick as a fallback)."""
     k = (path, size)
     if k not in _icon_cache:
-        out = ROOT / "build/_icon.png"
-        subprocess.run(["magick", "-background", "none", "-density", "600", str(ROOT / path),
-                        "-resize", f"{size}x{size}", "-gravity", "center", "-extent", f"{size}x{size}",
-                        "PNG32:" + str(out)], check=True)
-        _icon_cache[k] = Image.open(out).convert("RGBA").getchannel("A")
+        out = ROOT / f"build/_icon_{os.getpid()}.png"; out.parent.mkdir(exist_ok=True)
+        rsvg = shutil.which("rsvg-convert")
+        if rsvg:
+            subprocess.run([rsvg, "-a", "-w", str(size), "-h", str(size), "-o", str(out), str(ROOT / path)], check=True)
+            im = Image.open(out).convert("RGBA"); canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+            canvas.alpha_composite(im, ((size - im.width) // 2, (size - im.height) // 2)); mask = canvas.getchannel("A")
+        else:
+            subprocess.run(IM + ["-background", "none", "-density", "600", str(ROOT / path), "-resize", f"{size}x{size}",
+                                 "-gravity", "center", "-extent", f"{size}x{size}", "PNG32:" + str(out)], check=True)
+            mask = Image.open(out).convert("RGBA").getchannel("A")
+        _icon_cache[k] = mask
     return _icon_cache[k]
 
 def tinted(mask, color):

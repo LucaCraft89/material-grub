@@ -19,8 +19,8 @@ insmod gfxterm
 insmod gfxmenu
 insmod png
 terminal_output gfxterm
-loadfont (\$root)$REL/GSF-Label.pf2
-loadfont (\$root)$REL/GSF-Raw.pf2
+loadfont (\$root)$REL/MG-Label.pf2
+loadfont (\$root)$REL/MG-Raw.pf2
 set theme=(\$root)$REL/theme.txt
 export theme
 EOF

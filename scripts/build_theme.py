@@ -1,5 +1,5 @@
 """Build the GRUB theme. usage: build_theme.py [WIDTH HEIGHT] [--peek-test]"""
-import subprocess, sys, shutil
+import os, subprocess, sys, shutil
 from pathlib import Path
 from PIL import Image, ImageDraw
 sys.path.insert(0, str(Path(__file__).parent))
@@ -37,9 +37,10 @@ def pill_slices(prefix, h, w=64, color="#FFFFFF"):
             im.crop((x0, y0, x1, y1)).save(OUT / f"{prefix}_{names[j][i]}.png")
 
 def font(name, wght, wdth, size):
-    tmp = ROOT / "build/_inst.ttf"
+    tmp = ROOT / f"build/_inst_{os.getpid()}.ttf"
     f = TTFont(R.FONT)
-    f = instantiateVariableFont(f, {"wght": wght, "wdth": wdth, "opsz": min(144, size), "GRAD": 0, "ROND": 0, "slnt": 0})
+    axes = {"wght": wght, "wdth": wdth, "opsz": min(144, size), "GRAD": 0, "ROND": 0, "slnt": 0}
+    f = instantiateVariableFont(f, {k: x for k, x in axes.items() if k in {a.axisTag for a in f["fvar"].axes}})
     f.save(tmp)
     subprocess.run([shutil.which("grub2-mkfont") or shutil.which("grub-mkfont") or "grub2-mkfont", "-s", str(size), "-n", name, "-r", "0x20-0x7e,0xa0-0x17f,0x2013-0x2026",
                     "-o", str(OUT / f"{name}.pf2"), str(tmp)], check=True)
@@ -75,13 +76,13 @@ def assemble(W, H, only, pkg=None):
             for c in CLASSES[e[0]]: shutil.copy(f, OUT / "icons" / f"{c}.png")
     globals()["OUT"] = OUT
     bh = max(8, round(14 * SF)); pill_slices("bar", bh, color=INK_TRACK); pill_slices("hl", bh, color=INK_FILL)
-    fs = round(26 * SF); font("GSF-Label", 520, 105, fs); rs = max(12, round(20 * SF)); font("GSF-Raw", 450, 100, rs)
+    fs = round(26 * SF); font("MG-Label", 520, 105, fs); rs = max(12, round(20 * SF)); font("MG-Raw", 450, 100, rs)
     px = lambda v: round(v * SF)
     if pkg: (OUT / "logo_size").write_text(str(px(120))); (OUT / "aspect").write_text(aspect)
     else: subprocess.run(["python3", str(Path(__file__).parent / "bgrt-logo.py"), str(OUT / "machine-logo.png"), "--size", str(px(120))], check=True)
     cxp = px(WDs / 2); barw = px(560); logo = px(120)
     lx = px(WDs - 150) - logo // 2; ly = px(140) - logo // 2
-    FN = f"GSF-Label Regular {fs}"; RN = f"GSF-Raw Regular {rs}"
+    FN = f"MG-Label Regular {fs}"; RN = f"MG-Raw Regular {rs}"
     (OUT / "theme.txt").write_text(f'''# Material 3 Expressive GRUB theme (generated for {W}x{H}, {aspect} scenes)
 title-text: ""
 desktop-color: "#0D1411"

@@ -1,0 +1,166 @@
+#!/bin/sh
+# Material GRUB: one-command installer for Linux (Fedora/RHEL, Debian/Ubuntu, Arch, openSUSE, Alpine, Void).
+#
+#   sudo ./install.sh                 # auto-detects resolution, installs missing dependencies, builds and installs
+#   sudo ./install.sh --res 1920x1200 # force a resolution
+#   sudo ./install.sh --uninstall
+#   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
+#            --keep-build  keep the temporary build dir     --force  ignore the NixOS / immutable-system checks
+set -eu
+HERE=$(cd "$(dirname "$0")" && pwd)
+RES=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
+while [ $# -gt 0 ]; do
+  case $1 in
+    --res) RES=${2:?--res needs WxH}; shift;;
+    --no-deps) DEPS=0;; --stage-only) STAGE=1;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
+    -h|--help) sed -n 2,9p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    *) echo "unknown option: $1 (try --help)" >&2; exit 2;;
+  esac; shift
+done
+
+# ---------- output helpers ----------
+T0=$(date +%s); TOTAL=6; N=0
+if [ -t 1 ]; then TTY=1; B='\033[1m'; D='\033[2m'; M='\033[1;35m'; Y='\033[1;33m'; RD='\033[1;31m'; G='\033[1;32m'; Z='\033[0m'
+else TTY=0; B=''; D=''; M=''; Y=''; RD=''; G=''; Z=''; fi
+elapsed() { s=$(( $(date +%s) - T0 )); printf '%dm%02ds' $((s / 60)) $((s % 60)); }
+step() { N=$((N + 1)); printf "\n${M}[%d/%d]${Z} ${B}%s${Z}  ${D}(total elapsed %s)${Z}\n" "$N" "$TOTAL" "$*" "$(elapsed)"; }
+info() { printf '      %s\n' "$*"; }
+ok()   { printf "      ${G}ok${Z} %s\n" "$*"; }
+warn() { printf "${Y}warning:${Z} %s\n" "$*" >&2; }
+die()  { printf "${RD}error:${Z} %s\n" "$*" >&2; exit 1; }
+
+# Wait for a background job, printing a heartbeat so the terminal never looks frozen.
+# usage: wait_job PID LOGFILE LABEL [TOTAL_ITEMS]   (items are counted from "scene|bg|theme at" log lines)
+wait_job() {
+  _pid=$1; _log=$2; _label=$3; _total=${4:-0}; _start=$(date +%s); _last=0
+  while kill -0 "$_pid" 2>/dev/null; do
+    _now=$(date +%s); _e=$((_now - _start))
+    if [ "$_total" -gt 0 ]; then
+      _n=$(grep -c -E '^(scene|bg|theme at) ' "$_log" 2>/dev/null || true); _n=${_n:-0}
+      _p=$((_n * 100 / _total)); [ "$_p" -gt 99 ] && _p=99
+      _msg=$(printf '%s: %d/%d (%d%%)  %dm%02ds elapsed' "$_label" "$_n" "$_total" "$_p" $((_e / 60)) $((_e % 60)))
+    else
+      _msg=$(printf '%s ... %dm%02ds elapsed' "$_label" $((_e / 60)) $((_e % 60)))
+    fi
+    if [ "$TTY" = 1 ]; then printf '\r      %s   ' "$_msg"
+    elif [ $((_now - _last)) -ge 10 ]; then printf '      %s\n' "$_msg"; _last=$_now; fi
+    sleep 2
+  done
+  [ "$TTY" = 1 ] && printf '\r%*s\r' 78 ''
+  if wait "$_pid"; then return 0; else return 1; fi
+}
+
+printf "\n${B}Material GRUB installer${Z}\n"
+
+# ---------- [1/6] checks ----------
+step "Checking the system"
+if [ "$(id -u)" -ne 0 ]; then
+  if [ "$STAGE" = 1 ]; then DEPS=0; warn "not running as root: skipping dependency installation (--stage-only)"
+  else
+    echo "Material GRUB changes system files (/etc/grub.d, /boot) and may install packages."
+    echo "Please run the installer with sudo:"
+    echo
+    echo "    sudo ./install.sh${RES:+ --res $RES}"
+    exit 1
+  fi
+fi
+[ "$UNINSTALL" = 1 ] && exec sh "$HERE/install/uninstall.sh"
+[ -e /etc/NIXOS ] && [ "$FORCE" = 0 ] && die "NixOS manages GRUB declaratively; this installer does not support it."
+if [ -e /run/ostree-booted ] && [ "$FORCE" = 0 ]; then
+  die "Immutable (ostree) system detected: /usr is read-only, so the hook cannot be installed. Use --force to try anyway."
+fi
+PM=""
+for p in dnf apt-get pacman zypper apk xbps-install; do command -v "$p" >/dev/null 2>&1 && { PM=$p; break; }; done
+[ -f /etc/os-release ] && info "distribution: $(. /etc/os-release; echo "${PRETTY_NAME:-$NAME}")  |  package manager: ${PM:-none found}"
+info "free space in /var/tmp: $(df -h /var/tmp | awk 'NR==2{print $4}')   (the build needs about 300 MB, removed afterwards)"
+
+# ---------- [2/6] dependencies ----------
+step "Checking dependencies"
+missing() {   # prints what is missing
+  command -v grub2-mkfont >/dev/null 2>&1 || command -v grub-mkfont >/dev/null 2>&1 || printf 'grub-mkfont '
+  command -v grub2-mkconfig >/dev/null 2>&1 || command -v grub-mkconfig >/dev/null 2>&1 || printf 'grub-mkconfig '
+  command -v rsvg-convert >/dev/null 2>&1 || printf 'rsvg-convert '
+  command -v python3 >/dev/null 2>&1 || { printf 'python3 '; return; }
+  python3 -c "import venv, ensurepip" 2>/dev/null || printf 'python3-venv '
+  python3 -c "import PIL" 2>/dev/null || printf 'python3-pillow '
+}
+install_deps() {
+  case $PM in
+    dnf)          dnf install -y grub2-tools grub2-tools-extra librsvg2-tools python3 python3-pip python3-pillow ;;
+    apt-get)      apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y grub-common librsvg2-bin python3 python3-venv python3-pip python3-pil ;;
+    pacman)       pacman -Syu --needed --noconfirm grub librsvg python python-pip python-pillow ;;
+    zypper)       zypper --non-interactive install grub2 rsvg-convert python3 python3-pip python3-Pillow ;;
+    apk)          apk add grub grub-mkfont rsvg-convert python3 py3-pip py3-pillow ;;
+    xbps-install) xbps-install -Sy grub librsvg-utils python3 python3-pip python3-Pillow ;;
+    *) return 1 ;;
+  esac
+}
+MISS=$(missing)
+if [ -z "$MISS" ]; then ok "everything is already installed (the package manager will not be touched)"
+elif [ "$DEPS" = 0 ]; then die "missing: $MISS (drop --no-deps to let the installer install them)"
+else
+  [ -n "$PM" ] || die "missing: $MISS, and no supported package manager was found (dnf, apt, pacman, zypper, apk, xbps)."
+  info "missing: $MISS"
+  info "installing with $PM (its own output follows; this can take a minute) ..."
+  install_deps || die "Dependency installation failed."
+  MISS=$(missing); [ -z "$MISS" ] || die "still missing after installation: $MISS"
+  ok "dependencies installed"
+fi
+GRUB_MKFONT=$(command -v grub2-mkfont || command -v grub-mkfont); GRUB_MKCONFIG=$(command -v grub2-mkconfig || command -v grub-mkconfig)
+[ -f "$HERE/fonts/OFL.txt" ] && ls "$HERE"/fonts/GoogleSansFlex*.ttf >/dev/null 2>&1 || die "fonts/ is incomplete (Google Sans Flex missing)."
+ok "tools: $(basename "$GRUB_MKFONT"), $(basename "$GRUB_MKCONFIG"), rsvg-convert, python3 $(python3 -c 'import sys;print("%d.%d"%sys.version_info[:2])')"
+
+# ---------- resolution ----------
+detect_res() {
+  if [ -f /etc/default/grub ]; then
+    m=$(sed -n 's/^GRUB_GFXMODE=\([0-9]\{3,5\}x[0-9]\{3,5\}\).*/\1/p' /etc/default/grub | head -n1)
+    [ -n "$m" ] && { echo "$m"; return; }
+  fi
+  for s in /sys/class/drm/card*-eDP*/status /sys/class/drm/card*-*/status; do
+    [ -f "$s" ] && [ "$(cat "$s" 2>/dev/null)" = connected ] || continue
+    m=$(head -n1 "$(dirname "$s")/modes" 2>/dev/null); [ -n "$m" ] && { echo "$m"; return; }
+  done
+  echo 1920x1080
+}
+if [ -n "$RES" ]; then info "resolution: $RES (from --res)"; else RES=$(detect_res); info "resolution: $RES (auto-detected)"; fi
+info "supported: 1280x720 1920x1080 1920x1200 2560x1080 2560x1440 3440x1440 3840x2160 (others snap to the closest aspect ratio)"
+
+# ---------- [3/6] build environment ----------
+step "Preparing the build environment"
+BUILD=$(mktemp -d /var/tmp/material-grub-build.XXXXXX)
+cleanup() { [ "$KEEP" = 1 ] && info "build directory kept: $BUILD" || rm -rf "$BUILD"; }
+trap cleanup EXIT
+info "build directory: $BUILD (your clone stays untouched)"
+for d in scripts install vendor fonts; do cp -a "$HERE/$d" "$BUILD/"; done
+cp "$HERE/requirements.txt" "$BUILD/"; cd "$BUILD"
+info "creating a Python virtual environment"
+python3 -m venv --system-site-packages .venv 2>/dev/null || python3 -m venv .venv || die "python3 venv module missing."
+info "installing Python build requirements (fonttools, materialyoucolor); needs network access"
+.venv/bin/pip install --disable-pip-version-check -r requirements.txt >pip.log 2>&1 &
+wait_job $! pip.log "downloading Python packages" 0 || { tail -n 15 pip.log >&2; die "pip failed (network needed)."; }
+ok "build environment ready"
+
+# ---------- [4/6] render ----------
+step "Rendering the theme (the long step: about 1-3 minutes on a modern CPU, up to 6 on a slow one)"
+info "drawing 3 aspect-ratio scene sets in parallel, then one bundle per resolution"
+GSF_FONT=$(ls "$BUILD"/fonts/GoogleSansFlex*.ttf | head -n1); export GSF_FONT PYTHONUNBUFFERED=1
+.venv/bin/python scripts/package.py >build.log 2>&1 &
+PKGPID=$!
+sleep 3; ITEMS=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' build.log | head -n1); ITEMS=${ITEMS:-331}
+wait_job "$PKGPID" build.log "rendering scenes" "$ITEMS" || { tail -n 25 build.log >&2; die "Build failed (log above)."; }
+[ -d dist/material-grub ] || die "Build produced no package."
+ok "rendered $(find dist/material-grub/scenes -name '*.png' | wc -l) scene images and $(ls dist/material-grub/res | wc -l) resolution bundles in $(elapsed)"
+
+if [ "$STAGE" = 1 ]; then KEEP=1; step "Stage-only: stopping before GRUB is touched"; ok "package built at $BUILD/dist/material-grub"; exit 0; fi
+
+# ---------- [5/6] install ----------
+step "Installing into GRUB"
+sh install/install.sh --res "$RES" --pkg "$BUILD/dist/material-grub"
+
+# ---------- [6/6] done ----------
+step "Finished"
+printf "      ${G}Material GRUB is installed.${Z} Total time: %s\n\n" "$(elapsed)"
+echo "      Reboot to see it. The theme re-applies itself when kernels or boot entries change."
+echo "      resolution : $RES            theme : $(ls -d /boot/grub2/themes/material /boot/grub/themes/material 2>/dev/null | head -n1)"
+echo "      backups    : /var/backups/material-grub"
+echo "      uninstall  : sudo ./install.sh --uninstall"

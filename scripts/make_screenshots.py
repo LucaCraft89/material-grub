@@ -14,8 +14,8 @@ insmod gfxterm
 insmod gfxmenu
 insmod png
 terminal_output gfxterm
-loadfont /boot/grub/themes/material/GSF-Label.pf2
-loadfont /boot/grub/themes/material/GSF-Raw.pf2
+loadfont /boot/grub/themes/material/MG-Label.pf2
+loadfont /boot/grub/themes/material/MG-Raw.pf2
 set theme=/boot/grub/themes/material/theme.txt
 insmod blscfg
 blscfg

@@ -85,68 +85,64 @@ whole scene. Selection changes swap the scene, which gives the whole-screen colo
 | Reading the UEFI logo live at boot | GRUB has no BGRT reader; it is converted whenever the config is regenerated. |
 | One `theme.txt` for every resolution | Sizes are in pixels; a bundle per resolution is generated, GRUB scales the scenes. |
 
-## Requirements
-
-- Linux with **GRUB 2.12** (the version it was tested with), UEFI recommended. `/boot` must be readable by GRUB (ext4/xfs/btrfs/FAT).
-- Build machine: `python3` (with `venv`), **ImageMagick** (`magick`), `grub-mkfont` / `grub2-mkfont`, the Google Sans Flex font.
-- Target machine at runtime: `python3` + **Pillow**, `grub-mkconfig` / `grub2-mkconfig`. Without Pillow the theme still works but without per-entry pills and the rail.
-- Optional, for screenshots/tests: `qemu-system-x86_64` and OVMF (`edk2-ovmf`).
-
-| Distro | Packages |
-|---|---|
-| Fedora | `sudo dnf install grub2-tools ImageMagick python3 python3-pillow` |
-| Debian / Ubuntu | `sudo apt install grub-common imagemagick python3 python3-venv python3-pil` |
-| Arch | `sudo pacman -S grub imagemagick python python-pillow` |
-
 ## Install
 
-> ⚠️ This modifies your bootloader configuration. The installer backs up `/etc/default/grub` and `grub.cfg`
-> to `/var/backups/material-grub`, and `install/uninstall.sh` reverts everything. Know how to boot a live USB
-> before you try it on your only machine.
-
-**1. Get the sources**
+One command. The installer detects your distro, **installs every dependency**, builds the theme in a temporary
+directory, picks your screen resolution and installs it. It needs root, so run it with `sudo`:
 
 ```sh
 git clone https://github.com/LucaCraft89/material-grub.git
 cd material-grub
+sudo ./install.sh
 ```
 
-**2. Get the font.** Download *Google Sans Flex* from [Google Fonts](https://fonts.google.com/specimen/Google+Sans+Flex)
-(*Get font → Download all*, SIL OFL 1.1) and install the variable `.ttf` where the build can find it, either:
+Then reboot. That's it.
+
+> ⚠️ This modifies your bootloader configuration. The installer backs up `/etc/default/grub` and `grub.cfg` to
+> `/var/backups/material-grub`, and `sudo ./install.sh --uninstall` reverts everything. Know how to boot a live USB
+> before you try it on your only machine.
+
+**What it does** (it prints numbered steps and a live progress counter, so you can always see it is working; a full run takes about 2 to 4 minutes)
+
+1. Installs dependencies with your package manager: GRUB tools (`mkconfig`, `mkfont`), librsvg (`rsvg-convert`), Python 3 with `venv` and `pip`,
+   and Pillow. Supported: `dnf` (Fedora, RHEL family), `apt` (Debian, Ubuntu, Mint, Pop!_OS), `pacman` (Arch family),
+   `zypper` (openSUSE), `apk` (Alpine), `xbps` (Void). Python build requirements (`fonttools`, `materialyoucolor`) go into a throw-away virtualenv.
+2. Renders the scenes (a few minutes) into `/var/tmp`, leaving the cloned repository untouched.
+3. Auto-detects the resolution (existing `GRUB_GFXMODE`, otherwise your panel's preferred mode) and sets `GRUB_GFXMODE`.
+4. Installs the package to `/usr/share/material-grub`, the hooks to `/etc/grub.d/` (`05_material`, `15_material_menu`,
+   `90_material_system`) and a systemd path unit that re-applies everything when `grub.cfg`, `/boot/loader/entries` or
+   `grubenv` change, then regenerates `grub.cfg`.
+
+**Options**
 
 ```sh
-mkdir -p ~/.local/share/fonts && cp GoogleSansFlex-VariableFont_*.ttf ~/.local/share/fonts/
-# or point at it explicitly:
-export GSF_FONT=/path/to/GoogleSansFlex-VariableFont_GRAD,ROND,opsz,slnt,wdth,wght.ttf
+sudo ./install.sh --res 1920x1200   # force a resolution instead of auto-detecting
+sudo ./install.sh --no-deps         # you installed the dependencies yourself
+sudo ./install.sh --stage-only      # install deps and build, but do not touch GRUB
+sudo ./install.sh --keep-build      # keep the temporary build directory
+sudo ./install.sh --uninstall       # remove the theme and hooks
 ```
-
-**3. Build the package** (renders a few hundred scene images; takes a few minutes):
-
-```sh
-make venv
-make package
-```
-
-**4. Install** for your screen's resolution (pick one from the supported list below):
-
-```sh
-make install RES=1920x1200
-# equivalent: sudo sh install/install.sh --res 1920x1200
-```
-
-This installs the package to `/usr/share/material-grub`, the hooks to `/etc/grub.d/`
-(`05_material`, `15_material_menu`, `90_material_system`), a systemd path unit that re-applies everything when
-`grub.cfg`, `/boot/loader/entries` or `grubenv` change, sets `GRUB_GFXMODE`, and regenerates `grub.cfg`.
-
-**5. Reboot.** The menu is forced visible (Fedora normally hides it after a successful boot).
 
 **Supported resolutions:** `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `3440x1440`, `3840x2160`.
-Anything else snaps to the closest aspect ratio. The aspect-ratio scene sets are 16:9, 16:10 and 21:9.
+Anything else snaps to the closest aspect ratio. The scene sets are 16:9, 16:10 and 21:9.
 
-**Update:** `git pull && make package && sudo sh install/install.sh --res <your resolution>`
+**Update:** `git pull && sudo ./install.sh`  **Uninstall:** `sudo ./install.sh --uninstall`. To restore the original
+GRUB files, copy them back from `/var/backups/material-grub`.
 
-**Uninstall:** `make uninstall` (or `sudo sh install/uninstall.sh`). To restore the original GRUB files, copy them
-back from `/var/backups/material-grub`.
+**Not supported:** NixOS (declarative GRUB) and immutable/ostree systems such as Silverblue or Bazzite, where `/usr` is read-only
+(`--force` tries anyway). Systems without systemd work, but you must re-run the installer after kernel changes.
+
+<details>
+<summary>Manual install for developers (make targets)</summary>
+
+```sh
+make venv        # virtualenv with the build requirements
+make package     # render scenes + bundles into dist/material-grub
+make install RES=1920x1200
+```
+
+The Google Sans Flex font is bundled in `fonts/` (SIL OFL 1.1, unmodified upstream copy). Set `GSF_FONT=/path/to/font.ttf` to use another copy.
+</details>
 
 ### Other distros
 
@@ -175,9 +171,13 @@ Nothing in development touches your real bootloader; `scripts/make_screenshots.p
 
 Developed and tested on Fedora 44 (GRUB 2.12, BLS) with QEMU/OVMF at 1920×1080, 2560×1080, 1920×1200 and
 3440×1440. The first version ran on real hardware; the per-entry pills/Advanced-options structure has been verified
-in QEMU with the real `blscfg` module and a dry-run on real BLS entries. Reports and PRs from other distros are very welcome.
+in QEMU with the real `blscfg` module and a dry-run on real BLS entries.
+
+The installer's dependency detection/installation and the full theme build were verified in fresh **Fedora, Debian,
+Ubuntu, Arch, openSUSE and Alpine** containers (`--stage-only`). The step that actually rewrites GRUB has so far only been
+run on Fedora 44; reports and PRs from other distros are very welcome.
 
 ## Credits and licenses
 
-Code: [MIT](LICENSE). Fonts, icons and colour libraries: see [THIRD_PARTY.md](THIRD_PARTY.md). Distro names and
+Code: [MIT](LICENSE). The bundled Google Sans Flex font is under the SIL OFL 1.1 ([fonts/](fonts/)); the generated `MG-*` bitmap fonts are derivatives and stay under the OFL. Icons and colour libraries: see [THIRD_PARTY.md](THIRD_PARTY.md). This project is not affiliated with or endorsed by Google. Distro names and
 logos are trademarks of their owners and are used only to identify boot entries.

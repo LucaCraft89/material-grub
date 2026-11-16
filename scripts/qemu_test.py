@@ -21,7 +21,7 @@ insmod all_video
 insmod gfxterm
 insmod gfxmenu
 insmod png
-loadfont /boot/grub/themes/material/GSF-Label.pf2
+loadfont /boot/grub/themes/material/MG-Label.pf2
 terminal_output gfxterm
 set theme=/boot/grub/themes/material/theme.txt
 """ + "".join(f"menuentry '{t}' --class {c.replace(' ', ' --class ')} {{ true }}\n" for t, c in entries)

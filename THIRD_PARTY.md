@@ -2,7 +2,7 @@
 
 | Component | Used for | License |
 |---|---|---|
-| [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex) | All text (hero names, pills, labels). **Not included in this repository**; you download it yourself. Derived PF2 fonts are renamed `GSF-*`. | SIL Open Font License 1.1 |
+| [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex) | All text (hero names, pills, labels). Bundled **unmodified** in `fonts/` with upstream's `OFL.txt` and `TRADEMARKS.md`. The generated PF2 bitmap fonts (`MG-*`) are Modified Versions and remain under the OFL. Not affiliated with or endorsed by Google. | SIL Open Font License 1.1 |
 | [Font Logos](https://github.com/Lukas-W/font-logos) (`vendor/font-logos`) | Monochrome distro glyphs | Unlicense (public domain) |
 | [Material Symbols, Rounded](https://github.com/google/material-design-icons) (`vendor/material-symbols`) | Window, firmware, restart, power, gear, wrench, terminal glyphs | Apache-2.0 |
 | [material-color-utilities](https://github.com/material-foundation/material-color-utilities) via the `materialyoucolor` Python port | HCT colour science and the Material 3 Expressive dynamic scheme | Apache-2.0 / MIT |

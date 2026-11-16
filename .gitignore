@@ -5,4 +5,3 @@ theme-*/
 __pycache__/
 *.pyc
 data/
-fonts/*.ttf
