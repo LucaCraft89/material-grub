@@ -54,19 +54,23 @@ def ensure_scenes(aspect, only):
             scene(e).save(f, optimize=True); print("scene", aspect, e[0])
     return d
 
-def assemble(W, H, only):
+def assemble(W, H, only, pkg=None):
     aspect = aspect_for(W, H); src = ensure_scenes(aspect, only)
-    OUT = ROOT / f"theme-{W}x{H}"; shutil.rmtree(OUT, ignore_errors=True); (OUT / "icons").mkdir(parents=True)
+    OUT = (pkg / "res" / f"{W}x{H}") if pkg else ROOT / f"theme-{W}x{H}"
+    shutil.rmtree(OUT, ignore_errors=True); OUT.mkdir(parents=True)
     SF = H / 1080; WDs = ASPECTS[aspect]
-    for e in R.ENTRIES:
-        if only and e[0] not in only: continue
-        f = src / f"{CLASSES[e[0]][0]}.png"
-        for c in CLASSES[e[0]]: shutil.copy(f, OUT / "icons" / f"{c}.png")
+    if not pkg:
+        (OUT / "icons").mkdir()
+        for e in R.ENTRIES:
+            if only and e[0] not in only: continue
+            f = src / f"{CLASSES[e[0]][0]}.png"
+            for c in CLASSES[e[0]]: shutil.copy(f, OUT / "icons" / f"{c}.png")
     globals()["OUT"] = OUT
     bh = max(8, round(14 * SF)); pill_slices("bar", bh, color=INK_TRACK); pill_slices("hl", bh, color=INK_FILL)
     fs = round(26 * SF); font("GSF-Label", 520, 105, fs)
     px = lambda v: round(v * SF)
-    subprocess.run(["python3", str(Path(__file__).parent / "bgrt-logo.py"), str(OUT / "machine-logo.png"), "--size", str(px(120))], check=True)
+    if pkg: (OUT / "logo_size").write_text(str(px(120))); (OUT / "aspect").write_text(aspect)
+    else: subprocess.run(["python3", str(Path(__file__).parent / "bgrt-logo.py"), str(OUT / "machine-logo.png"), "--size", str(px(120))], check=True)
     cxp = px(WDs / 2); barw = px(560); logo = px(120)
     lx = px(WDs - 150) - logo // 2; ly = px(140) - logo // 2
     FN = f"GSF-Label Regular {fs}"

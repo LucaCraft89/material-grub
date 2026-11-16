@@ -1,0 +1,7 @@
+[Unit]
+Description=Re-apply Material GRUB classes when grub.cfg changes
+[Path]
+PathChanged=/boot/grub2/grub.cfg
+PathChanged=/boot/grub/grub.cfg
+[Install]
+WantedBy=multi-user.target

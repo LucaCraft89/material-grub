@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Rewrite menuentry classes in a grub.cfg by matching entry titles (case-insensitive). stdlib only.
+usage: material-grub-classes GRUB_CFG [--pkg DIR]   Idempotent; marker line prevents re-processing."""
+import json, os, re, struct, subprocess, sys, tempfile
+from pathlib import Path
+cfg = Path(sys.argv[1]); pkg = Path(sys.argv[sys.argv.index("--pkg") + 1]) if "--pkg" in sys.argv else Path("/usr/share/material-grub")
+MARK = "# material-grub: classes applied"
+text = cfg.read_text()
+if MARK in text: sys.exit(0)
+rules = json.loads((pkg / "rules.json").read_text())
+
+def key_for(title):
+    toks = re.findall(r"[a-z0-9]+", title.lower())
+    if "windows" in toks or "microsoft" in toks: return None            # handled separately
+    for r in rules:
+        t = r["tokens"]; n = len(t)
+        if any(toks[i:i + n] == t for i in range(len(toks) - n + 1)): return r["key"]
+        if "".join(t) in toks: return r["key"]
+    return None
+
+def windows_key(device):
+    """Windows 11 if bootmgfw.efi reports build >= 22000; fall back to windows11 when unknown."""
+    try:
+        with tempfile.TemporaryDirectory() as mp:
+            subprocess.run(["mount", "-o", "ro", device, mp], check=True, capture_output=True)
+            try:
+                for p in Path(mp).rglob("*"):
+                    if p.name.lower() == "bootmgfw.efi":
+                        s = p.read_bytes(); u = s.decode("utf-16le", "ignore") + s[1:].decode("utf-16le", "ignore")
+                        m = re.search(r"10\.0\.(\d{5})\.", u)
+                        if m: return "windows11" if int(m.group(1)) >= 22000 else "windows10"
+            finally: subprocess.run(["umount", mp], capture_output=True)
+    except Exception: pass
+    return "windows11"
+
+pat = re.compile(r"^(\s*)menuentry\s+(['\"])(.*?)\2(.*)$")
+out, n = [], 0
+for line in text.splitlines():
+    m = pat.match(line)
+    if m:
+        ind, q, title, rest = m.groups()
+        key = key_for(title)
+        if key is None and re.search(r"windows|microsoft", title, re.I):
+            d = re.search(r"\(on (/dev/[^)\s]+)\)", title)
+            key = windows_key(d.group(1)) if d else "windows11"
+        if key and not re.search(rf"--class {key}\b", line.split("{")[0][:len(ind)+len(title)+40]): line = f"{ind}menuentry {q}{title}{q} --class {key}{rest}"; n += 1
+    out.append(line)
+tmp = cfg.with_name(cfg.name + ".material"); tmp.write_text(MARK + "\n" + "\n".join(out) + "\n")
+os.chmod(tmp, cfg.stat().st_mode); os.replace(tmp, cfg)
+print(f"material-grub: classes set on {n} entries")
