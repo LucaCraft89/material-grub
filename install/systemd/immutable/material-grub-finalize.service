@@ -1,0 +1,17 @@
+# ostree writes the next deployment's boot entry at SHUTDOWN (ostree-finalize-staged.service, in its ExecStop), where the path unit cannot
+# react. This unit is started before that service, so systemd stops it after it: its ExecStop runs once the new entry exists.
+[Unit]
+Description=Refresh Material GRUB entries after ostree finalizes the next deployment
+DefaultDependencies=no
+After=local-fs.target
+Before=ostree-finalize-staged.service
+RequiresMountsFor=/boot /var
+ConditionPathExists=/run/ostree-booted
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/bin/sh /var/lib/material-grub/postprocess
+TimeoutStopSec=180
+[Install]
+WantedBy=multi-user.target

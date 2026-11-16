@@ -23,6 +23,8 @@ def parse_title(title):
     t = title.strip(); d = {"os": None, "kver": None, "osver": None, "edition": None, "where": None}
     m = re.search(r"\(on (/dev/[^)\s]+)\)", t)
     if m: d["where"] = m.group(1); t = t.replace(m.group(0), "").strip()
+    m = re.match(r"^(?P<os>.+?) (?P<v>\d\S*) \((?P<ed>[^)]+)\) \((?P<k>ostree:\d+)\)$", t)                  # ostree: Fedora Linux 44.20260301.0 (Silverblue) (ostree:0)
+    if m: d.update(os=m["os"], osver=m["v"], edition=m["ed"], kver=m["k"]); return d
     m = re.match(r"^(?P<os>.+?) \((?P<kver>[^)]+)\) (?P<osver>\S+)(?: \((?P<ed>[^)]+)\))?$", t)   # BLS: Fedora Linux (6.x) 44 (Workstation)
     if m: d.update(os=m["os"], kver=m["kver"], osver=m["osver"], edition=m["ed"]); return d
     m = re.match(r"^(?P<os>.+?), with (?P<k>[A-Za-z]+) (?P<v>\S+)(?: \((?P<x>[^)]+)\))?$", t)        # classic: Ubuntu, with Linux 6.8.0-45-generic (recovery mode)

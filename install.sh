@@ -6,16 +6,19 @@
 #   sudo ./install.sh --scheme light  # light Material 3 scheme instead of the default dark one
 #   sudo ./install.sh --uninstall
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
-#            --keep-build  keep the temporary build dir     --force  ignore the NixOS / immutable-system checks
+#            --keep-build  keep the temporary build dir     --force  ignore the NixOS check
+#            --immutable  use the ostree/bootc layout (automatic when /run/ostree-booted exists)   --yes  do not ask for confirmation
+#            --pkg DIR  install a package built elsewhere   --dist-out DIR  with --stage-only: copy the built package to DIR
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-RES=""; SCHEME=dark; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
+RES=""; SCHEME=dark; IMM=0; YES=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
 while [ $# -gt 0 ]; do
   case $1 in
     --res) RES=${2:?--res needs WxH}; shift;;
     --scheme) SCHEME=${2:?--scheme needs light or dark}; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
+    --immutable) IMM=1;; --yes|-y) YES=1;; --pkg) PREBUILT=${2:?--pkg needs a directory}; shift;; --dist-out) DISTOUT=${2:?--dist-out needs a directory}; shift;;
     --no-deps) DEPS=0;; --stage-only) STAGE=1;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
-    -h|--help) sed -n 2,9p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    -h|--help) sed -n 2,11p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2;;
   esac; shift
 done
@@ -68,8 +71,25 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 [ "$UNINSTALL" = 1 ] && exec sh "$HERE/install/uninstall.sh"
 [ -e /etc/NIXOS ] && [ "$FORCE" = 0 ] && die "NixOS manages GRUB declaratively; this installer does not support it."
-if [ -e /run/ostree-booted ] && [ "$FORCE" = 0 ]; then
-  die "Immutable (ostree) system detected: /usr is read-only, so the hook cannot be installed. Use --force to try anyway."
+[ -e /run/ostree-booted ] && IMM=1
+if [ "$IMM" = 1 ] && [ "$STAGE" = 0 ]; then
+  warn "immutable (ostree/bootc) system: using the immutable layout. Support for it is EXPERIMENTAL and could not be tested on a real ostree boot."
+  cat <<MSG
+      What will be done:
+        * nothing is written under /usr; the package and a Python venv go to /var/lib/material-grub, systemd units to /etc/systemd/system
+        * the STATIC /boot/grub2/grub.cfg is modified (theme block, Restart/Shut down entries, Advanced-options structure); an untouched copy is kept
+          in /var/backups/material-grub, and a raw "All boot entries" submenu is always added as a safety net
+        * ostree writes the next deployment's boot entry at shutdown: a unit refreshes our copy afterwards, so the first boot after an update
+          may still show the previous list; use the raw submenu if the newest deployment is missing
+        * 'bootupctl update' rewrites grub.cfg; a path unit re-applies the theme afterwards
+        * build tools (grub-mkfont, rsvg-convert) are never layered with rpm-ostree: the package is built in a throw-away podman container
+          (or pass --pkg DIR with a package built on another machine)
+      Undo: sudo ./install.sh --uninstall   (restores grub.cfg from the pristine copy)
+MSG
+  if [ "$YES" = 0 ]; then
+    [ -t 0 ] || die "refusing to change the bootloader without confirmation: re-run with --yes"
+    printf '      Continue? [y/N] '; read -r ans; case $ans in y|Y|yes|YES) ;; *) die "aborted";; esac
+  fi
 fi
 PM=""
 for p in dnf apt-get pacman zypper apk xbps-install; do command -v "$p" >/dev/null 2>&1 && { PM=$p; break; }; done
@@ -97,20 +117,33 @@ install_deps() {
     *) return 1 ;;
   esac
 }
-MISS=$(missing)
-if [ -z "$MISS" ]; then ok "everything is already installed (the package manager will not be touched)"
-elif [ "$DEPS" = 0 ]; then die "missing: $MISS (drop --no-deps to let the installer install them)"
+VIA_CONTAINER=0
+if [ "$IMM" = 1 ]; then
+  # immutable: never use the package manager. Only the BUILD tools may be missing (the target machine needs just python3).
+  command -v python3 >/dev/null 2>&1 || die "python3 is required"
+  if [ -n "$PREBUILT" ]; then ok "using the prebuilt package $PREBUILT (no build tools needed)"
+  else
+    MISS=$(missing | sed 's/grub-mkconfig //; s/python3-venv //; s/python3-pillow //')
+    if [ -z "$MISS" ]; then ok "build tools found on the host"
+    elif command -v podman >/dev/null 2>&1; then info "missing on this immutable host: $MISS"; info "the package will be built in a throw-away podman container"; VIA_CONTAINER=1
+    else die "missing build tools: $MISS. Install podman, or build the package elsewhere (./install.sh --stage-only --dist-out DIR) and pass --pkg DIR."; fi
+  fi
 else
-  [ -n "$PM" ] || die "missing: $MISS, and no supported package manager was found (dnf, apt, pacman, zypper, apk, xbps)."
-  info "missing: $MISS"
-  info "installing with $PM (its own output follows; this can take a minute) ..."
-  install_deps || die "Dependency installation failed."
-  MISS=$(missing); [ -z "$MISS" ] || die "still missing after installation: $MISS"
-  ok "dependencies installed"
+  MISS=$(missing)
+  if [ -z "$MISS" ]; then ok "everything is already installed (the package manager will not be touched)"
+  elif [ "$DEPS" = 0 ]; then die "missing: $MISS (drop --no-deps to let the installer install them)"
+  else
+    [ -n "$PM" ] || die "missing: $MISS, and no supported package manager was found (dnf, apt, pacman, zypper, apk, xbps)."
+    info "missing: $MISS"
+    info "installing with $PM (its own output follows; this can take a minute) ..."
+    install_deps || die "Dependency installation failed."
+    MISS=$(missing); [ -z "$MISS" ] || die "still missing after installation: $MISS"
+    ok "dependencies installed"
+  fi
 fi
-GRUB_MKFONT=$(command -v grub2-mkfont || command -v grub-mkfont); GRUB_MKCONFIG=$(command -v grub2-mkconfig || command -v grub-mkconfig)
+GRUB_MKFONT=$(command -v grub2-mkfont || command -v grub-mkfont || true); GRUB_MKCONFIG=$(command -v grub2-mkconfig || command -v grub-mkconfig || true)
 [ -f "$HERE/fonts/OFL.txt" ] && ls "$HERE"/fonts/GoogleSansFlex*.ttf >/dev/null 2>&1 || die "fonts/ is incomplete (Google Sans Flex missing)."
-ok "tools: $(basename "$GRUB_MKFONT"), $(basename "$GRUB_MKCONFIG"), rsvg-convert, python3 $(python3 -c 'import sys;print("%d.%d"%sys.version_info[:2])')"
+ok "tools: ${GRUB_MKFONT:+$(basename "$GRUB_MKFONT"), }${GRUB_MKCONFIG:+$(basename "$GRUB_MKCONFIG"), }python3 $(python3 -c 'import sys;print("%d.%d"%sys.version_info[:2])')"
 
 # ---------- resolution ----------
 detect_res() {
@@ -142,32 +175,50 @@ BUILD=$(mktemp -d /var/tmp/material-grub-build.XXXXXX)
 cleanup() { [ "$KEEP" = 1 ] && info "build directory kept: $BUILD" || rm -rf "$BUILD"; }
 trap cleanup EXIT
 info "build directory: $BUILD (your clone stays untouched)"
-for d in scripts install vendor fonts; do cp -a "$HERE/$d" "$BUILD/"; done
-cp "$HERE/requirements.txt" "$BUILD/"; cd "$BUILD"
-info "creating a Python virtual environment"
-python3 -m venv --system-site-packages .venv 2>/dev/null || python3 -m venv .venv || die "python3 venv module missing."
-info "installing Python build requirements (fonttools, materialyoucolor); needs network access"
-.venv/bin/pip install --disable-pip-version-check -r requirements.txt >pip.log 2>&1 &
-wait_job $! pip.log "downloading Python packages" 0 || { tail -n 15 pip.log >&2; die "pip failed (network needed)."; }
-ok "build environment ready"
+DIST=$BUILD/dist/material-grub
+if [ -n "$PREBUILT" ]; then
+  DIST=$PREBUILT; [ -d "$DIST/res" ] && [ -d "$DIST/scenes" ] || die "--pkg $PREBUILT is not a built package (expected res/ and scenes/ inside)."
+  ok "skipping the build: using $DIST"
+elif [ "$VIA_CONTAINER" = 1 ]; then
+  step "Building the package in a throw-away podman container (the host is immutable)"
+  mkdir -p "$BUILD/out"; CIMG=${MG_BUILD_IMAGE:-registry.fedoraproject.org/fedora:latest}
+  info "image: $CIMG (pulled once; its own output follows). The container installs the build tools and renders the theme."
+  podman run --rm --security-opt label=disable -v "$HERE":/src:ro -v "$BUILD/out":/out "$CIMG" \
+    sh -c "cd /src && ./install.sh --stage-only --res '$BUILD_RES' --scheme '$SCHEME' --dist-out /out" || die "container build failed (log above)."
+  DIST=$BUILD/out/material-grub; [ -d "$DIST/res" ] || die "container build produced no package."
+  ok "package built in the container: $DIST"
+else
+  for d in scripts install vendor fonts; do cp -a "$HERE/$d" "$BUILD/"; done
+  cp "$HERE/requirements.txt" "$BUILD/"; cd "$BUILD"
+  info "creating a Python virtual environment"
+  python3 -m venv --system-site-packages .venv 2>/dev/null || python3 -m venv .venv || die "python3 venv module missing."
+  info "installing Python build requirements (fonttools, materialyoucolor); needs network access"
+  .venv/bin/pip install --disable-pip-version-check -r requirements.txt >pip.log 2>&1 &
+  wait_job $! pip.log "downloading Python packages" 0 || { tail -n 15 pip.log >&2; die "pip failed (network needed)."; }
+  ok "build environment ready"
 
-# ---------- [4/6] render ----------
-step "Rendering the theme (the long step: about 1-3 minutes on a modern CPU, up to 6 on a slow one)"
-info "colour scheme: $SCHEME"
-info "drawing the scene set for $BUILD_RES (native 2160-high design for 4K-class screens), then its theme bundle"
-GSF_FONT=$(ls "$BUILD"/fonts/GoogleSansFlex*.ttf | head -n1); export GSF_FONT PYTHONUNBUFFERED=1
-.venv/bin/python scripts/package.py --res "$BUILD_RES" --scheme "$SCHEME" >build.log 2>&1 &
-PKGPID=$!
-sleep 3; ITEMS=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' build.log | head -n1); ITEMS=${ITEMS:-109}
-wait_job "$PKGPID" build.log "rendering scenes" "$ITEMS" || { tail -n 25 build.log >&2; die "Build failed (log above)."; }
-[ -d dist/material-grub ] || die "Build produced no package."
-ok "rendered $(find dist/material-grub/scenes -name '*.png' | wc -l) scene images and $(ls dist/material-grub/res | wc -l) resolution bundles in $(elapsed)"
+  # ---------- [4/6] render ----------
+  step "Rendering the theme (the long step: about 1-3 minutes on a modern CPU, up to 6 on a slow one)"
+  info "colour scheme: $SCHEME"
+  info "drawing the scene set for $BUILD_RES (native 2160-high design for 4K-class screens), then its theme bundle"
+  GSF_FONT=$(ls "$BUILD"/fonts/GoogleSansFlex*.ttf | head -n1); export GSF_FONT PYTHONUNBUFFERED=1
+  .venv/bin/python scripts/package.py --res "$BUILD_RES" --scheme "$SCHEME" >build.log 2>&1 &
+  PKGPID=$!
+  sleep 3; ITEMS=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' build.log | head -n1); ITEMS=${ITEMS:-109}
+  wait_job "$PKGPID" build.log "rendering scenes" "$ITEMS" || { tail -n 25 build.log >&2; die "Build failed (log above)."; }
+  [ -d dist/material-grub ] || die "Build produced no package."
+  ok "rendered $(find dist/material-grub/scenes -name '*.png' | wc -l) scene images and $(ls dist/material-grub/res | wc -l) resolution bundles in $(elapsed)"
+fi
 
-if [ "$STAGE" = 1 ]; then KEEP=1; step "Stage-only: stopping before GRUB is touched"; ok "package built at $BUILD/dist/material-grub"; exit 0; fi
+if [ "$STAGE" = 1 ]; then
+  KEEP=1; step "Stage-only: stopping before GRUB is touched"
+  if [ -n "$DISTOUT" ]; then mkdir -p "$DISTOUT/material-grub" && cp -a "$DIST/." "$DISTOUT/material-grub/" && ok "package copied to $DISTOUT/material-grub"; fi
+  ok "package built at $DIST"; exit 0
+fi
 
 # ---------- [5/6] install ----------
 step "Installing into GRUB"
-sh install/install.sh --res "$RES" --pkg "$BUILD/dist/material-grub"
+sh "$HERE/install/install.sh" --res "$RES" --pkg "$DIST" $( [ "$IMM" = 1 ] && echo --immutable )
 
 # ---------- [6/6] done ----------
 step "Finished"

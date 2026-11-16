@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Experimental immutable (ostree/bootc) support: `/var/lib/material-grub` layout, direct edit of the static `grub.cfg` (`material-grub-static`), mirrors outside `/boot/loader`, a shutdown-time refresh unit, a raw "All boot entries" safety submenu, podman build of the package, `--pkg`, `--dist-out`, `--yes`, `--immutable`. Replaces the old refusal. Not tested on a real ostree boot.
+- ostree entry titles (`Fedora Linux 44.x (Silverblue) (ostree:0)`) parse into proper info pills.
 - Contributor docs: `docs/adding-a-distro.md`, issue templates (bug report, distro request) and a PR template.
 - Light scheme: `sudo ./install.sh --scheme light` (`package.py --scheme light`, `make package SCHEME=light`). Dark remains the default. Separate render cache (`build/scenes-light`).
 - Native 2160-high scene sets (`16x9@2`, `16x10@2`, `21x9@2`) for screens 1800+ px high instead of a 2x upscale; every hero/pill/rail coordinate scales with scene height. Glyph masks are rendered at 512 px.
