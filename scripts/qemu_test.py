@@ -27,7 +27,7 @@ set theme=/boot/grub/themes/material/theme.txt
 """ + "".join(f"menuentry '{t}' --class {c.replace(' ', ' --class ')} {{ true }}\n" for t, c in entries)
 (ESP / "boot/grub/grub.cfg").write_text(cfg)
 sock = ROOT / "build/mon.sock"; sock.unlink(missing_ok=True)
-q = subprocess.Popen(["qemu-system-x86_64", "-machine", "q35", "-m", "1024", "-display", "none", "-vga", "std",
+q = subprocess.Popen(["qemu-system-x86_64", "-machine", "q35", "-m", "1024", "-display", "none", "-vga", "none", "-device", f"VGA,vgamem_mb=64,xres={res.split('x')[0]},yres={res.split('x')[1]}",
     "-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/edk2/ovmf/OVMF_CODE.fd",
     "-drive", f"format=raw,file=fat:rw:{ESP}", "-monitor", f"unix:{sock},server,nowait"], stderr=subprocess.DEVNULL)
 def mon(cmd):
@@ -38,7 +38,7 @@ def mon(cmd):
 try:
     time.sleep(float(os.environ.get("BOOT_WAIT", "12")))
     for i, k in enumerate(["-"] + keys):
-        if k != "-": mon("sendkey " + k); time.sleep(1.5)
+        if k != "-": mon("sendkey " + k); time.sleep(float(os.environ.get("KEY_WAIT", "1.5")))
         out = ROOT / f"build/qemu-{i}.ppm"; mon(f"screendump {out}"); time.sleep(.5)
         subprocess.run(["magick", str(out), str(ROOT / f"build/qemu-{i}.png")], check=True)
         print("shot", ROOT / f"build/qemu-{i}.png")

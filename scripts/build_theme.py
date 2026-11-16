@@ -9,10 +9,10 @@ from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = R.ROOT
-args = [a for a in sys.argv[1:] if not a.startswith("--")]
-W, H = (int(args[0]), int(args[1])) if len(args) >= 2 else (1920, 1080)
-OUT = ROOT / f"theme-{W}x{H}"
-SF = H / 1080; WD = round(1080 * W / H)   # design width at 1080 height
+ASPECTS = {"16x9": 1920, "16x10": 1728, "21x9": 2560}   # design width at 1080 high
+def aspect_for(w, h): return min(ASPECTS, key=lambda k: abs(ASPECTS[k] / 1080 - w / h))
+opt = lambda n, d=None: sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
+WD = 1920  # set per aspect in scene()
 
 INK_TRACK, INK_FILL, INK_TEXT = "#49454F", "#E6E1E5", "#CAC4D0"
 
@@ -21,9 +21,9 @@ def scene(entry):
     im, _ = R.panel(entry, WD + 48, ph=1080, yoff=60, dyn=False)     # pw == WD
     canvas = Image.new("RGBA", (WD, 1080), R.hx(p["surface"]) + (255,)); canvas.alpha_composite(im)
     hint = R.key_hints(p); canvas.alpha_composite(hint, ((WD - hint.width) // 2, 1080 - 120))
-    out = canvas.convert("RGB")
-    return out if out.size == (W, H) else out.resize((W, H), Image.LANCZOS)
+    return canvas.convert("RGB")
 
+OUT = None
 def pill_slices(prefix, h, w=64, color="#FFFFFF"):
     S = 4; r = h // 2
     im = Image.new("RGBA", (w * S, h * S), (0, 0, 0, 0))
@@ -44,40 +44,36 @@ def font(name, wght, wdth, size):
     subprocess.run(["grub2-mkfont", "-s", str(size), "-n", name, "-r", "0x20-0x7e,0xa0-0x17f,0x2013-0x2026",
                     "-o", str(OUT / f"{name}.pf2"), str(tmp)], check=True)
 
-if __name__ == "__main__":
-    shutil.rmtree(OUT, ignore_errors=True); (OUT / "icons").mkdir(parents=True)
+def ensure_scenes(aspect, only):
+    global WD
+    WD = ASPECTS[aspect]; d = ROOT / "build/scenes" / aspect / "icons"; d.mkdir(parents=True, exist_ok=True)
     for e in R.ENTRIES:
-        img = scene(e); tmp = OUT / "icons" / f"{CLASSES[e[0]][0]}.png"; img.save(tmp, optimize=True)
-        for extra in CLASSES[e[0]][1:]: shutil.copy(tmp, OUT / "icons" / f"{extra}.png")
-        print("scene", e[0], img.size)
+        if only and e[0] not in only: continue
+        f = d / f"{CLASSES[e[0]][0]}.png"
+        if not f.exists() or "--rescene" in sys.argv:
+            scene(e).save(f, optimize=True); print("scene", aspect, e[0])
+    return d
+
+def assemble(W, H, only):
+    aspect = aspect_for(W, H); src = ensure_scenes(aspect, only)
+    OUT = ROOT / f"theme-{W}x{H}"; shutil.rmtree(OUT, ignore_errors=True); (OUT / "icons").mkdir(parents=True)
+    SF = H / 1080; WDs = ASPECTS[aspect]
+    for e in R.ENTRIES:
+        if only and e[0] not in only: continue
+        f = src / f"{CLASSES[e[0]][0]}.png"
+        for c in CLASSES[e[0]]: shutil.copy(f, OUT / "icons" / f"{c}.png")
+    globals()["OUT"] = OUT
     bh = max(8, round(14 * SF)); pill_slices("bar", bh, color=INK_TRACK); pill_slices("hl", bh, color=INK_FILL)
-    font("GSF-Label", 520, 105, round(26 * SF))
+    fs = round(26 * SF); font("GSF-Label", 520, 105, fs)
     px = lambda v: round(v * SF)
     subprocess.run(["python3", str(Path(__file__).parent / "bgrt-logo.py"), str(OUT / "machine-logo.png"), "--size", str(px(120))], check=True)
-    cxp = px(WD / 2); barw = px(560); logo = px(120)
-    lx = px(WD - 150) - logo // 2; ly = px(140) - logo // 2
-    MENU = f'''+ boot_menu {{
-  left = 0
-  top = 0
-  width = {W}
-  height = {H}
-  item_height = {H}
-  item_spacing = 0
-  item_padding = 0
-  item_icon_space = 0
-  icon_width = {W}
-  icon_height = {H}
-  item_font = "GSF-Label Regular {round(26 * SF)}"
-  selected_item_font = "GSF-Label Regular {round(26 * SF)}"
-  item_color = "#00000000"
-  selected_item_color = "#00000000"
-  scrollbar = false
-}}
-'''
-    theme = f'''# Material 3 Expressive GRUB theme (generated)
+    cxp = px(WDs / 2); barw = px(560); logo = px(120)
+    lx = px(WDs - 150) - logo // 2; ly = px(140) - logo // 2
+    FN = f"GSF-Label Regular {fs}"
+    (OUT / "theme.txt").write_text(f'''# Material 3 Expressive GRUB theme (generated for {W}x{H}, {aspect} scenes)
 title-text: ""
 desktop-color: "#0D1411"
-terminal-font: "GSF-Label Regular {round(26 * SF)}"
+terminal-font: "{FN}"
 
 + image {{
   left = {lx}
@@ -105,9 +101,32 @@ terminal-font: "GSF-Label Regular {round(26 * SF)}"
   height = {px(34)}
   align = "center"
   color = "{INK_TEXT}"
-  font = "GSF-Label Regular {round(26 * SF)}"
+  font = "{FN}"
   text = "Booting in %d seconds"
 }}
-'''
-    theme = theme.rstrip() + "\n\n# GRUB draws the first-declared component on top, so the menu goes last\n" + MENU
-    (OUT / "theme.txt").write_text(theme); print("theme at", OUT)
+
+# GRUB draws the first-declared component on top, so the menu goes last
++ boot_menu {{
+  left = 0
+  top = 0
+  width = {W}
+  height = {H}
+  item_height = {H}
+  item_spacing = 0
+  item_padding = 0
+  item_icon_space = 0
+  icon_width = {W}
+  icon_height = {H}
+  item_font = "{FN}"
+  selected_item_font = "{FN}"
+  item_color = "#00000000"
+  selected_item_color = "#00000000"
+  scrollbar = false
+}}
+''')
+    print("theme at", OUT)
+
+if __name__ == "__main__":
+    only = set(opt("--only", "").split(",")) - {""}
+    for res in (opt("--res", "1920x1080")).split(","):
+        w, h = map(int, res.split("x")); assemble(w, h, only)
