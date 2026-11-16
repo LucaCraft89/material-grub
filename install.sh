@@ -4,6 +4,7 @@
 #   sudo ./install.sh                 # auto-detects resolution, installs missing dependencies, builds and installs
 #   sudo ./install.sh --res 1920x1200 # force a resolution
 #   sudo ./install.sh --scheme light  # light Material 3 scheme instead of the default dark one
+#   sudo ./install.sh --no-hints      # leave the key-hint pills out of the screens
 #   sudo ./install.sh --uninstall
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
 #            --keep-build  keep the temporary build dir     --force  ignore the NixOS check
@@ -11,14 +12,15 @@
 #            --pkg DIR  install a package built elsewhere   --dist-out DIR  with --stage-only: copy the built package to DIR
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-RES=""; SCHEME=dark; IMM=0; YES=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
+RES=""; SCHEME=dark; IMM=0; YES=0; HINTS=1; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
 while [ $# -gt 0 ]; do
   case $1 in
     --res) RES=${2:?--res needs WxH}; shift;;
     --scheme) SCHEME=${2:?--scheme needs light or dark}; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
     --immutable) IMM=1;; --yes|-y) YES=1;; --pkg) PREBUILT=${2:?--pkg needs a directory}; shift;; --dist-out) DISTOUT=${2:?--dist-out needs a directory}; shift;;
+    --no-hints) HINTS=0;;
     --no-deps) DEPS=0;; --stage-only) STAGE=1;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
-    -h|--help) sed -n 2,11p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    -h|--help) sed -n 2,12p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2;;
   esac; shift
 done
@@ -184,7 +186,7 @@ elif [ "$VIA_CONTAINER" = 1 ]; then
   mkdir -p "$BUILD/out"; CIMG=${MG_BUILD_IMAGE:-registry.fedoraproject.org/fedora:latest}
   info "image: $CIMG (pulled once; its own output follows). The container installs the build tools and renders the theme."
   podman run --rm --security-opt label=disable -v "$HERE":/src:ro -v "$BUILD/out":/out "$CIMG" \
-    sh -c "cd /src && ./install.sh --stage-only --res '$BUILD_RES' --scheme '$SCHEME' --dist-out /out" || die "container build failed (log above)."
+    sh -c "cd /src && ./install.sh --stage-only --res '$BUILD_RES' --scheme '$SCHEME' $( [ "$HINTS" = 0 ] && echo --no-hints ) --dist-out /out" || die "container build failed (log above)."
   DIST=$BUILD/out/material-grub; [ -d "$DIST/res" ] || die "container build produced no package."
   ok "package built in the container: $DIST"
 else
@@ -202,7 +204,7 @@ else
   info "colour scheme: $SCHEME"
   info "drawing the scene set for $BUILD_RES (native 2160-high design for 4K-class screens), then its theme bundle"
   GSF_FONT=$(ls "$BUILD"/fonts/GoogleSansFlex*.ttf | head -n1); export GSF_FONT PYTHONUNBUFFERED=1
-  .venv/bin/python scripts/package.py --res "$BUILD_RES" --scheme "$SCHEME" >build.log 2>&1 &
+  .venv/bin/python scripts/package.py --res "$BUILD_RES" --scheme "$SCHEME" $( [ "$HINTS" = 0 ] && echo --no-hints ) >build.log 2>&1 &
   PKGPID=$!
   sleep 3; ITEMS=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' build.log | head -n1); ITEMS=${ITEMS:-109}
   wait_job "$PKGPID" build.log "rendering scenes" "$ITEMS" || { tail -n 25 build.log >&2; die "Build failed (log above)."; }

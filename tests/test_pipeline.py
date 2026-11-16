@@ -25,6 +25,14 @@ class Pipeline(unittest.TestCase):
         subprocess.run([py, BIN / "material-grub-classes", self.cfg, "--pkg", PKG, "--bls", self.entries, "--loader", self.boot / "loader", "--mirrors", gd / "material",
                         "--mirrorbase", "/grub2/material", "--fallback-all", "--state", self.state], check=True, capture_output=True)
         subprocess.run([py, BIN / "material-grub-scenes", "--theme", gd / "themes/material", "--pkg", PKG, "--state", self.state], check=True, capture_output=True)
+    def test_conf(self):
+        conf = self.d / "m.conf"; conf.write_text("RAW_NAME=off\nCOUNTDOWN=off\nLOGO=off\nTIMEOUT=9\n"); os.environ["MATERIAL_CONF"] = str(conf)
+        try: self.run_all()
+        finally: del os.environ["MATERIAL_CONF"]
+        th = (self.boot / "grub2/themes/material/theme.txt").read_text()
+        for gone in ('id = "__timeout__"', "machine-logo.png", 'item_height = 34'): self.assertNotIn(gone, th)
+        self.assertIn("boot_menu", th); self.assertIn("set timeout=9", self.cfg.read_text())
+        self.assertFalse((self.boot / "grub2/themes/material/machine-logo.png").exists())
     def test_non_latin_titles(self):      # pills fall back to another installed font; the theme ships GRUB's unicode.pf2 when the system has it
         (self.entries / "ostree-4-fedora.conf").write_text(ENTRY.format(v="44.1", n=4).replace("(Silverblue)", "(Рабочая станция 日本語)"))
         self.run_all(); self.assertTrue(any((self.boot / "grub2/themes/material/icons").glob("mg_*.png")))

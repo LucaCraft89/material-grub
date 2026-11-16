@@ -45,6 +45,17 @@ class Match(unittest.TestCase):
         self.assertIsNone(mgrub.key_for("Some Unknown OS", self.rules))
         self.assertIsNone(mgrub.key_for("Windows Boot Manager", self.rules))    # Windows is resolved separately (10 vs 11)
 
+class Conf(unittest.TestCase):
+    def test_conf(self):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile("w", suffix=".conf", delete=False) as f:
+            f.write('# c\nRAW_NAME=off\nCOUNTDOWN = "no"  # trailing\nLOGO=maybe\nTIMEOUT=12\nBOGUS=1\n'); n = f.name
+        c = mgrub.load_conf(n); os.unlink(n)
+        self.assertEqual((c["RAW_NAME"], c["COUNTDOWN"], c["LOGO"], c["TIMEOUT"]), ("off", "off", "on", "12"))   # bad value ignored
+        self.assertEqual(mgrub.load_conf("/nonexistent")["TIMEOUT"], "")
+        t = "a\n# mg:begin raw\nX\n# mg:end raw\n# mg:begin logo\nY\n# mg:end logo\nb\n"
+        self.assertEqual(mgrub.apply_conf_to_theme(t, c), "a\n# mg:begin logo\nY\n# mg:end logo\nb\n")
+
 class Catalog(unittest.TestCase):
     def test_catalog(self):
         sys.path.insert(0, str(ROOT / "scripts")); import catalog as C

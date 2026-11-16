@@ -20,6 +20,7 @@ if [ "$IMM" = 1 ]; then
   echo "    - copying the theme package to $DEST (immutable layout: nothing is written under /usr)"
   rm -rf "$DEST"; install -d "$DEST"; cp -a "$PKG/." "$DEST/"; chmod +x "$DEST/bin/"*
   install -m755 "$HERE/postprocess.sh" "$ST/postprocess"
+  install -d "$D/usr/local/sbin"; install -m755 "$HERE/material-grub-apply" "$D/usr/local/sbin/material-grub-apply"
   TO=5; [ -f /etc/default/grub ] && TO=$(sed -n 's/^GRUB_TIMEOUT=\([0-9]\{1,\}\).*/\1/p' /etc/default/grub | head -n1); TO=${TO:-5}
   { echo "MATERIAL_PKG=$DEST"; echo "MATERIAL_PY=$PY"; echo "MG_IMMUTABLE=1"; echo "MG_RES=${RES:-1920x1080}"; echo "MG_TIMEOUT=$TO"; } > "$ST/env"
   install -m644 "$HERE"/systemd/immutable/* "$D/etc/systemd/system/"
@@ -32,11 +33,13 @@ else
   chmod +x "$D/usr/share/material-grub/bin/"*
   echo "    - installing GRUB hooks (05_material, 15_material_menu, 90_material_system) and the systemd path unit"
   install -m755 "$HERE/postprocess.sh" "$D/usr/libexec/material-grub-postprocess"
+  install -d "$D/usr/local/sbin"; install -m755 "$HERE/material-grub-apply" "$D/usr/local/sbin/material-grub-apply"
   install -m755 "$HERE/05_material" "$D/etc/grub.d/05_material"
   install -m755 "$HERE/15_material_menu" "$D/etc/grub.d/15_material_menu"
   install -m755 "$HERE/90_material_system" "$D/etc/grub.d/90_material_system"
   install -m644 "$HERE"/systemd/material-grub.* "$D/etc/systemd/system/"
 fi
+[ -e "$D/etc/material-grub.conf" ] || install -m644 "$HERE/material-grub.conf" "$D/etc/material-grub.conf"     # never overwrite the user's settings
 if [ -z "$D" ]; then
   B=/var/backups/material-grub; mkdir -p "$B"
   [ -f "$B/default-grub.orig" ] || { [ -f /etc/default/grub ] && cp -a /etc/default/grub "$B/default-grub.orig" || true; }

@@ -23,7 +23,8 @@ WD = 1920  # set per aspect in scene()
 LIGHT = R.SCHEME == "light"
 # theme colours are global (GRUB cannot recolour per entry), so these are neutral M3 greys chosen per scheme
 INK_TRACK, INK_FILL, INK_TEXT = ("#CAC4D0", "#49454F", "#49454F") if LIGHT else ("#49454F", "#E6E1E5", "#CAC4D0")
-SCENES = ROOT / ("build/scenes-light" if LIGHT else "build/scenes")   # separate render cache per scheme
+HINTS = os.environ.get("MG_HINTS", "1") != "0"          # --no-hints: leave the key-hint pills out of the scenes (build time)
+SCENES = ROOT / ("build/scenes" + ("-light" if LIGHT else "") + ("" if HINTS else "-nohints"))   # separate render cache per scheme
 DESKTOP, RAWNAME = ("#F6F4F7", "#5F5B66") if LIGHT else ("#0D1411", "#6E7681")
 
 def scene(entry, hero=True):
@@ -31,7 +32,7 @@ def scene(entry, hero=True):
     s = R.SC; Wp, Hp = WD * s, 1080 * s
     im, _ = R.panel(entry, Wp + R.u(48), ph=Hp, yoff=R.u(60), dyn=False, hero=hero)     # pw == Wp
     canvas = Image.new("RGBA", (Wp, Hp), R.hx(p["surface"]) + (255,)); canvas.alpha_composite(im)
-    hint = R.key_hints(p); canvas.alpha_composite(hint, ((Wp - hint.width) // 2, Hp - R.u(120)))
+    if HINTS: hint = R.key_hints(p); canvas.alpha_composite(hint, ((Wp - hint.width) // 2, Hp - R.u(120)))
     return canvas.convert("RGB")
 
 OUT = None
@@ -97,6 +98,7 @@ title-text: ""
 desktop-color: "{DESKTOP}"
 terminal-font: "{FN}"
 
+# mg:begin raw
 # raw entry name (debug/clarity): a 1-item list that only ever shows the selected entry
 + boot_menu {{
   left = {px(96)}
@@ -115,7 +117,9 @@ terminal-font: "{FN}"
   selected_item_color = "{RAWNAME}"
   scrollbar = false
 }}
+# mg:end raw
 
+# mg:begin logo
 + image {{
   left = {lx}
   top = {ly}
@@ -123,7 +127,9 @@ terminal-font: "{FN}"
   height = {logo}
   file = "machine-logo.png"
 }}
+# mg:end logo
 
+# mg:begin countdown
 + progress_bar {{
   id = "__timeout__"
   left = {cxp - barw // 2}
@@ -145,6 +151,7 @@ terminal-font: "{FN}"
   font = "{FN}"
   text = "Booting in %d seconds"
 }}
+# mg:end countdown
 
 # GRUB draws the first-declared component on top, so the menu goes last
 + boot_menu {{

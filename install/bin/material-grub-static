@@ -11,6 +11,7 @@ usage: material-grub-static GRUB_CFG --mode WxH [--pkg DIR] [--backup DIR] [--ti
        material-grub-static GRUB_CFG --restore [--backup DIR]"""
 import os, re, shutil, subprocess, sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import mgrub
 
 def arg(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 cfg = Path(sys.argv[1]).resolve()                      # resolve: /boot/grub2/grub.cfg may be a symlink
@@ -29,7 +30,7 @@ if "--restore" in sys.argv:
     if not pristine.exists(): sys.exit("material-grub-static: no pristine copy in %s" % backup)
     shutil.copy2(pristine, cfg); print(f"material-grub-static: restored {cfg}"); sys.exit(0)
 
-mode = arg("--mode"); timeout = arg("--timeout", "5")
+mode = arg("--mode"); timeout = mgrub.load_conf()["TIMEOUT"] or arg("--timeout", "5")      # TIMEOUT in /etc/material-grub.conf wins
 if not mode: sys.exit("material-grub-static: --mode WxH required")
 text = cfg.read_text()
 if MARK not in text and A not in text:                  # a file we have never touched (first run, or bootupd just rewrote it): remember it
