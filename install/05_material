@@ -1,10 +1,10 @@
 #!/bin/sh
 # /etc/grub.d/05_material — Material 3 Expressive theme. Runs inside grub-mkconfig.
 set -e
-PKG=/usr/share/material-grub
+PKG=${MATERIAL_PKG:-/usr/share/material-grub}
 . "${pkgdatadir:-/usr/share/grub}/grub-mkconfig_lib"
 [ -d "$PKG" ] || exit 0
-if [ -d /boot/grub2 ]; then GDIR=/boot/grub2; else GDIR=/boot/grub; fi
+if [ -n "$MATERIAL_GRUBDIR" ]; then GDIR=$MATERIAL_GRUBDIR; elif [ -d /boot/grub2 ]; then GDIR=/boot/grub2; else GDIR=/boot/grub; fi
 THEMEDIR=$GDIR/themes/material
 MODE=$(python3 "$PKG/bin/material-grub-assemble" --mode "${GRUB_GFXMODE:-}" --pkg "$PKG" --out "$THEMEDIR" 2>/dev/null | tail -n1) || exit 0
 [ -n "$MODE" ] || exit 0
