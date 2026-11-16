@@ -4,6 +4,7 @@ set -e
 HERE=$(cd "$(dirname "$0")" && pwd); PKG=$HERE/../dist/material-grub
 D=""; RES=""; RUN=1
 while [ $# -gt 0 ]; do case $1 in --dest) D=$2; shift;; --res) RES=$2; shift;; --no-run) RUN=0;; esac; shift; done
+python3 -c "import PIL" 2>/dev/null || echo "WARNING: python3 Pillow missing; the icon rail will be disabled (dnf install python3-pillow)"
 [ -d "$PKG" ] || { echo "run scripts/package.py first"; exit 1; }
 install -d "$D/usr/share/material-grub" "$D/usr/libexec" "$D/etc/grub.d" "$D/etc/systemd/system"
 cp -a "$PKG/." "$D/usr/share/material-grub/"
@@ -11,6 +12,7 @@ chmod +x "$D/usr/share/material-grub/bin/"*
 install -m755 "$HERE/postprocess.sh" "$D/usr/libexec/material-grub-postprocess"
 install -m755 "$HERE/05_material" "$D/etc/grub.d/05_material"
 install -m755 "$HERE/15_material_menu" "$D/etc/grub.d/15_material_menu"
+install -m755 "$HERE/90_material_system" "$D/etc/grub.d/90_material_system"
 install -m644 "$HERE"/systemd/material-grub.* "$D/etc/systemd/system/"
 if [ -z "$D" ]; then
   B=/var/backups/material-grub; mkdir -p "$B"

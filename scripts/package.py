@@ -22,5 +22,10 @@ if __name__ == "__main__":
             if toks: rules.append({"key": k, "tokens": toks})
     rules.sort(key=lambda r: -len("".join(r["tokens"])))
     (PKG / "rules.json").write_text(json.dumps(rules))
+    (PKG / "glyphs").mkdir()
+    from PIL import Image
+    for k, _, _, g in C.ENTRIES:
+        m = B.R.icon_mask(g, 128); im = Image.new("RGBA", (128, 128), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
+    (PKG / "palettes.json").write_text(json.dumps({k: v for k, v in B.R.PAL.items()}))
     shutil.copytree(ROOT / "install/bin", PKG / "bin"); shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
     print("package at", PKG)

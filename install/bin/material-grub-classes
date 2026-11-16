@@ -3,20 +3,14 @@
 usage: material-grub-classes GRUB_CFG [--pkg DIR]   Idempotent; marker line prevents re-processing."""
 import json, os, re, struct, subprocess, sys, tempfile
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import mgrub
 cfg = Path(sys.argv[1]); pkg = Path(sys.argv[sys.argv.index("--pkg") + 1]) if "--pkg" in sys.argv else Path("/usr/share/material-grub")
 MARK = "# material-grub: classes applied"
 text = cfg.read_text()
 if MARK in text: sys.exit(0)
 rules = json.loads((pkg / "rules.json").read_text())
 
-def key_for(title):
-    toks = re.findall(r"[a-z0-9]+", title.lower())
-    if "windows" in toks or "microsoft" in toks: return None            # handled separately
-    for r in rules:
-        t = r["tokens"]; n = len(t)
-        if any(toks[i:i + n] == t for i in range(len(toks) - n + 1)): return r["key"]
-        if "".join(t) in toks: return r["key"]
-    return None
+def key_for(title): return mgrub.key_for(title, rules)
 
 def windows_key(device):
     """Windows 11 if bootmgfw.efi reports build >= 22000; fall back to windows11 when unknown."""

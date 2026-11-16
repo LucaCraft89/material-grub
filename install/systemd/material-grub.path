@@ -1,7 +1,8 @@
 [Unit]
-Description=Re-apply Material GRUB classes when grub.cfg changes
+Description=Re-apply Material GRUB classes and rail when grub.cfg or boot entries change
 [Path]
 PathChanged=/boot/grub2/grub.cfg
 PathChanged=/boot/grub/grub.cfg
+PathChanged=/boot/loader/entries
 [Install]
 WantedBy=multi-user.target

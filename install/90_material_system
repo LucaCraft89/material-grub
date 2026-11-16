@@ -1,0 +1,6 @@
+#!/bin/sh
+# /etc/grub.d/90_material_system — Restart / Shut down entries (shown in the rail's System section)
+cat << 'EOF'
+menuentry 'Restart' --class restart --id material-reboot { reboot }
+menuentry 'Shut down' --class shutdown --id material-halt { halt }
+EOF

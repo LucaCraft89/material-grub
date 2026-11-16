@@ -19,7 +19,7 @@ res = pkg / "res" / best; aspect = (res / "aspect").read_text().strip()
 tmp = out.with_name(out.name + ".new"); shutil.rmtree(tmp, ignore_errors=True); tmp.mkdir(parents=True)
 for f in res.iterdir():
     if f.name not in ("logo_size", "aspect"): shutil.copy(f, tmp / f.name)
-(tmp / "icons").mkdir()
+(tmp / "icons").mkdir(); (tmp / ".aspect").write_text(aspect)
 classes = json.loads((pkg / "classes.json").read_text())
 for key, names in classes.items():
     src = pkg / "scenes" / aspect / "icons" / f"{names[0]}.png"
