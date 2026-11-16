@@ -11,6 +11,9 @@ shutil.copytree(theme, ESP / "boot/grub/themes/material")
 entries = [("Fedora Linux", "fedora gnu-linux gnu os"), ("Windows Boot Manager", "windows os"), ("Arch Linux", "arch gnu-linux gnu os"),
            ("Ubuntu", "ubuntu gnu-linux gnu os"), ("Debian GNU/Linux", "debian gnu-linux gnu os"), ("Some Other Linux", "gnu-linux gnu os"),
            ("UEFI Firmware Settings", "efi"), ("Reboot", "restart"), ("Shutdown", "shutdown")]
+if os.environ.get("SAMPLE"):
+    entries = [("Zorin OS", "zorin gnu-linux"), ("Bazzite", "bazzite"), ("Windows Boot Manager", "windows os"),
+               ("CachyOS", "cachyos"), ("Mystery Distro", "mystery gnu-linux gnu os"), ("Pop!_OS", "pop_os gnu-linux")]
 cfg = f"""set timeout={os.environ.get('TMO', '30')}
 set gfxmode={res}
 set gfxpayload=keep

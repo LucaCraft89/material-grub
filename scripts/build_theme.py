@@ -4,6 +4,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 sys.path.insert(0, str(Path(__file__).parent))
 import render_scene as R
+from catalog import CLASSES
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
@@ -13,9 +14,6 @@ W, H = (int(args[0]), int(args[1])) if len(args) >= 2 else (1920, 1080)
 OUT = ROOT / f"theme-{W}x{H}"
 SF = H / 1080; WD = round(1080 * W / H)   # design width at 1080 height
 
-CLASSES = {"fedora": ["fedora"], "windows": ["windows"], "arch": ["arch", "archlinux"], "ubuntu": ["ubuntu"],
-           "debian": ["debian"], "tux": ["gnu-linux", "linux", "unknown"], "firmware": ["efi", "firmware"],
-           "reboot": ["restart", "reboot"], "shutdown": ["shutdown", "poweroff"]}
 INK_TRACK, INK_FILL, INK_TEXT = "#49454F", "#E6E1E5", "#CAC4D0"
 
 def scene(entry):

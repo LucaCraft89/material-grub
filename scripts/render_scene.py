@@ -5,21 +5,12 @@ from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
 FONT = "/home/luca/.local/share/fonts/GoogleSansFlex-VariableFont_GRAD,ROND,opsz,slnt,wdth,wght.ttf"
-PAL = json.loads((ROOT / "build/palettes-expressive.json").read_text())
 H = 1080
 SS = 3  # supersample for shapes
 
-ENTRIES = [  # key, title, subtitle, icon svg
-    ("fedora", "Fedora", "Fedora Linux", "vendor/font-logos/src/vectors/fedora.svg"),
-    ("windows", "Windows", "Boot Manager", "vendor/material-symbols/window.svg"),
-    ("arch", "Arch Linux", "Rolling release", "vendor/font-logos/src/vectors/archlinux.svg"),
-    ("ubuntu", "Ubuntu", "Ubuntu Linux", "vendor/font-logos/src/vectors/ubuntu.svg"),
-    ("debian", "Debian", "GNU/Linux", "vendor/font-logos/src/vectors/debian.svg"),
-    ("tux", "Linux", "Generic Linux", "vendor/font-logos/src/vectors/tux.svg"),
-    ("firmware", "Firmware", "UEFI settings", "vendor/material-symbols/memory.svg"),
-    ("reboot", "Restart", "Reboot the machine", "vendor/material-symbols/restart_alt.svg"),
-    ("shutdown", "Shut down", "Power off", "vendor/material-symbols/power_settings_new.svg"),
-]
+from catalog import ENTRIES, SEEDS, CLASSES
+from palettes import scheme
+PAL = {k: {"seed": v, **scheme(v)} for k, v in SEEDS.items()}
 
 def font(size, wght=400, wdth=100, rond=0, opsz=None):
     f = ImageFont.truetype(FONT, size)
@@ -113,8 +104,10 @@ def panel(entry, W, ph=888, yoff=0, dyn=True):
     paste_c(im, fill(pill(pw_, ph_), p["primaryContainer"]), cx, 300 + yoff)
     paste_c(im, tinted(icon_mask(icon, 230), p["onPrimaryContainer"]), cx, 300 + yoff)
     # name + subtitle
-    text_c(d, (cx, 530 + yoff), title, font(150, 800, 135, rond=60, opsz=144), p["primary"])
-    text_c(d, (cx, 622 + yoff), sub, font(40, 420, 105), p["onSurfaceVariant"])
+    tsz = 150
+    while tsz > 60 and font(tsz, 800, 135, rond=60, opsz=144).getlength(title) > pw * 0.62: tsz -= 6
+    text_c(d, (cx, 530 + yoff), title, font(tsz, 800, 135, rond=60, opsz=144), p["primary"])
+    text_c(d, (cx, 644 + yoff), sub, font(40, 420, 105), p["onSurfaceVariant"])
     if dyn:
         # countdown: wavy track (static preview, 62% filled)
         bw, by = 560, 695; x0 = cx - bw // 2
