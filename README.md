@@ -4,6 +4,7 @@
 
 **A Material 3 Expressive theme for GRUB, where the whole screen changes color with the selected boot entry.**
 
+[![CI](https://github.com/LucaCraft89/material-grub/actions/workflows/ci.yml/badge.svg)](https://github.com/LucaCraft89/material-grub/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 ![GRUB 2.12](https://img.shields.io/badge/GRUB-2.12-blue)
 ![Material 3 Expressive](https://img.shields.io/badge/Material%203-Expressive-8A4FFF)
@@ -195,6 +196,8 @@ What was tested: the whole flow in a container with a read-only `/usr` and a sim
 make screenshots          # QEMU + OVMF run, writes docs/screenshots/
 .venv/bin/python scripts/qemu_tree.py build/shots-tree 1920x1080 down ret   # poke the VM by hand
 ```
+
+`sh tests/run.sh` runs the fast checks (syntax, unit tests, a fake-`/boot` pipeline test against `dist/material-grub`); `python3 tests/boot_smoke.py 1920x1080 dark` boots the package in QEMU and checks what GRUB drew. GitHub Actions runs both, plus the installer in Fedora, Ubuntu, Debian, Arch, openSUSE and Alpine containers, on every PR. The workflow itself has not run yet (only its commands were run locally).
 
 Nothing in development touches your real bootloader; `scripts/make_screenshots.py` builds a throw-away ESP tree.
 

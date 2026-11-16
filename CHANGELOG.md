@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- CI (GitHub Actions): syntax + unit + fake-`/boot` pipeline tests, installer matrix over six distro containers (dark/light, several resolutions), QEMU boot smoke test per scheme with screenshots as artifacts. New `tests/`.
+- QEMU helpers find OVMF on Debian/Ubuntu/Arch/Fedora layouts (or `OVMF_CODE`), work without KVM, and no longer need ImageMagick.
+
 ## 0.2.0 (2026-11-16)
 
 Highlights: light scheme, native 4K scenes, five more resolutions, experimental immutable-distro support, contributor docs.

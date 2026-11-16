@@ -47,7 +47,7 @@ def shoot(res, keys, names):
     OUT.mkdir(parents=True, exist_ok=True)
     for i, n in enumerate(names):
         if n.startswith("_"): continue
-        subprocess.run(["magick", ROOT / f"build/tree-{i}.png", "-strip", "-define", "png:compression-level=9", OUT / f"{n}.png"], check=True)
+        from PIL import Image; Image.open(ROOT / f"build/tree-{i}.png").save(OUT / f"{n}.png", optimize=True)
 
 if __name__ == "__main__":
     resl = [a for a in sys.argv[1:] if not a.startswith("--")] or ["1920x1080", "2560x1080"]
