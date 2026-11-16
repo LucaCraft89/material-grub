@@ -16,9 +16,9 @@ WD = 1920  # set per aspect in scene()
 
 INK_TRACK, INK_FILL, INK_TEXT = "#49454F", "#E6E1E5", "#CAC4D0"
 
-def scene(entry):
+def scene(entry, hero=True):
     key = entry[0]; p = R.PAL[key]
-    im, _ = R.panel(entry, WD + 48, ph=1080, yoff=60, dyn=False)     # pw == WD
+    im, _ = R.panel(entry, WD + 48, ph=1080, yoff=60, dyn=False, hero=hero)     # pw == WD
     canvas = Image.new("RGBA", (WD, 1080), R.hx(p["surface"]) + (255,)); canvas.alpha_composite(im)
     hint = R.key_hints(p); canvas.alpha_composite(hint, ((WD - hint.width) // 2, 1080 - 120))
     return canvas.convert("RGB")
@@ -44,6 +44,14 @@ def font(name, wght, wdth, size):
     subprocess.run(["grub2-mkfont", "-s", str(size), "-n", name, "-r", "0x20-0x7e,0xa0-0x17f,0x2013-0x2026",
                     "-o", str(OUT / f"{name}.pf2"), str(tmp)], check=True)
 
+def ensure_bg(aspect):
+    global WD
+    WD = ASPECTS[aspect]; d = ROOT / "build/scenes" / aspect / "bg"; d.mkdir(parents=True, exist_ok=True)
+    for e in R.ENTRIES:
+        f = d / f"{e[0]}.png"
+        if not f.exists() or "--rescene" in sys.argv: scene(e, hero=False).save(f, optimize=True); print("bg", aspect, e[0])
+    return d
+
 def ensure_scenes(aspect, only):
     global WD
     WD = ASPECTS[aspect]; d = ROOT / "build/scenes" / aspect / "icons"; d.mkdir(parents=True, exist_ok=True)
@@ -67,17 +75,36 @@ def assemble(W, H, only, pkg=None):
             for c in CLASSES[e[0]]: shutil.copy(f, OUT / "icons" / f"{c}.png")
     globals()["OUT"] = OUT
     bh = max(8, round(14 * SF)); pill_slices("bar", bh, color=INK_TRACK); pill_slices("hl", bh, color=INK_FILL)
-    fs = round(26 * SF); font("GSF-Label", 520, 105, fs)
+    fs = round(26 * SF); font("GSF-Label", 520, 105, fs); rs = max(12, round(20 * SF)); font("GSF-Raw", 450, 100, rs)
     px = lambda v: round(v * SF)
     if pkg: (OUT / "logo_size").write_text(str(px(120))); (OUT / "aspect").write_text(aspect)
     else: subprocess.run(["python3", str(Path(__file__).parent / "bgrt-logo.py"), str(OUT / "machine-logo.png"), "--size", str(px(120))], check=True)
     cxp = px(WDs / 2); barw = px(560); logo = px(120)
     lx = px(WDs - 150) - logo // 2; ly = px(140) - logo // 2
-    FN = f"GSF-Label Regular {fs}"
+    FN = f"GSF-Label Regular {fs}"; RN = f"GSF-Raw Regular {rs}"
     (OUT / "theme.txt").write_text(f'''# Material 3 Expressive GRUB theme (generated for {W}x{H}, {aspect} scenes)
 title-text: ""
 desktop-color: "#0D1411"
 terminal-font: "{FN}"
+
+# raw entry name (debug/clarity): a 1-item list that only ever shows the selected entry
++ boot_menu {{
+  left = {px(96)}
+  top = {H - px(58)}
+  width = {W - px(192)}
+  height = {px(34)}
+  item_height = {px(34)}
+  item_spacing = 0
+  item_padding = 0
+  item_icon_space = 0
+  icon_width = 1
+  icon_height = 1
+  item_font = "{RN}"
+  selected_item_font = "{RN}"
+  item_color = "#6E7681"
+  selected_item_color = "#6E7681"
+  scrollbar = false
+}}
 
 + image {{
   left = {lx}

@@ -84,7 +84,7 @@ def machine_logo(p, size):
     g = Image.open(ROOT / "build/bgrt.png").convert("L").resize((size, size), Image.LANCZOS)
     return tinted(g, p["onPrimaryContainer"])
 
-def panel(entry, W, ph=888, yoff=0, dyn=True):
+def panel(entry, W, ph=888, yoff=0, dyn=True, hero=True):
     key, title, sub, icon = entry; p = PAL[key]
     pw = W - 48
     im = fill(rrect(pw, ph, 64), p["surface"]); d = ImageDraw.Draw(im)
@@ -98,16 +98,17 @@ def panel(entry, W, ph=888, yoff=0, dyn=True):
     deco.putalpha(ImageChops.multiply(deco.getchannel("A"), clip))
     im.alpha_composite(deco)
     d = ImageDraw.Draw(im)
-    # hero pill
-    pw_, ph_ = 560, 280
-    paste_c(im, fill(pill(pw_ + 40, ph_ + 40), p["surfaceContainerHigh"]), cx, 300 + yoff)
-    paste_c(im, fill(pill(pw_, ph_), p["primaryContainer"]), cx, 300 + yoff)
-    paste_c(im, tinted(icon_mask(icon, 230), p["onPrimaryContainer"]), cx, 300 + yoff)
-    # name + subtitle
-    tsz = 150
-    while tsz > 60 and font(tsz, 800, 135, rond=60, opsz=144).getlength(title) > pw * 0.62: tsz -= 6
-    text_c(d, (cx, 530 + yoff), title, font(tsz, 800, 135, rond=60, opsz=144), p["primary"])
-    text_c(d, (cx, 644 + yoff), sub, font(40, 420, 105), p["onSurfaceVariant"])
+    if hero:
+        # hero pill
+        pw_, ph_ = 560, 280
+        paste_c(im, fill(pill(pw_ + 40, ph_ + 40), p["surfaceContainerHigh"]), cx, 300 + yoff)
+        paste_c(im, fill(pill(pw_, ph_), p["primaryContainer"]), cx, 300 + yoff)
+        paste_c(im, tinted(icon_mask(icon, 230), p["onPrimaryContainer"]), cx, 300 + yoff)
+        # name + subtitle
+        tsz = 150
+        while tsz > 60 and font(tsz, 800, 135, rond=60, opsz=144).getlength(title) > pw * 0.62: tsz -= 6
+        text_c(d, (cx, 530 + yoff), title, font(tsz, 800, 135, rond=60, opsz=144), p["primary"])
+        text_c(d, (cx, 644 + yoff), sub, font(40, 420, 105), p["onSurfaceVariant"])
     if dyn:
         # countdown: wavy track (static preview, 62% filled)
         bw, by = 560, 695; x0 = cx - bw // 2

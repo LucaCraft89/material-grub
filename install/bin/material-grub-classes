@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
-"""Rewrite menuentry classes in a grub.cfg by matching entry titles (case-insensitive). stdlib only.
-usage: material-grub-classes GRUB_CFG [--pkg DIR]   Idempotent; marker line prevents re-processing."""
-import json, os, re, struct, subprocess, sys, tempfile
+"""Annotate grub.cfg for the Material theme and refresh BLS mirrors. stdlib only. Idempotent.
+ - titles -> catalog class (case-insensitive), Windows 10/11 detection
+ - unique per-entry classes (mg_xxxx) so each kernel/recovery/advanced entry gets its own scene
+ - Fedora BLS: top level = default kernel, 'Advanced options' submenu = the rest (via mirror dirs; system files untouched)
+usage: material-grub-classes GRUB_CFG [--pkg DIR] [--bls DIR] [--loader DIR] [--blsbase /loader] [--state FILE] [--default ID]"""
+import json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent)); import mgrub
-cfg = Path(sys.argv[1]); pkg = Path(sys.argv[sys.argv.index("--pkg") + 1]) if "--pkg" in sys.argv else Path("/usr/share/material-grub")
-MARK = "# material-grub: classes applied"
-text = cfg.read_text()
-if MARK in text: sys.exit(0)
-rules = json.loads((pkg / "rules.json").read_text())
 
-def key_for(title): return mgrub.key_for(title, rules)
+def arg(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
+cfg = Path(sys.argv[1]); pkg = Path(arg("--pkg", "/usr/share/material-grub"))
+bls = Path(arg("--bls", "/boot/loader/entries")); loader = Path(arg("--loader", "/boot/loader"))
+blsbase = arg("--blsbase", "/loader" if os.path.ismount("/boot") else "/boot/loader")
+state = Path(arg("--state", "/var/lib/material-grub/entries.json")); cfgstate = state.with_name("cfg-entries.json")
+MARK = "# material-grub: classes applied"
+rules = mgrub.load_rules(pkg); classes = json.loads((pkg / "classes.json").read_text())
+alias2key = {a: k for k, al in classes.items() for a in al}
+
+def os_name():
+    try:
+        for l in Path(os.environ.get("OS_RELEASE", "/etc/os-release")).read_text().splitlines():
+            if l.startswith("NAME="): return l.split("=", 1)[1].strip('"')
+    except Exception: pass
+    return "Linux"
 
 def windows_key(device):
-    """Windows 11 if bootmgfw.efi reports build >= 22000; fall back to windows11 when unknown."""
     try:
         with tempfile.TemporaryDirectory() as mp:
             subprocess.run(["mount", "-o", "ro", device, mp], check=True, capture_output=True)
@@ -27,18 +38,84 @@ def windows_key(device):
     except Exception: pass
     return "windows11"
 
-pat = re.compile(r"^(\s*)menuentry\s+(['\"])(.*?)\2(.*)$")
-out, n = [], 0
-for line in text.splitlines():
-    m = pat.match(line)
-    if m:
-        ind, q, title, rest = m.groups()
-        key = key_for(title)
-        if key is None and re.search(r"windows|microsoft", title, re.I):
-            d = re.search(r"\(on (/dev/[^)\s]+)\)", title)
-            key = windows_key(d.group(1)) if d else "windows11"
-        if key and not re.search(rf"--class {key}\b", line.split("{")[0][:len(ind)+len(title)+40]): line = f"{ind}menuentry {q}{title}{q} --class {key}{rest}"; n += 1
-    out.append(line)
-tmp = cfg.with_name(cfg.name + ".material"); tmp.write_text(MARK + "\n" + "\n".join(out) + "\n")
-os.chmod(tmp, cfg.stat().st_mode); os.replace(tmp, cfg)
-print(f"material-grub: classes set on {n} entries")
+def key_of(title, cls=()):
+    k = mgrub.key_for(title, rules)
+    if k: return k
+    if re.search(r"windows|microsoft", title, re.I):
+        d = re.search(r"\(on (/dev/[^)\s]+)\)", title); return windows_key(d.group(1)) if d else "windows11"
+    for c in cls:
+        if c in alias2key: return alias2key[c]
+    return "tux"
+
+def mkentry(title, key, kind, level, cls, **kw):
+    info = mgrub.parse_title(title); e = {"class": cls, "key": key, "kind": kind, "level": level, "title": title, **info}; e.update(kw); return e
+
+# ---------------- phase 1: grub.cfg (only when not yet annotated) ----------------
+text = cfg.read_text(); first = MARK not in text
+bls_confs = sorted(bls.glob("*.conf")) if bls.is_dir() else []
+if first:
+    out, cfg_entries, stack = [], [], []
+    pat = re.compile(r"^(\s*)(menuentry|submenu)\s+(['\"])(.*?)\3(.*)$")
+    for line in text.splitlines():
+        m = pat.match(line)
+        if m:
+            ind, word, q, title, rest = m.groups(); level = "adv" if "submenu" in stack else "top"
+            cls = re.findall(r"--class\s+(\S+)", rest); key = key_of(title, cls); kind = mgrub.kind_of(title, key, word == "submenu")
+            c = mgrub.uid(level, title) if kind != "plain" else key
+            if not re.search(rf"--class {re.escape(c)}\b", rest): line = f"{ind}{word} {q}{title}{q} --class {c}{(' --class ' + key) if c != key else ''}{rest}"
+            cfg_entries.append(mkentry(title, key, kind, level, c))
+            if line.rstrip().endswith("{"): stack.append(word)
+        elif line.strip() == "}" and stack: stack.pop()
+        elif line.strip() == "blscfg" and bls_confs:
+            osn = os_name(); k = key_of(osn); ac = mgrub.uid("adv-menu", osn)
+            out += ["# material-grub: structured BLS entries (default kernel here, the rest under Advanced options)",
+                    f"set blsdir={blsbase}/material-top", "if blscfg; then true; else unset blsdir; blscfg; fi",
+                    f"submenu 'Advanced options for {osn}' --class {ac} --class {k} --id material-advanced {{",
+                    f"\tset blsdir={blsbase}/material-adv", "\tblscfg", "}", "unset blsdir"]
+            continue
+        out.append(line)
+    tmp = cfg.with_name(cfg.name + ".material"); tmp.write_text(MARK + "\n" + "\n".join(out) + "\n")
+    os.chmod(tmp, cfg.stat().st_mode); os.replace(tmp, cfg)
+    state.parent.mkdir(parents=True, exist_ok=True); cfgstate.write_text(json.dumps(cfg_entries))
+    print(f"material-grub: annotated {len(cfg_entries)} grub.cfg entries")
+cfg_entries = json.loads(cfgstate.read_text()) if cfgstate.exists() else []
+
+# ---------------- phase 2: BLS mirrors (always) ----------------
+bls_entries = []
+if bls_confs:
+    def parse(f):
+        d = {}
+        for l in f.read_text(errors="ignore").splitlines():
+            if " " in l: k, v = l.split(None, 1); d.setdefault(k, v.strip())
+        return f, d
+    items = [parse(f) for f in bls_confs]
+    vk = lambda it: [int(x) if x.isdigit() else x for x in re.split(r"(\d+)", it[1].get("version", ""))]
+    normal = sorted([i for i in items if "rescue" not in i[0].name.lower() and "rescue" not in i[1].get("title", "").lower()], key=lambda i: [(0, x) if isinstance(x, int) else (1, x) for x in vk(i)], reverse=True)
+    rescue = [i for i in items if i not in normal]
+    saved = arg("--default")
+    if saved is None:
+        for ed in ("grub2-editenv", "grub-editenv"):
+            try:
+                o = subprocess.run([ed, "list"], capture_output=True, text=True).stdout
+                m = re.search(r"^saved_entry=(.+)$", o, re.M)
+                if m: saved = m.group(1).strip(); break
+            except Exception: pass
+    default = next((i for i in normal if i[0].stem == saved), normal[0] if normal else None)
+    for d in ("material-top", "material-adv"): shutil.rmtree(loader / d, ignore_errors=True); (loader / d).mkdir(parents=True)
+    def mirror(item, where, level, is_default):
+        f, d = item; title = d.get("title", f.stem); key = key_of(title, [d["grub_class"]] if "grub_class" in d else [])
+        kind = mgrub.kind_of(title, key); cls = mgrub.uid(level, title)
+        lines = [l for l in f.read_text(errors="ignore").splitlines() if not l.startswith("grub_class")] + [f"grub_class {cls}"]
+        (loader / where / f.name).write_text("\n".join(lines) + "\n")
+        bls_entries.append(mkentry(title, key, kind, level, cls, default=is_default))
+    if default: mirror(default, "material-top", "top", True)
+    for it in normal + rescue:
+        if it is not default: mirror(it, "material-adv", "adv", False)
+    osn = os_name(); k = key_of(osn)
+    adv = {"class": mgrub.uid("adv-menu", osn), "key": k, "kind": "advanced", "level": "top", "title": f"Advanced options for {osn}", "count": sum(1 for e in bls_entries if e["level"] == "adv"), "os": osn}
+    bls_entries.insert(1 if default else 0, adv)
+
+# ---------------- phase 3: state for the scene renderer ----------------
+allents = bls_entries + [e for e in cfg_entries if not (e["kind"] == "advanced" and bls_entries and e["title"].startswith("Advanced options for") and False)]
+state.write_text(json.dumps(allents, indent=0))
+print(f"material-grub: state has {len(allents)} entries ({len(bls_entries)} from BLS)")

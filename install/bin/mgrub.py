@@ -13,3 +13,26 @@ def key_for(title, rules):
         if any(toks[i:i + n] == t for i in range(len(toks) - n + 1)): return r["key"]
         if "".join(t) in toks: return r["key"]
     return None
+
+import hashlib
+
+def uid(*parts): return "mg_" + hashlib.sha1("|".join(parts).encode()).hexdigest()[:10]
+
+def parse_title(title):
+    """Extract kernel/os/edition info from BLS or classic GRUB entry titles."""
+    t = title.strip(); d = {"os": None, "kver": None, "osver": None, "edition": None, "where": None}
+    m = re.search(r"\(on (/dev/[^)\s]+)\)", t)
+    if m: d["where"] = m.group(1); t = t.replace(m.group(0), "").strip()
+    m = re.match(r"^(?P<os>.+?) \((?P<kver>[^)]+)\) (?P<osver>\S+)(?: \((?P<ed>[^)]+)\))?$", t)   # BLS: Fedora Linux (6.x) 44 (Workstation)
+    if m: d.update(os=m["os"], kver=m["kver"], osver=m["osver"], edition=m["ed"]); return d
+    m = re.match(r"^(?P<os>.+?), with (?P<k>[A-Za-z]+) (?P<v>\S+)(?: \((?P<x>[^)]+)\))?$", t)        # classic: Ubuntu, with Linux 6.8.0-45-generic (recovery mode)
+    if m: d.update(os=m["os"], kver=m["v"], edition=m["x"]); return d
+    m = re.match(r"^(?P<os>[A-Za-z][A-Za-z!_ /\-]*?)\s+(?P<v>\d[\w.\-+ ]*)$", t)                        # os-prober: Ubuntu 24.04.1 LTS
+    if m: d.update(os=m["os"], osver=m["v"]); return d
+    d["os"] = t; return d
+
+def kind_of(title, key, is_submenu=False):
+    if is_submenu and re.search(r"advanced options", title, re.I): return "advanced"
+    if re.search(r"recovery|rescue", title, re.I): return "rescue"
+    if key in ("windows10", "windows11", "firmware", "reboot", "shutdown"): return "plain"
+    return "kernel"

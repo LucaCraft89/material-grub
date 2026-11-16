@@ -4,5 +4,7 @@ Description=Re-apply Material GRUB classes and rail when grub.cfg or boot entrie
 PathChanged=/boot/grub2/grub.cfg
 PathChanged=/boot/grub/grub.cfg
 PathChanged=/boot/loader/entries
+PathChanged=/boot/grub2/grubenv
+PathChanged=/boot/grub/grubenv
 [Install]
 WantedBy=multi-user.target
