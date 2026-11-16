@@ -9,7 +9,7 @@ from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = R.ROOT
-ASPECTS = {"16x9": 1920, "16x10": 1728, "21x9": 2560}   # design width at 1080 high
+ASPECTS = {"16x9": 1920, "16x10": 1728, "21x9": 2560, "32x9": 3840}   # design width at 1080 high
 HI_FROM = 1800   # screens at least this high get a native 2160-high scene set ("<aspect>@2") instead of a 2x upscale of the 1080 one
 def aspect_for(w, h):
     base = min(ASPECTS, key=lambda k: abs(ASPECTS[k] / 1080 - w / h)); return base + "@2" if h >= HI_FROM else base

@@ -129,10 +129,10 @@ detect_res() {
 if [ -n "$RES" ]; then info "resolution: $RES (from --res)"; else RES=$(detect_res); info "resolution: $RES (auto-detected)"; fi
 # the bundle to build: the exact resolution if supported, else the closest aspect ratio, then the closest height (same rule as material-grub-assemble)
 BUILD_RES=$(python3 -c 'import sys
-a="1280x720 1920x1080 1920x1200 2560x1080 2560x1440 3440x1440 3840x2160".split(); w,h=map(int,sys.argv[1].split("x"))
+a="1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split(); w,h=map(int,sys.argv[1].split("x"))
 print(sys.argv[1] if sys.argv[1] in a else min(a,key=lambda r:(abs(int(r.split("x")[0])/int(r.split("x")[1])-w/h)>0.02,abs(int(r.split("x")[1])-h))))' "$RES") || die "Bad resolution '$RES' (expected WxH)."
 [ "$BUILD_RES" != "$RES" ] && info "$RES is not a built-in size: using the $BUILD_RES theme"
-info "supported: 1280x720 1920x1080 1920x1200 2560x1080 2560x1440 3440x1440 3840x2160 (others snap to the closest aspect ratio)"
+info "supported: 1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160 (others snap to the closest aspect ratio)"
 
 # ---------- [3/6] build environment ----------
 step "Preparing the build environment"

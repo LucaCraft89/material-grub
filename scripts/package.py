@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 import build_theme as B, catalog as C
 ROOT = B.ROOT; PKG = ROOT / "dist/material-grub"
-RES_ALL = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 3440x1440 3840x2160".split()
+RES_ALL = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split()
 def opt(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 # --res WxH[,WxH...] builds only those resolutions and the scene sets they need (the 2160-high sets are 4x the size of the 1080-high ones)
 RES = opt("--res", "").split(",") if opt("--res") else RES_ALL

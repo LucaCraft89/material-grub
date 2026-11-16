@@ -27,7 +27,7 @@ sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](ht
 - **Your machine's firmware logo.** The UEFI (BGRT) logo is converted at config time and drawn in a cookie shape at the top right. Verified with a real Dell logo and synthetic white-on-black, black-on-white and coloured logos (HP/Acer/Asus style). Machines that do not expose a BGRT (some MSI/Gigabyte boards) simply show the empty cookie.
 - **Raw entry title, always visible** (small, muted) at the bottom of the screen, so it is obvious what GRUB actually sees if parsing ever goes wrong.
 - **Case-insensitive name matching.** Entry titles are matched to a distro by name, not only by GRUB's `--class`. Unknown Linux falls back to Tux; an unknown Windows version falls back to Windows 11.
-- **Many screens, one package.** Scenes are rendered per aspect ratio (16:9, 16:10, 21:9) and a tiny `theme.txt` is generated per resolution: 1280×720, 1920×1080, **1920×1200**, **2560×1080**, 2560×1440, **3440×1440**, 3840×2160. Screens 1800 or more pixels high (4K) get **native 2160-high scenes** instead of an upscaled 1080 design, so text, glyphs and the rail stay sharp.
+- **Many screens, one package.** Scenes are rendered per aspect ratio (16:9, 16:10, 21:9, 32:9) and a tiny `theme.txt` is generated per resolution: 1280×720, 1920×1080, 1920×1200, 2560×1080, 2560×1440, 2880×1800, 3440×1440, 3840×1080, 3840×1600, 3840×2160, 5120×1440, 5120×2160. Screens 1800 or more pixels high (4K, 2880×1800, 5120×2160) get **native 2160-high scenes** instead of an upscaled 1080 design, so text, glyphs and the rail stay sharp.
 - **Menu always visible.** Fedora hides the GRUB menu after a successful boot; the installer keeps it on screen.
 
 ## Gallery
@@ -123,8 +123,8 @@ sudo ./install.sh --keep-build      # keep the temporary build directory
 sudo ./install.sh --uninstall       # remove the theme and hooks
 ```
 
-**Supported resolutions:** `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `3440x1440`, `3840x2160`.
-Anything else snaps to the closest aspect ratio. The scene sets are 16:9, 16:10 and 21:9; screens at least 1800 px high use a 2160-high set
+**Supported resolutions:** `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `2880x1800`, `3440x1440`, `3840x1080`, `3840x1600`, `3840x2160`, `5120x1440`, `5120x2160`.
+Anything else snaps to the closest aspect ratio. The scene sets are 16:9, 16:10, 21:9 and 32:9; screens at least 1800 px high use a 2160-high set
 (four times the pixels, about 20 MB per set). The installer builds only the set for the resolution it detects (or `--res`), so after
 switching monitors or `GRUB_GFXMODE`, run `sudo ./install.sh --res WxH` again.
 
@@ -171,8 +171,9 @@ Nothing in development touches your real bootloader; `scripts/make_screenshots.p
 
 ## Status
 
-Developed and tested on Fedora 44 (GRUB 2.12, BLS) with QEMU/OVMF at 1920×1080, 2560×1080, 1920×1200 and
-3440×1440, and 3840×2160 (native 2160-high scenes). The first version ran on real hardware; the per-entry pills/Advanced-options structure has been verified
+Developed and tested on Fedora 44 (GRUB 2.12, BLS) with QEMU/OVMF at 1920×1080, 2560×1080, 1920×1200,
+3440×1440, 3840×2160, 2880×1800, 3840×1600 and 3840×1080. 5120×1440 and 5120×2160 are built and the scenes were checked as images, but
+QEMU/OVMF cannot create 5120-wide GOP modes, so they have **not** been booted. The first version ran on real hardware; the per-entry pills/Advanced-options structure has been verified
 in QEMU with the real `blscfg` module and a dry-run on real BLS entries.
 
 The installer's dependency detection/installation and the full theme build were verified in fresh **Fedora, Debian,
