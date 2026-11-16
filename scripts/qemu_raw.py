@@ -6,7 +6,7 @@ cfg, bls, keys = Path(sys.argv[1]), sys.argv[2], sys.argv[3:]
 ESP = ROOT / "build/esp-raw"; shutil.rmtree(ESP, ignore_errors=True)
 (ESP / "EFI/BOOT").mkdir(parents=True); (ESP / "boot/grub").mkdir(parents=True)
 mods = "normal configfile gfxterm gfxmenu png all_video efi_gop video video_fb fat part_gpt part_msdos font echo test true search reboot halt terminal gettext blscfg regexp"
-subprocess.run(["grub2-mkimage", "-O", "x86_64-efi", "-o", str(ESP / "EFI/BOOT/BOOTX64.EFI"), "-p", "/boot/grub"] + mods.split(), check=True)
+subprocess.run([shutil.which("grub2-mkimage") or shutil.which("grub-mkimage") or "grub2-mkimage", "-O", "x86_64-efi", "-o", str(ESP / "EFI/BOOT/BOOTX64.EFI"), "-p", "/boot/grub"] + mods.split(), check=True)
 shutil.copy(cfg, ESP / "boot/grub/grub.cfg")
 if bls != "-":
     if (Path(bls) / "entries").is_dir(): shutil.copytree(Path(bls), ESP / "loader")

@@ -4,7 +4,19 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageChops, ImageFilter
 
 ROOT = Path(__file__).resolve().parent.parent
-FONT = "/home/luca/.local/share/fonts/GoogleSansFlex-VariableFont_GRAD,ROND,opsz,slnt,wdth,wght.ttf"
+def _find_font():
+    """Google Sans Flex variable font: $GSF_FONT, else common locations, else fontconfig."""
+    import glob, os
+    if os.environ.get("GSF_FONT"): return os.environ["GSF_FONT"]
+    for pat in ("~/.local/share/fonts/**/GoogleSansFlex*.ttf", "~/.fonts/**/GoogleSansFlex*.ttf", "/usr/share/fonts/**/GoogleSansFlex*.ttf", str(ROOT / "fonts/GoogleSansFlex*.ttf")):
+        hits = sorted(glob.glob(os.path.expanduser(pat), recursive=True))
+        if hits: return hits[0]
+    try:
+        out = subprocess.run(["fc-match", "-f", "%{file}", "Google Sans Flex"], capture_output=True, text=True).stdout
+        if "GoogleSansFlex" in out: return out
+    except Exception: pass
+    raise SystemExit("Google Sans Flex not found. Download it from Google Fonts and set GSF_FONT=/path/to/GoogleSansFlex-VariableFont_*.ttf")
+FONT = _find_font()
 H = 1080
 SS = 3  # supersample for shapes
 

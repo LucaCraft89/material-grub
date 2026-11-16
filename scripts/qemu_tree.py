@@ -1,11 +1,12 @@
 """Boot a prepared ESP/boot tree in QEMU. usage: qemu_tree.py TREE WxH [keys...]  (TREE gets EFI/BOOT/BOOTX64.EFI added)"""
-import os, socket, subprocess, sys, time
+import os, shutil, socket, subprocess, sys, time
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 tree, res, keys = Path(sys.argv[1]), sys.argv[2], sys.argv[3:]
+(tree / "NvVars").unlink(missing_ok=True)   # stale firmware vars change boot behaviour
 (tree / "EFI/BOOT").mkdir(parents=True, exist_ok=True)
 mods = "normal configfile gfxterm gfxmenu png all_video efi_gop video video_fb fat part_gpt part_msdos font echo test true search reboot halt terminal gettext blscfg regexp"
-subprocess.run(["grub2-mkimage", "-O", "x86_64-efi", "-o", str(tree / "EFI/BOOT/BOOTX64.EFI"), "-p", "/boot/grub"] + mods.split(), check=True)
+subprocess.run([shutil.which("grub2-mkimage") or shutil.which("grub-mkimage") or "grub2-mkimage", "-O", "x86_64-efi", "-o", str(tree / "EFI/BOOT/BOOTX64.EFI"), "-p", "/boot/grub"] + mods.split(), check=True)
 sock = ROOT / "build/mon.sock"; sock.unlink(missing_ok=True); w, h = res.split("x")
 q = subprocess.Popen(["qemu-system-x86_64", "-machine", "q35", "-enable-kvm", "-cpu", "host", "-m", "1024", "-display", "none", "-vga", "none",
     "-device", f"VGA,vgamem_mb=64,xres={w},yres={h}", "-drive", "if=pflash,format=raw,readonly=on,file=/usr/share/edk2/ovmf/OVMF_CODE.fd",

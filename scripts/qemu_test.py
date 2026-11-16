@@ -6,7 +6,7 @@ theme, res = Path(sys.argv[1]).resolve(), sys.argv[2]; keys = sys.argv[3:] or ["
 ESP = ROOT / "build/esp"; shutil.rmtree(ESP, ignore_errors=True)
 (ESP / "EFI/BOOT").mkdir(parents=True); (ESP / "boot/grub/themes").mkdir(parents=True)
 mods = "normal configfile gfxterm gfxmenu png all_video efi_gop video video_fb fat part_gpt part_msdos font echo test true search reboot halt terminal gettext"
-subprocess.run(["grub2-mkimage", "-O", "x86_64-efi", "-o", str(ESP / "EFI/BOOT/BOOTX64.EFI"), "-p", "/boot/grub"] + mods.split(), check=True)
+subprocess.run([shutil.which("grub2-mkimage") or shutil.which("grub-mkimage") or "grub2-mkimage", "-O", "x86_64-efi", "-o", str(ESP / "EFI/BOOT/BOOTX64.EFI"), "-p", "/boot/grub"] + mods.split(), check=True)
 shutil.copytree(theme, ESP / "boot/grub/themes/material")
 entries = [("Fedora Linux", "fedora gnu-linux gnu os"), ("Windows Boot Manager", "windows os"), ("Arch Linux", "arch gnu-linux gnu os"),
            ("Ubuntu", "ubuntu gnu-linux gnu os"), ("Debian GNU/Linux", "debian gnu-linux gnu os"), ("Some Other Linux", "gnu-linux gnu os"),

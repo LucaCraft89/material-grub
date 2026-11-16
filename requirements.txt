@@ -1,0 +1,4 @@
+# build-time dependencies (the installed hook only needs system python3 + Pillow)
+fonttools>=4.50
+materialyoucolor>=2.0
+pillow>=10.0

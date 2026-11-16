@@ -19,6 +19,7 @@ ROLES = ["primary", "onPrimary", "primaryContainer", "onPrimaryContainer", "seco
          "secondaryContainer", "tertiary", "tertiaryContainer", "surface",
          "surfaceContainer", "surfaceContainerHigh", "onSurface", "onSurfaceVariant", "outline"]
 
+import sys; sys.path.insert(0, str(Path(__file__).parent))
 def argb(h): return 0xFF000000 | int(h.lstrip("#"), 16)
 def hexs(a): return "#%06X" % (a & 0xFFFFFF)
 
@@ -31,7 +32,7 @@ if __name__ == "__main__":
     VAR = sys.argv[1] if len(sys.argv) > 1 else "expressive"
     pal = {k: {"seed": v, **scheme(v, VAR)} for k, v in seeds.items()}
     (ROOT / ("build/palettes-%s.json" % VAR)).write_text(json.dumps(pal, indent=1))
-    f = ImageFont.truetype("/home/luca/.local/share/fonts/GoogleSansFlex-VariableFont_GRAD,ROND,opsz,slnt,wdth,wght.ttf", 18)
+    f = ImageFont.truetype(__import__("render_scene").FONT, 18)
     cw, rh = 70, 64
     W, H = 150 + cw * len(ROLES), 40 + rh * len(pal)
     im = Image.new("RGB", (W, H), "#101412"); d = ImageDraw.Draw(im)

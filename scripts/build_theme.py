@@ -41,7 +41,7 @@ def font(name, wght, wdth, size):
     f = TTFont(R.FONT)
     f = instantiateVariableFont(f, {"wght": wght, "wdth": wdth, "opsz": min(144, size), "GRAD": 0, "ROND": 0, "slnt": 0})
     f.save(tmp)
-    subprocess.run(["grub2-mkfont", "-s", str(size), "-n", name, "-r", "0x20-0x7e,0xa0-0x17f,0x2013-0x2026",
+    subprocess.run([shutil.which("grub2-mkfont") or shutil.which("grub-mkfont") or "grub2-mkfont", "-s", str(size), "-n", name, "-r", "0x20-0x7e,0xa0-0x17f,0x2013-0x2026",
                     "-o", str(OUT / f"{name}.pf2"), str(tmp)], check=True)
 
 def ensure_bg(aspect):

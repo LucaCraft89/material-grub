@@ -1,4 +1,8 @@
-.venv/
+dist/
 build/
 theme-*/
+.venv/
 __pycache__/
+*.pyc
+data/
+fonts/*.ttf
