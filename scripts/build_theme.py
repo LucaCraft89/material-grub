@@ -53,7 +53,7 @@ def font(name, wght, wdth, size):
     axes = {"wght": wght, "wdth": wdth, "opsz": min(144, size), "GRAD": 0, "ROND": 0, "slnt": 0}
     f = instantiateVariableFont(f, {k: x for k, x in axes.items() if k in {a.axisTag for a in f["fvar"].axes}})
     f.save(tmp)
-    subprocess.run([shutil.which("grub2-mkfont") or shutil.which("grub-mkfont") or "grub2-mkfont", "-s", str(size), "-n", name, "-r", "0x20-0x7e,0xa0-0x17f,0x2013-0x2026",
+    subprocess.run([shutil.which("grub2-mkfont") or shutil.which("grub-mkfont") or "grub2-mkfont", "-s", str(size), "-n", name, "-r", "0x20-0x7e,0xa0-0x24f,0x1e00-0x1eff,0x2010-0x2027,0x20a0-0x20bf,0x2190-0x2193",
                     "-o", str(OUT / f"{name}.pf2"), str(tmp)], check=True)
 
 def ensure_bg(aspect):

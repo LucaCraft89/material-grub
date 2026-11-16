@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Fonts: bitmap fonts now cover Latin Extended-A/B, Vietnamese, general punctuation, currency and arrows. Non-Latin entry titles (Cyrillic, Greek, CJK, ...) fall back to GRUB's `unicode.pf2` (copied into the theme, loaded by `05_material` / the static block) and, in the info pills, to an installed system font. Verified in QEMU. Google Sans Flex itself has no Cyrillic/Greek/CJK glyphs.
 - CI (GitHub Actions): syntax + unit + fake-`/boot` pipeline tests, installer matrix over six distro containers (dark/light, several resolutions), QEMU boot smoke test per scheme with screenshots as artifacts. New `tests/`.
 - QEMU helpers find OVMF on Debian/Ubuntu/Arch/Fedora layouts (or `OVMF_CODE`), work without KVM, and no longer need ImageMagick.
 

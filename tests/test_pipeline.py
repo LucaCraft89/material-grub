@@ -25,6 +25,9 @@ class Pipeline(unittest.TestCase):
         subprocess.run([py, BIN / "material-grub-classes", self.cfg, "--pkg", PKG, "--bls", self.entries, "--loader", self.boot / "loader", "--mirrors", gd / "material",
                         "--mirrorbase", "/grub2/material", "--fallback-all", "--state", self.state], check=True, capture_output=True)
         subprocess.run([py, BIN / "material-grub-scenes", "--theme", gd / "themes/material", "--pkg", PKG, "--state", self.state], check=True, capture_output=True)
+    def test_non_latin_titles(self):      # pills fall back to another installed font; the theme ships GRUB's unicode.pf2 when the system has it
+        (self.entries / "ostree-4-fedora.conf").write_text(ENTRY.format(v="44.1", n=4).replace("(Silverblue)", "(Рабочая станция 日本語)"))
+        self.run_all(); self.assertTrue(any((self.boot / "grub2/themes/material/icons").glob("mg_*.png")))
     def test_flow(self):
         self.run_all(); t = self.cfg.read_text()
         self.assertIn("set theme=$prefix/themes/material/theme.txt", t); self.assertIn("material-fallback", t); self.assertIn("'Restart'", t)

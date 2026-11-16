@@ -21,6 +21,9 @@ insmod png
 terminal_output gfxterm
 loadfont (\$root)$REL/MG-Label.pf2
 loadfont (\$root)$REL/MG-Raw.pf2
+EOF
+[ -f "$THEMEDIR/unicode.pf2" ] && echo "loadfont (\$root)$REL/unicode.pf2"   # non-Latin fallback glyphs
+cat << EOF
 set theme=(\$root)$REL/theme.txt
 export theme
 EOF

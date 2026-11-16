@@ -41,6 +41,7 @@ out = subprocess.run([sys.executable, str(pkg / "bin/material-grub-assemble"), "
 chosen = out.stdout.strip().splitlines()[-1] if out.stdout.strip() else ""
 if out.returncode or not chosen: sys.exit("material-grub-static: theme assembly failed: " + out.stderr.strip())
 
+UNI = "loadfont $prefix/themes/material/unicode.pf2\n" if (theme / "unicode.pf2").exists() else ""   # non-Latin fallback glyphs
 # $prefix is where GRUB found this very grub.cfg (the stub on the ESP sets it), so no device probing is needed
 block = f"""{A}
 set gfxmode={chosen},auto
@@ -52,7 +53,7 @@ insmod png
 terminal_output gfxterm
 loadfont $prefix/themes/material/MG-Label.pf2
 loadfont $prefix/themes/material/MG-Raw.pf2
-set theme=$prefix/themes/material/theme.txt
+{UNI}set theme=$prefix/themes/material/theme.txt
 export theme
 set timeout_style=menu
 set timeout={timeout}

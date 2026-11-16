@@ -20,6 +20,9 @@ tmp = out.with_name(out.name + ".new"); shutil.rmtree(tmp, ignore_errors=True); 
 for f in res.iterdir():
     if f.name not in ("logo_size", "aspect"): shutil.copy(f, tmp / f.name)
 (tmp / "icons").mkdir(); [shutil.copy(pkg / "fonts" / n, tmp / n) for n in ("OFL.txt", "TRADEMARKS.md") if (pkg / "fonts" / n).exists()]; (tmp / ".aspect").write_text(aspect)
+# glyph fallback for non-Latin titles (the bundled Google Sans Flex is Latin only): GRUB tries every loaded font, so ship its own unicode.pf2 along
+for cand in ("/usr/share/grub/unicode.pf2", "/usr/share/grub2/unicode.pf2", "/usr/share/fonts/grub/unicode.pf2", "/usr/share/fonts/truetype/unifont/unicode.pf2", "/boot/grub/fonts/unicode.pf2", "/boot/grub2/fonts/unicode.pf2"):
+    if os.path.exists(cand): shutil.copy(cand, tmp / "unicode.pf2"); break
 classes = json.loads((pkg / "classes.json").read_text())
 for key, names in classes.items():
     src = pkg / "scenes" / aspect / "icons" / f"{names[0]}.png"
