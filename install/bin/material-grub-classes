@@ -101,11 +101,11 @@ if bls_confs:
                 if m: saved = m.group(1).strip(); break
             except Exception: pass
     default = next((i for i in normal if i[0].stem == saved), normal[0] if normal else None)
-    for d in ("material-top", "material-adv"): shutil.rmtree(loader / d, ignore_errors=True); (loader / d).mkdir(parents=True)
+    for d in ("material-top", "material-adv"): shutil.rmtree(loader / d, ignore_errors=True); (loader / d).mkdir(parents=True, exist_ok=True)
     def mirror(item, where, level, is_default):
         f, d = item; title = d.get("title", f.stem); key = key_of(title, [d["grub_class"]] if "grub_class" in d else [])
         kind = mgrub.kind_of(title, key); cls = mgrub.uid(level, title)
-        lines = [l for l in f.read_text(errors="ignore").splitlines() if not l.startswith("grub_class")] + [f"grub_class {cls}"]
+        lines = [l for l in f.read_text(errors="ignore").splitlines() if l.strip() and not l.startswith("grub_class")] + [f"grub_class {cls}"]   # GRUB stops parsing a BLS entry at the first blank line, so the class must not follow one
         (loader / where / f.name).write_text("\n".join(lines) + "\n")
         bls_entries.append(mkentry(title, key, kind, level, cls, default=is_default))
     if default: mirror(default, "material-top", "top", True)

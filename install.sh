@@ -116,13 +116,22 @@ detect_res() {
     m=$(sed -n 's/^GRUB_GFXMODE=\([0-9]\{3,5\}x[0-9]\{3,5\}\).*/\1/p' /etc/default/grub | head -n1)
     [ -n "$m" ] && { echo "$m"; return; }
   fi
-  for s in /sys/class/drm/card*-eDP*/status /sys/class/drm/card*-*/status; do
+  best=""; barea=0                      # several monitors: the biggest connected one wins (a small secondary screen must not decide)
+  for s in /sys/class/drm/card*-*/status; do
     [ -f "$s" ] && [ "$(cat "$s" 2>/dev/null)" = connected ] || continue
-    m=$(head -n1 "$(dirname "$s")/modes" 2>/dev/null); [ -n "$m" ] && { echo "$m"; return; }
+    m=$(head -n1 "$(dirname "$s")/modes" 2>/dev/null); [ -n "$m" ] || continue
+    a=$(( ${m%x*} * ${m#*x} )) 2>/dev/null || continue
+    [ "$a" -gt "$barea" ] && { barea=$a; best=$m; }
   done
+  [ -n "$best" ] && { echo "$best"; return; }
   echo 1920x1080
 }
 if [ -n "$RES" ]; then info "resolution: $RES (from --res)"; else RES=$(detect_res); info "resolution: $RES (auto-detected)"; fi
+# the bundle to build: the exact resolution if supported, else the closest aspect ratio, then the closest height (same rule as material-grub-assemble)
+BUILD_RES=$(python3 -c 'import sys
+a="1280x720 1920x1080 1920x1200 2560x1080 2560x1440 3440x1440 3840x2160".split(); w,h=map(int,sys.argv[1].split("x"))
+print(sys.argv[1] if sys.argv[1] in a else min(a,key=lambda r:(abs(int(r.split("x")[0])/int(r.split("x")[1])-w/h)>0.02,abs(int(r.split("x")[1])-h))))' "$RES") || die "Bad resolution '$RES' (expected WxH)."
+[ "$BUILD_RES" != "$RES" ] && info "$RES is not a built-in size: using the $BUILD_RES theme"
 info "supported: 1280x720 1920x1080 1920x1200 2560x1080 2560x1440 3440x1440 3840x2160 (others snap to the closest aspect ratio)"
 
 # ---------- [3/6] build environment ----------
@@ -142,11 +151,11 @@ ok "build environment ready"
 
 # ---------- [4/6] render ----------
 step "Rendering the theme (the long step: about 1-3 minutes on a modern CPU, up to 6 on a slow one)"
-info "drawing 3 aspect-ratio scene sets in parallel, then one bundle per resolution"
+info "drawing the scene set for $BUILD_RES (native 2160-high design for 4K-class screens), then its theme bundle"
 GSF_FONT=$(ls "$BUILD"/fonts/GoogleSansFlex*.ttf | head -n1); export GSF_FONT PYTHONUNBUFFERED=1
-.venv/bin/python scripts/package.py >build.log 2>&1 &
+.venv/bin/python scripts/package.py --res "$BUILD_RES" >build.log 2>&1 &
 PKGPID=$!
-sleep 3; ITEMS=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' build.log | head -n1); ITEMS=${ITEMS:-331}
+sleep 3; ITEMS=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' build.log | head -n1); ITEMS=${ITEMS:-109}
 wait_job "$PKGPID" build.log "rendering scenes" "$ITEMS" || { tail -n 25 build.log >&2; die "Build failed (log above)."; }
 [ -d dist/material-grub ] || die "Build produced no package."
 ok "rendered $(find dist/material-grub/scenes -name '*.png' | wc -l) scene images and $(ls dist/material-grub/res | wc -l) resolution bundles in $(elapsed)"
