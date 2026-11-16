@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Native 2160-high scene sets (`16x9@2`, ...) for screens 1800+ px high instead of a 2x upscale; every hero/pill/rail coordinate scales with scene height (the code landed with #2). Glyph masks are rendered at 512 px.
+- The installer (and `package.py --res`) builds only the scene set for the chosen resolution.
+
 ## 0.1.0 (2026-11-16)
 
 First public release.
