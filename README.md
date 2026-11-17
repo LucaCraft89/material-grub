@@ -19,6 +19,30 @@ distro's brand colour. Move the selection and the entire screen, rail and pills 
 Kernel versions, system versions and recovery entries are shown as info pills, and a
 sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex).
 
+## Getting started
+
+**On your computer's GRUB** (Linux with GRUB 2; about 2 to 4 minutes):
+
+```sh
+git clone https://github.com/LucaCraft89/material-grub.git
+cd material-grub
+sudo ./install.sh          # asks for style, colour scheme and resolution; Enter keeps the defaults
+```
+
+Reboot and the new menu is there. Want another look later? `sudo ./install.sh --style split --scheme light`. Want it gone? `sudo ./install.sh --uninstall` (your original GRUB files are backed up in `/var/backups/material-grub`). Keep a live USB around the first time, since this edits your bootloader configuration.
+
+**On a Ventoy USB stick** (no root, nothing on your computer changes):
+
+```sh
+git clone https://github.com/LucaCraft89/material-grub.git
+cd material-grub
+./install.sh --ventoy      # pick the stick, then style and scheme
+```
+
+Boot from the stick. Copy ISOs onto it as usual, from any computer; the theme picks them up by file name.
+
+Which style? Pick by look in the [gallery](docs/gallery.md): `rail`, `clean`, `list` and `split` on the PC, `full` and `list` on Ventoy. All options: [Install](#install) and [Ventoy](#ventoy).
+
 ## Ventoy
 
 The same theme runs on the menu of a [Ventoy](https://www.ventoy.net) USB stick, and it follows the ISOs on the stick: add, rename or remove files on any computer and nothing needs to run again. A full-screen picker with the real file name, or a list; dark or light; Ventoy's own menus are themed too, and an image with `pnlug` in its name gets the Pordenone Linux User Group's colours and logo.
