@@ -6,7 +6,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 WIN, SYS = {"windows10", "windows11"}, {"firmware", "reboot", "shutdown"}
-STYLES = ("rail", "clean", "list")
+STYLES = ("rail", "clean", "list", "split")
+LISTY = ("list", "split")      # styles that bake a list into the scene; `split` is `list` with the hero on the left and the list on the right
 hexc = lambda c: tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
 
 def poly_mask(size, fn, ss=3, n=720):
@@ -249,19 +250,19 @@ class Renderer:
             a = min(max(sel - k // 2, 0), n - k); b = a + k
             if height(a, b) <= avail: return a, b, height(a, b)
         return sel, sel + 1, row
-    def draw_list(self, canvas, p, items, sel, opts):
+    def draw_list(self, canvas, p, items, sel, opts, x0=None):
         u = self.u; L = self.LIST; W, H = canvas.size; row, gap, div = u(L["row"]), u(L["gap"]), u(L["div"]); col = u(L["col"])
-        a, b, h = self.list_window(items, sel or 0); x0 = (W - col) // 2      # sel=None: nothing highlighted (fallback scene for entries that arrived after install)
+        a, b, h = self.list_window(items, sel or 0); x0 = (W - col) // 2 if x0 is None else x0; mid = x0 + col // 2      # sel=None: nothing highlighted (fallback scene for entries that arrived after install)
         top = max(u(L["top"]), min((H - h) // 2, u(L["bottom"]) - h)); y = top; shape = opts.get("shape", "cookie")
         def more(n, y):
-            im = self.pill(f"+{n} more", p, "plain", None, h=u(L["more_h"])); canvas.alpha_composite(im, ((W - im.width) // 2, y)); return y + im.height + u(10)
+            im = self.pill(f"+{n} more", p, "plain", None, h=u(L["more_h"])); canvas.alpha_composite(im, (mid - im.width // 2, y)); return y + im.height + u(10)
         if a > 0: y = more(a, y)
         d = ImageDraw.Draw(canvas)
         for k in range(a, b):
             e = items[k]
             if k > a:
                 if self._group(e["key"]) != self._group(items[k - 1]["key"]):
-                    ly = y + div // 2 - gap // 2 - u(1); d.rounded_rectangle([W // 2 - u(60), ly, W // 2 + u(60), ly + u(2)], radius=u(1), fill=hexc(p["outline"]) + (150,)); y += div
+                    ly = y + div // 2 - gap // 2 - u(1); d.rounded_rectangle([mid - u(60), ly, mid + u(60), ly + u(2)], radius=u(1), fill=hexc(p["outline"]) + (150,)); y += div
                 else: y += gap
             on = sel is not None and k == sel
             sh = self.shape(shape, row, p["primary"] if on else p["surfaceContainerHigh"]); canvas.alpha_composite(sh, (x0, y))
@@ -291,8 +292,10 @@ class Renderer:
     def render_entry(self, e, bg_path, groups, style="rail", opts=None, menu=None, by_class=None):
         """Per-entry scene. Kernel / rescue / advanced: bg + hero + info pills. Plain entries in clean/list styles pass their class hero scene as bg_path."""
         opts = opts or {}; p = self.pal[e["key"]]; sc = Image.open(bg_path).convert("RGBA")
-        if style == "list":
-            items, sel = self.level_items(menu, by_class or {}, e); self.decorate(sc, p, opts); self.draw_list(sc, p, items, sel, opts); return sc.convert("RGB")
+        if style in LISTY:
+            items, sel = self.level_items(menu, by_class or {}, e); self.decorate(sc, p, opts)
+            if style == "split": self.draw_side_hero(sc, e["key"], p, opts, {"advanced": "gear", "rescue": "wrench"}.get(e["kind"]), self.title_for(e))
+            self.draw_list(sc, p, items, sel, opts, self.split_x(sc.width) if style == "split" else None); return sc.convert("RGB")
         if e["kind"] != "plain": self.hero(sc, e, p)
         if style == "clean":
             prev, nxt = self.neighbours(menu, by_class or {}, e, opts.get("wrap", True)); return self.render_clean(e, sc, prev, nxt, opts).convert("RGB")
@@ -300,19 +303,24 @@ class Renderer:
     def render_list_fallback(self, key, bg_path, items, opts=None):
         """`list` scene with the whole menu level and no highlight: shown for an entry the scene set does not know (an ISO added after install)."""
         opts = opts or {}; p = self.pal[key]; sc = Image.open(bg_path).convert("RGBA"); self.decorate(sc, p, opts); self.draw_list(sc, p, items, None, opts); return sc.convert("RGB")
-    def render_list_hero(self, key, bg_path, opts=None):
-        """Dynamic `list` scene (no per-file data): the distro's glyph in a cookie and its name on the left. The rows are drawn by GRUB itself (a native boot_menu), so the scene works for any ISO list."""
-        opts = opts or {}; p = self.pal[key]; u = self.u; sc = Image.open(bg_path).convert("RGBA"); self.decorate(sc, p, opts)
-        W = sc.width; cx, cy = round(W * 0.25), u(450)
-        self.paste_c(sc, self.shape("cookie", u(400), p["primaryContainer"]), cx, cy)
-        self.paste_c(sc, self.glyph(key, u(200), hexc(p["onPrimaryContainer"]) + (255,)), cx, cy)
-        title = self.title_for({"kind": "plain", "key": key}); size = u(96)
+    @staticmethod
+    def split_x(W): return round(W * 0.47)      # left edge of the list in `split` (and in the dynamic Ventoy list)
+    def draw_side_hero(self, sc, key, p, opts, acc=None, title=None):
+        """The hero of `split` / the dynamic Ventoy list: the distro's glyph in a big cookie on the left (a gear / wrench next to it for Advanced / Rescue) and its name below."""
+        u = self.u; W = sc.width; cx, cy = round(W * 0.25), u(450)
+        self.paste_c(sc, self.shape("cookie", u(400), p["primaryContainer"]), cx, cy); ink = hexc(p["onPrimaryContainer"]) + (255,)
+        if acc: self.paste_c(sc, self.glyph(key, u(150), ink), cx - u(62), cy); self.paste_c(sc, self.glyph(acc, u(96), ink), cx + u(88), cy)
+        else: self.paste_c(sc, self.glyph(key, u(200), ink), cx, cy)
+        title = title or self.title_for({"kind": "plain", "key": key}); size = u(96)
         while size > u(48) and self.font(size, 800, 135, 60).getlength(title) > W * 0.38: size -= u(4)
         ImageDraw.Draw(sc).text((cx, cy + u(290)), title, font=self.font(size, 800, 135, 60), fill=hexc(p["primary"]) + (255,), anchor="mm")
-        return sc.convert("RGB")
+    def render_list_hero(self, key, bg_path, opts=None):
+        """Dynamic `list` scene (no per-file data): the distro's glyph in a cookie and its name on the left. The rows are drawn by GRUB itself (a native boot_menu), so the scene works for any ISO list."""
+        opts = opts or {}; p = self.pal[key]; sc = Image.open(bg_path).convert("RGBA"); self.decorate(sc, p, opts); self.draw_side_hero(sc, key, p, opts); return sc.convert("RGB")
     def render_class(self, key, icon_path, groups, style="rail", opts=None, menu=None, rail_sel=None):
         """Class-level scene (fallbacks, and plain entries in the rail style): the build-time hero scene + cookie + hints + style furniture."""
         opts = opts or {}; p = self.pal[key]; sc = Image.open(icon_path).convert("RGBA")
         if style == "list": self.decorate(sc, p, opts); return sc.convert("RGB")      # fallback only: the real list scenes are per entry
+        if style == "split": return self.render_list_hero(key, icon_path, opts)
         if style == "clean": return self.render_clean({"key": key, "kind": "plain", "title": key}, sc, None, None, opts).convert("RGB")
         self.decorate(sc, p, opts); self.draw_rail(sc, p, groups, rail_sel or key); return sc.convert("RGB")      # rail_sel: the slot to highlight when the rail shows sections instead of one slot per entry

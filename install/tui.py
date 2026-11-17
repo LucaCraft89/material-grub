@@ -24,6 +24,7 @@ def snap(res):
 WIRE = {
  "rail": ["+------------------+", "|[o]          (o) |", "| o     ( icon )  |", "| o     Fedora    |", "|[o]   [pills]    |", "+------[hints]-----+"],
  "clean": ["+------------------+", "| (next panel peek)|", "|  ( chip )   (o)  |", "|  (  icon  )      |", "|  ( chip )        |", "| (next panel peek)|"],
+ "split": ["+------------------+", "|   (o)    (o) Fedora|", "|  ( icon )  (o) Windows|", "|  Fedora    (o) Restart|", "|                   |", "+------[hints]-----+"],
  "list": ["+------------------+", "|            (o)  |", "|  (o) [ Fedora  ] |", "|  (o) [ Windows ] |", "|  (o) [ Restart ] |", "+------[hints]-----+"],
 }
 
@@ -80,7 +81,8 @@ def build_steps(presets, monitors, immutable, sticks=None):
     steps.append({"id": "STYLE", "title": "Style", "type": "choice", "cur": 0, "options": [
         opt("rail", "Full screen with a left rail", "The default: a big hero panel for the selected entry and a rail of icons on the left, grouped Linux | Windows | System."),
         opt("clean", "Full screen, no rail", "The very first design: a big panel per entry, with the previous and next entry peeking in above and below in their own colours and small label chips on the edges."),
-        opt("list", "Centered list", "The whole menu as a centred list: each entry is an icon in a Material shape plus its name in a pill; the selected row is highlighted and the background follows its colour.")]})
+        opt("list", "Centered list", "The whole menu as a centred list: each entry is an icon in a Material shape plus its name in a pill; the selected row is highlighted and the background follows its colour."),
+        opt("split", "Split: hero left, list right", "Like the centred list (icon in a Material shape, name in a pill, separators between Linux, Windows and System), but moved to the right so the distro's big logo and name fill the left half.")]})
     steps.append({"id": "SCHEME", "title": "Colour scheme", "type": "choice", "cur": 0, "options": [
         opt("dark", "Dark", "Deep Material 3 surfaces, easy on the eyes in a dark room. This is the colour scheme baked into the scene images."),
         opt("light", "Light", "Light Material 3 surfaces. The scheme is chosen when the images are built, so switching later means installing again.")]})
@@ -144,7 +146,7 @@ def answers(steps, presets):
     if a.get("COOKIE") == "off": a["LOGO"] = "off"
     return a
 
-CHECK = {"RES": RES_RE, "STYLE": re.compile(r"^(rail|clean|list)$"), "SCHEME": re.compile(r"^(dark|light)$"), "COOKIE": re.compile(r"^(on|off)$"), "LOGO": re.compile(r"^(on|off)$"),
+CHECK = {"RES": RES_RE, "STYLE": re.compile(r"^(rail|clean|list|split)$"), "SCHEME": re.compile(r"^(dark|light)$"), "COOKIE": re.compile(r"^(on|off)$"), "LOGO": re.compile(r"^(on|off)$"),
          "HINTS": re.compile(r"^(on|off)$"), "RAW_NAME": re.compile(r"^(on|off)$"), "COUNTDOWN": re.compile(r"^(on|off)$"), "TIMEOUT": re.compile(r"^[0-9]{0,4}$"),
          "IMMUTABLE": re.compile(r"^(yes|no)$"), "TARGET": re.compile(r"^(grub|ventoy)$"), "MODE": re.compile(r"^(dynamic|snapshot)$"),
          "STICK": re.compile(r"^(dev:/dev/[A-Za-z0-9/_.-]+|/[^'\x00-\x1f]*)$"), "RESX": re.compile(r"^([0-9]{3,5}x[0-9]{3,5}(,[0-9]{3,5}x[0-9]{3,5})*)?$")}

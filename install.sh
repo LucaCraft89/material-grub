@@ -23,7 +23,7 @@ while [ $# -gt 0 ]; do
     --res) RES=${2:?--res needs WxH}; shift;;
     --ventoy) VENTOY=1; case ${2:-} in ""|-*) ;; *) STICK=$2; shift;; esac;;
     --mode) VMODE=${2:?--mode needs dynamic or snapshot}; shift; case $VMODE in dynamic|snapshot) ;; *) echo "--mode must be dynamic or snapshot" >&2; exit 2;; esac;;
-    --style) STYLE=${2:?--style needs rail, clean or list}; shift; case $STYLE in rail|clean|list) ;; *) echo "--style must be rail, clean or list" >&2; exit 2;; esac;;
+    --style) STYLE=${2:?--style needs rail, clean, list or split}; shift; case $STYLE in rail|clean|list|split) ;; *) echo "--style must be rail, clean, list or split" >&2; exit 2;; esac;;
     --cookie) COOKIE=on;; --no-cookie) COOKIE=off;; --logo) LOGO=on;; --no-logo) LOGO=off;; --hints) HINTS=1; HINTS_SET=1;; --tui) TUIMODE=force;; --no-tui) TUIMODE=no;;
     --scheme) SCHEME=${2:?--scheme needs light or dark}; SCHEME_SET=1; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
     --immutable) IMM=1;; --yes|-y) YES=1;; --pkg) PREBUILT=${2:?--pkg needs a directory}; shift;; --dist-out) DISTOUT=${2:?--dist-out needs a directory}; shift;;

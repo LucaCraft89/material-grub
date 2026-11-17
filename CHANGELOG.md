@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- New fourth style for the PC: `STYLE=split` (`install.sh --style split`). The centred list moved to the right, the selected entry's logo in a big cookie and its name on the left (Advanced / Rescue show their gear / wrench). Every row keeps its themed icon-in-a-shape, highlight colour and the separators between Linux, Windows and System. On a Ventoy stick `split` is the same as `list` (its list already has that layout).
+
 Ventoy support.
 
 - The cookie now shows the real Ventoy logo (blue disc with a USB stick, full colour) instead of the Material "V"; vendored from the Ventoy release as `vendor/ventoy/VentoyLogo.png` and shipped in the package. `--logo FILE` keeps its colours too.

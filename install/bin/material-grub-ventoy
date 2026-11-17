@@ -156,6 +156,7 @@ if "--uninstall" in sys.argv: uninstall(); sys.exit(0)
 try: import mgscenes; from PIL import Image
 except ImportError: sys.exit("material-grub-ventoy: Pillow is required")
 conf = mgrub.load_conf(arg("--conf", str(stick / "ventoy/material-grub.conf"))); style = conf["STYLE"]
+if style == "split": style = "list"      # the Ventoy list already is hero-left / list-right
 conf["COUNTDOWN"] = "on" if conf["TIMEOUT"] else "off"          # Ventoy has no timeout unless one is configured
 rules = mgrub.load_rules(PKG); classes = json.loads((PKG / "classes.json").read_text())
 avail = sorted(p.name for p in (PKG / "res").iterdir())

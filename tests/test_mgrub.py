@@ -70,6 +70,8 @@ class Conf(unittest.TestCase):
         with tempfile.NamedTemporaryFile("w", suffix=".conf", delete=False) as f: f.write("STYLE=List\nHINTS=off\nCOOKIE=no\nSCHEME=sepia\n"); n = f.name
         c = mgrub.load_conf(n); os.unlink(n)
         self.assertEqual((c["STYLE"], c["HINTS"], c["COOKIE"], c["SCHEME"]), ("list", "off", "off", "dark"))   # bad SCHEME ignored
+        with tempfile.NamedTemporaryFile("w", suffix=".conf", delete=False) as f: f.write("STYLE=split\n"); n = f.name
+        self.assertEqual(mgrub.load_conf(n)["STYLE"], "split"); os.unlink(n)
         d = mgrub.load_conf("/nonexistent"); self.assertEqual((d["STYLE"], d["HINTS"], d["COOKIE"]), ("rail", "on", "on"))
         t = "# mg:begin logo\nY\n# mg:end logo\nb\n"
         self.assertEqual(mgrub.apply_conf_to_theme(t, c), "b\n", "COOKIE=off removes the logo block too")
