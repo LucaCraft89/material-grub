@@ -4,6 +4,7 @@
 
 **A Material 3 Expressive theme for GRUB, where the whole screen changes color with the selected boot entry.**
 
+[![CI](https://github.com/LucaCraft89/material-grub/actions/workflows/ci.yml/badge.svg)](https://github.com/LucaCraft89/material-grub/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
 ![GRUB 2.12](https://img.shields.io/badge/GRUB-2.12-blue)
 ![Material 3 Expressive](https://img.shields.io/badge/Material%203-Expressive-8A4FFF)
@@ -29,6 +30,7 @@ sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](ht
 - **Case-insensitive name matching.** Entry titles are matched to a distro by name, not only by GRUB's `--class`. Unknown Linux falls back to Tux; an unknown Windows version falls back to Windows 11.
 - **Many screens, one package.** Scenes are rendered per aspect ratio (16:9, 16:10, 21:9, 32:9) and a tiny `theme.txt` is generated per resolution: 1280×720, 1920×1080, 1920×1200, 2560×1080, 2560×1440, 2880×1800, 3440×1440, 3840×1080, 3840×1600, 3840×2160, 5120×1440, 5120×2160. Screens 1800 or more pixels high (4K, 2880×1800, 5120×2160) get **native 2160-high scenes** instead of an upscaled 1080 design, so text, glyphs and the rail stay sharp.
 - **Dark (default) or light.** `sudo ./install.sh --scheme light` builds the light Material 3 Expressive scheme: neutral countdown, raw-name and progress colours, the desktop colour and the rail glyphs switch with it (contrast checked: all text at least 5:1; see the [gallery](#gallery)).
+- **Non-Latin names.** The bundled font is Latin (incl. Latin Extended and Vietnamese). Cyrillic, Greek, CJK and other titles use GRUB's own `unicode.pf2` as glyph fallback in the menu line, and any installed system font (via fontconfig) in the info pills.
 - **Menu always visible.** Fedora hides the GRUB menu after a successful boot; the installer keeps it on screen.
 
 ## Gallery
@@ -134,11 +136,14 @@ Then reboot. That's it.
 ```sh
 sudo ./install.sh --res 1920x1200   # force a resolution instead of auto-detecting
 sudo ./install.sh --scheme light    # light variant instead of dark
+sudo ./install.sh --prebuilt        # download the release's prebuilt theme: no build tools, no pip
 sudo ./install.sh --no-deps         # you installed the dependencies yourself
 sudo ./install.sh --stage-only      # install deps and build, but do not touch GRUB
 sudo ./install.sh --keep-build      # keep the temporary build directory
 sudo ./install.sh --uninstall       # remove the theme and hooks
 ```
+
+**Prebuilt themes:** each release attaches the theme for every supported resolution and both schemes plus `SHA256SUMS` (built by `.github/workflows/release.yml` when a `vX.Y.Z` tag is pushed; the tag must equal `VERSION`). `--prebuilt` downloads the matching one, verifies the checksum and installs it. It is opt-in because the package contains scripts that run as root and the checksum comes from the same release (it guards against corruption, not a compromised release). There is no `--no-hints` variant. This is the easiest route on immutable systems. Until the first release that contains the assets is published, `--prebuilt` reports a download error; the release workflow itself has not run yet.
 
 **Supported resolutions:** `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `2880x1800`, `3440x1440`, `3840x1080`, `3840x1600`, `3840x2160`, `5120x1440`, `5120x2160`.
 Anything else snaps to the closest aspect ratio. The scene sets are 16:9, 16:10, 21:9 and 32:9; screens at least 1800 px high use a 2160-high set
@@ -169,7 +174,7 @@ The installer detects `grub2-mkconfig` (Fedora/RHEL) and `grub-mkconfig` (Debian
 `menuentry`/`submenu` entries (Debian-family and Arch style "Advanced options for ...") are annotated and themed
 directly. Fedora's BootLoaderSpec (BLS) entries get the *default kernel on top, rest under Advanced options*
 structure through mirror directories in `/boot/loader/material-top` and `/boot/loader/material-adv`; Fedora's own
-files are never edited. **Fedora 44 is the primary target; other distros have not been tested on real hardware.**
+files are never edited. Systems without `blscfg` (Debian, Ubuntu, Arch: classic `menuentry`/`submenu`) are themed directly from `grub.cfg`; `blscfg` calls with `--path` or `--show-*` options are left untouched (themed by class, no pills or Advanced grouping). **Fedora 44 is the primary target; other distros have not been tested on real hardware.**
 
 ### Immutable systems (ostree / bootc: Silverblue, Kinoite, Bazzite, uCore, ...) - experimental
 
@@ -185,6 +190,8 @@ What was tested: the whole flow in a container with a read-only `/usr` and a sim
 
 ## Customising
 
+- **Runtime options:** `/etc/material-grub.conf` (`RAW_NAME`, `COUNTDOWN`, `LOGO`, `TIMEOUT`); apply with `sudo material-grub-apply`. Key-hint pills are baked into the scenes: `sudo ./install.sh --no-hints`.
+
 - **Seed colours, names, aliases:** `scripts/catalog.py` is the single source of truth. Colours marked `proposed` are hand-picked, not official, and are happy to be changed (open a PR). Rebuild with `make package`.
 - **Add a distro:** add a row to `catalog.py` (key, title, subtitle, glyph, seed colour, aliases); the full guide is [docs/adding-a-distro.md](docs/adding-a-distro.md). Unknown distros already fall back to Tux.
 - **Layout and shapes:** `scripts/render_scene.py` (background scene) and `install/bin/material-grub-scenes` (hero, pills, rail, drawn at config time).
@@ -195,6 +202,8 @@ What was tested: the whole flow in a container with a read-only `/usr` and a sim
 make screenshots          # QEMU + OVMF run, writes docs/screenshots/
 .venv/bin/python scripts/qemu_tree.py build/shots-tree 1920x1080 down ret   # poke the VM by hand
 ```
+
+`sh tests/run.sh` runs the fast checks (syntax, unit tests, a fake-`/boot` pipeline test against `dist/material-grub`); `python3 tests/boot_smoke.py 1920x1080 dark` boots the package in QEMU and checks what GRUB drew. GitHub Actions runs both, plus the installer in Fedora, Ubuntu, Debian, Arch, openSUSE and Alpine containers, on every PR. The workflow itself has not run yet (only its commands were run locally).
 
 Nothing in development touches your real bootloader; `scripts/make_screenshots.py` builds a throw-away ESP tree.
 

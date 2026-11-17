@@ -29,6 +29,29 @@ def font(size, wght=500, wdth=100, rond=0):
         n = ax["name"].decode() if isinstance(ax["name"], bytes) else ax["name"]
         v = next((want[k] for k in want if k in n.lower()), ax["default"]); vals.append(min(max(v, ax["minimum"]), ax["maximum"]))
     f.set_variation_by_axes(vals); return f
+import os, subprocess
+_nd = {}
+def _render(f, c):
+    im = Image.new("L", (96, 96)); ImageDraw.Draw(im).text((8, 8), c, font=f, fill=255); return im.tobytes()
+def has_glyphs(f, text):    # a character the font lacks renders as its .notdef glyph; compare with a codepoint no font maps
+    nd = _nd.setdefault(id(f), _render(f, "\U0010FFFF"))
+    return all(c.isspace() or _render(f, c) != nd for c in text)
+_fb = {}
+def fallback_font(text, size):
+    """Google Sans Flex is Latin only: for pills with other scripts use any installed font that has the characters (fontconfig, else common paths)."""
+    want = sorted({c for c in text if ord(c) > 0x24f})[:6]
+    key = tuple(want)
+    if key not in _fb:
+        cands = []
+        try: cands.append(subprocess.run(["fc-match", "-f", "%{file}", "sans:charset=" + " ".join("%x" % ord(c) for c in want)], capture_output=True, text=True, timeout=5).stdout.strip())
+        except Exception: pass
+        cands += ["/usr/share/fonts/noto/NotoSans-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", "/usr/share/fonts/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf"]
+        _fb[key] = next((c for c in cands if c and os.path.exists(c)), None)
+    return ImageFont.truetype(_fb[key], size) if _fb[key] else None
+def text_font(text, size, wght=500, wdth=100, rond=0):
+    f = font(size, wght, wdth, rond)
+    if all(ord(c) < 0x250 for c in text) or has_glyphs(f, text): return f
+    return fallback_font(text, size) or f
 _g = {}
 def glyph(name, size, color):
     a = _g.setdefault(name, Image.open(pkg / "glyphs" / f"{name}.png").convert("RGBA").getchannel("A"))
@@ -40,7 +63,7 @@ def paste_c(dst, src, cx, cy): dst.alpha_composite(src, (round(cx - src.width / 
 
 def pill(text, p, style="plain", icon=None, h=None):
     h = h or u(58)
-    f = font(u(28), 560, 104); tw = int(f.getlength(text)); ic = u(30) if icon else 0
+    f = text_font(text, u(28), 560, 104); tw = int(f.getlength(text)); ic = u(30) if icon else 0
     w = u(28) * 2 + tw + (ic + u(10) if icon else 0)
     bg, fg = ((hexc(p["primaryContainer"]), hexc(p["onPrimaryContainer"])) if style == "accent" else (hexc(p["surfaceContainerHigh"]), hexc(p["onSurface"])))
     im = rrect(w, h, h // 2, bg + (255,)); d = ImageDraw.Draw(im); x = u(28)

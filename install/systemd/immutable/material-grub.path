@@ -6,5 +6,6 @@ PathChanged=/boot/grub/grub.cfg
 PathChanged=/boot/loader
 PathChanged=/boot/loader/entries
 PathChanged=/boot/grub2/grubenv
+PathChanged=/etc/material-grub.conf
 [Install]
 WantedBy=multi-user.target

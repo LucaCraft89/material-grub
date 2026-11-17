@@ -11,6 +11,7 @@ usage: material-grub-static GRUB_CFG --mode WxH [--pkg DIR] [--backup DIR] [--ti
        material-grub-static GRUB_CFG --restore [--backup DIR]"""
 import os, re, shutil, subprocess, sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent)); import mgrub
 
 def arg(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 cfg = Path(sys.argv[1]).resolve()                      # resolve: /boot/grub2/grub.cfg may be a symlink
@@ -29,7 +30,7 @@ if "--restore" in sys.argv:
     if not pristine.exists(): sys.exit("material-grub-static: no pristine copy in %s" % backup)
     shutil.copy2(pristine, cfg); print(f"material-grub-static: restored {cfg}"); sys.exit(0)
 
-mode = arg("--mode"); timeout = arg("--timeout", "5")
+mode = arg("--mode"); timeout = mgrub.load_conf()["TIMEOUT"] or arg("--timeout", "5")      # TIMEOUT in /etc/material-grub.conf wins
 if not mode: sys.exit("material-grub-static: --mode WxH required")
 text = cfg.read_text()
 if MARK not in text and A not in text:                  # a file we have never touched (first run, or bootupd just rewrote it): remember it
@@ -41,6 +42,7 @@ out = subprocess.run([sys.executable, str(pkg / "bin/material-grub-assemble"), "
 chosen = out.stdout.strip().splitlines()[-1] if out.stdout.strip() else ""
 if out.returncode or not chosen: sys.exit("material-grub-static: theme assembly failed: " + out.stderr.strip())
 
+UNI = "loadfont $prefix/themes/material/unicode.pf2\n" if (theme / "unicode.pf2").exists() else ""   # non-Latin fallback glyphs
 # $prefix is where GRUB found this very grub.cfg (the stub on the ESP sets it), so no device probing is needed
 block = f"""{A}
 set gfxmode={chosen},auto
@@ -52,7 +54,7 @@ insmod png
 terminal_output gfxterm
 loadfont $prefix/themes/material/MG-Label.pf2
 loadfont $prefix/themes/material/MG-Raw.pf2
-set theme=$prefix/themes/material/theme.txt
+{UNI}set theme=$prefix/themes/material/theme.txt
 export theme
 set timeout_style=menu
 set timeout={timeout}
@@ -68,7 +70,7 @@ menuentry 'Shut down' --class shutdown --id material-halt {{ halt }}
 # on every run (and re-trigger the path unit that watches it)
 had_system = C in text
 body = strip(text, [(A, B)] + ([] if had_system else [(C, D)])); lines = body.splitlines(keepends=True)
-at = next((i for i, l in enumerate(lines) if l.strip() == "blscfg" or l.startswith("# material-grub: structured BLS")), None)
+at = next((i for i, l in enumerate(lines) if mgrub.bls_call(l) is not None or l.startswith("# material-grub: structured BLS") or l.strip().startswith("# material-grub: structured BLS")), None)
 if at is None: at = next((i for i, l in enumerate(lines) if re.match(r"\s*(menuentry|submenu)\b", l)), len(lines))
 if lines and not lines[-1].endswith("\n"): lines[-1] += "\n"
 new = "".join(lines[:at]) + block + "".join(lines[at:]) + ("" if had_system else system)

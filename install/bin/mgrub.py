@@ -38,3 +38,36 @@ def kind_of(title, key, is_submenu=False):
     if re.search(r"recovery|rescue", title, re.I): return "rescue"
     if key in ("windows10", "windows11", "firmware", "reboot", "shutdown"): return "plain"
     return "kernel"
+
+
+CONF_DEFAULTS = {"RAW_NAME": "on", "COUNTDOWN": "on", "LOGO": "on", "TIMEOUT": ""}
+def load_conf(path=None):
+    """/etc/material-grub.conf: KEY=value lines, '#' comments. Unknown keys and bad values are ignored (never fatal in a boot-config path)."""
+    import os
+    c = dict(CONF_DEFAULTS); path = path or os.environ.get("MATERIAL_CONF", "/etc/material-grub.conf")
+    try:
+        for line in Path(path).read_text().splitlines():
+            m = re.match(r"^\s*([A-Z_]+)\s*=\s*\"?([^\"#]*?)\"?\s*(?:#.*)?$", line)
+            if not m or m[1] not in c: continue
+            k, v = m[1], m[2].strip()
+            if k == "TIMEOUT": c[k] = v if v.isdigit() else ""
+            elif v.lower() in ("on", "off", "yes", "no", "true", "false", "1", "0"): c[k] = "on" if v.lower() in ("on", "yes", "true", "1") else "off"
+    except OSError: pass
+    return c
+
+def apply_conf_to_theme(text, conf):
+    """Drop the '# mg:begin NAME' .. '# mg:end NAME' blocks of theme.txt that the config switches off."""
+    for key, name in (("RAW_NAME", "raw"), ("COUNTDOWN", "countdown"), ("LOGO", "logo")):
+        if conf[key] == "off": text = re.sub(rf"(?ms)^# mg:begin {name}\n.*?^# mg:end {name}\n", "", text)
+    return text
+
+
+# `blscfg` is how GRUB loads BootLoaderSpec entries. Distros call it as a bare line (Fedora), indented inside an if, or with options.
+_BLS = re.compile(r"^(?P<ind>\s*)blscfg(?P<args>(?:\s+[^#;|&]*?)?)\s*(?:#.*)?$")
+def bls_call(line):
+    """None if the line is not a blscfg call. Else (indent, args). Only a bare call or --enable-fallback can be restructured:
+    options that pick the directory or filter entries (--path, --show-default, --show-non-default) would fight our mirrors."""
+    m = _BLS.match(line)
+    return (m["ind"], m["args"].strip()) if m else None
+def bls_restructurable(call):
+    return call is not None and call[1] in ("", "--enable-fallback")

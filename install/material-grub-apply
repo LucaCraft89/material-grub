@@ -1,0 +1,10 @@
+#!/bin/sh
+# Re-apply Material GRUB after editing /etc/material-grub.conf (or to force a refresh).
+set -e
+[ "$(id -u)" -eq 0 ] || { echo "run as root: sudo $0"; exit 1; }
+if [ -f /var/lib/material-grub/env ] && grep -q '^MG_IMMUTABLE=1' /var/lib/material-grub/env; then
+  exec sh /var/lib/material-grub/postprocess
+fi
+MK=$(command -v grub2-mkconfig || command -v grub-mkconfig) || { echo "grub-mkconfig not found"; exit 1; }
+CFG=/boot/grub2/grub.cfg; [ -f "$CFG" ] || CFG=/boot/grub/grub.cfg
+"$MK" -o "$CFG" && /usr/libexec/material-grub-postprocess

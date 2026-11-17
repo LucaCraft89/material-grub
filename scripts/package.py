@@ -5,6 +5,7 @@ def opt(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else
 if opt("--scheme"):    # light | dark: read by palettes.py (also in the worker processes)
     if opt("--scheme") not in ("light", "dark"): sys.exit("--scheme must be light or dark")
     os.environ["MG_SCHEME"] = opt("--scheme")
+if "--no-hints" in sys.argv: os.environ["MG_HINTS"] = "0"      # build time: no key-hint pills in the scenes
 sys.path.insert(0, str(Path(__file__).parent))
 import build_theme as B, catalog as C
 ROOT = B.ROOT; PKG = ROOT / "dist/material-grub"
