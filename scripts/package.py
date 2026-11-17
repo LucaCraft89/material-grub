@@ -38,7 +38,7 @@ if __name__ == "__main__":
             if toks: rules.append({"key": k, "tokens": toks})
     rules.sort(key=lambda r: -len("".join(r["tokens"])))
     (PKG / "rules.json").write_text(json.dumps(rules))
-    (PKG / "titles.json").write_text(json.dumps({k: t for k, t, *_ in C.D}))
+    (PKG / "titles.json").write_text(json.dumps({k: t for k, t, *_ in C.D + C.X}))
     (PKG / "fonts").mkdir(); shutil.copy(B.R.FONT, PKG / "fonts" / "GoogleSansFlex-VF.ttf")
     for n in ("OFL.txt", "TRADEMARKS.md"): shutil.copy(ROOT / "fonts" / n, PKG / "fonts" / n)
     (PKG / "fonts" / "NOTICE.txt").write_text("Google Sans Flex: SIL Open Font License 1.1 (OFL.txt). Not affiliated with or endorsed by Google; see TRADEMARKS.md. The GRUB .pf2 fonts MG-* are Modified Versions derived from it and remain under the OFL.\n")

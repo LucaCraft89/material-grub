@@ -88,12 +88,12 @@ if __name__ == "__main__":
     ok = True
     print("1. installed with two ISOs (Fedora, Ubuntu)")
     a = boot(img, 2); ok &= check("first entry (Fedora)", a[0], "fedora", pal); ok &= check("second entry (Ubuntu)", a[1], "ubuntu", pal)
-    print("2. now, WITHOUT running anything: add Arch, Linux Mint, Win11; rename Ubuntu (capital U); remove Fedora")
-    for n in ("archlinux-2026.11.01-x86_64.iso", "linuxmint-22-cinnamon-64bit.iso", "Win11_24H2_English_x64.iso", "Ubuntu-Desktop-26.04-amd64.iso"):
+    print("2. now, WITHOUT running anything: add Arch, Linux Mint, Win11 and an unrecognised image; rename Ubuntu (capital U); remove Fedora")
+    for n in ("archlinux-2026.11.01-x86_64.iso", "linuxmint-22-cinnamon-64bit.iso", "Win11_24H2_English_x64.iso", "Ubuntu-Desktop-26.04-amd64.iso", "gparted-live-1.6.0-1-amd64.iso"):
         f = work / n; f.write_bytes(b"\0" * MIB); mt(img, "mcopy", str(f), f"::/ISO/{n}")
     mt(img, "mdel", "::/ISO/Fedora-Workstation-Live-x86_64-44-1.7.iso"); mt(img, "mdel", "::/ISO/ubuntu-24.04.1-desktop-amd64.iso")
-    b = boot(img, 4)       # sorted: archlinux, linuxmint, Ubuntu-Desktop, Win11
-    for i, (n, k) in enumerate((("archlinux", "arch"), ("linuxmint", "linuxmint"), ("Ubuntu-Desktop (renamed)", "ubuntu"), ("Win11", "windows11"))): ok &= check(n, b[i], k, pal)
+    b = boot(img, 5)       # sorted: archlinux, gparted, linuxmint, Ubuntu-Desktop, Win11
+    for i, (n, k) in enumerate((("archlinux", "arch"), ("gparted (unrecognised: grey disc)", "iso"), ("linuxmint", "linuxmint"), ("Ubuntu-Desktop (renamed)", "ubuntu"), ("Win11", "windows11"))): ok &= check(n, b[i], k, pal)
     print("3. the theme files were not touched in between")
     same = ventoy_hashes(img) == before and len(before) > 100; print(f"  {'ok  ' if same else 'FAIL'} all {len(before)} files under /ventoy identical before and after"); ok &= same
     shutil.rmtree(work, ignore_errors=True); print("PASS" if ok else "FAIL"); sys.exit(0 if ok else 1)

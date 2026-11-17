@@ -6,7 +6,8 @@ from materialyoucolor.hct import Hct
 from materialyoucolor.scheme.scheme_expressive import SchemeExpressive
 from materialyoucolor.scheme.scheme_tonal_spot import SchemeTonalSpot
 from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant
-VARIANTS = {'expressive': SchemeExpressive, 'tonalspot': SchemeTonalSpot, 'vibrant': SchemeVibrant}
+from materialyoucolor.scheme.scheme_monochrome import SchemeMonochrome
+VARIANTS = {'expressive': SchemeExpressive, 'tonalspot': SchemeTonalSpot, 'vibrant': SchemeVibrant, 'monochrome': SchemeMonochrome}
 from materialyoucolor.dynamiccolor.material_dynamic_colors import MaterialDynamicColors as M
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,6 +27,7 @@ def hexs(a): return "#%06X" % (a & 0xFFFFFF)
 import os
 SCHEME = os.environ.get("MG_SCHEME", "dark")      # "dark" (default) or "light"; set by package.py --scheme / install.sh --scheme
 def scheme(seed, variant='expressive', dark=None):
+    if variant == 'expressive' and Hct.from_int(argb(seed)).chroma < 8: variant = 'monochrome'      # a (near) grey seed gives a truly grey scene; Expressive would add colour
     s = VARIANTS[variant](Hct.from_int(argb(seed)), (SCHEME != "light") if dark is None else dark, 0.0)
     return {r: hexs(getattr(M, r).get_hct(s).to_int()) for r in ROLES}
 

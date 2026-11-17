@@ -64,7 +64,7 @@ Options are saved on the stick in `/ventoy/material-grub.conf` (`STYLE`, `SCHEME
 - **Key hints** at the bottom use Ventoy's keys: F1 Help, F2 Browse, F3 Tree, F4 Local boot, F5 Tools.
 - **Ventoy's own menus** have scenes too: folders in tree view (Folder, Back), F4 (Windows, Local boot), F5 (Tools, with Restart, Shut down and Firmware items using their own scenes).
 - **Windows ISOs** are recognised as Windows 10 or Windows 11 from the name (`Win10`, `Windows_11`, ...); a plain "Windows" name gets Windows 11.
-- **Anything else** (a rescue tool, an unknown distro) gets the generic Linux scene.
+- **Anything it does not recognise** (a rescue tool such as GParted or Clonezilla, an unknown distro, a `.wim` or `.img` file) gets a neutral **gray "Disk image" scene with a disc icon**, in every style and in both schemes. The raw file name is still shown, and the entry boots as usual.
 
 ## Dynamic and snapshot
 
@@ -86,6 +86,10 @@ Ventoy's [`menu_class`](https://www.ventoy.net/en/plugin_menuclass.html) assigns
 - Snapshot mode writes one rule per file: the longest piece of the name (at most 30 characters) that no other file contains. Ventoy never matches a key equal to the whole name and ignores keys of 32 characters or more, which is why it does not use the full name.
 - Your own `menu_class` rules in `ventoy.json` stay first and win over the theme's. The installer keeps a backup next to the file (`ventoy.json.material-grub.bak`) and only ever removes its own rules.
 - The distro list and the names matched are the same as on a PC: see [distros.md](distros.md). A name that matches nothing gets the generic Linux scene. If your ISO is recognised wrongly, add a `menu_class` rule of your own in `ventoy.json`.
+
+## Recognised file names
+
+Matching looks at the **file name only**, not the folder. These are checked by `tests/iso_names.txt` (about 150 realistic names, for example `Fedora-Workstation-Live-x86_64-44-1.7.iso`, `ubuntu-24.04.1-desktop-amd64.iso`, `archlinux-2026.11.01-x86_64.iso`, `EndeavourOS_Mercury-2025.02.08.iso`, `Rocky-9.4-x86_64-dvd.iso`, `openSUSE-Tumbleweed-DVD-x86_64-Current.iso`, `MX-23.3_x64.iso`, `FreeBSD-14.1-RELEASE-amd64-disc1.iso`, `install75.iso` for OpenBSD, `Win11_24H2_English_x64.iso`, `SW_DVD9_Win_Pro_10_22H2_64BIT.ISO`) and the same file also lists generic tools that must stay gray (GParted, Clonezilla, SystemRescue, Memtest86). The names were collected from the distros' download pages and mirrors and from the quickemu project's download script, plus well-known naming; not every one was checked against a live mirror. If one of your files is not recognised, tell us the exact file name in an issue, or add a rule of your own to `ventoy.json`.
 
 ## Resolutions
 

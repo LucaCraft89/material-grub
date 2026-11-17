@@ -13,7 +13,7 @@ import mgrub
 
 def arg(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 EXTS = (".iso", ".wim", ".img", ".vhd", ".vhdx", ".vtoy")
-VTOY_FALLBACK = ("vtoyiso", "vtoywim", "vtoyimg", "vtoyvhd", "vtoyefi", "vtoydir", "vtoyret", "vtoyvtoy")   # built-in Ventoy classes: shown when no menu_class matches (phase 1: generic scene)
+VTOY_FALLBACK = ("vtoyiso", "vtoywim", "vtoyimg", "vtoyvhd", "vtoyefi", "vtoydir", "vtoyret", "vtoyvtoy")   # built-in Ventoy classes: shown when no menu_class matches (the grey disc scene)
 # Ventoy's own menus (F2 browse, F3 tree, F4 local boot, F5 tools). class -> (glyph, title, subtitle, palette borrowed from a catalog entry). Verified class list: Ventoy 1.1.18 grub/*.cfg.
 MENU = {"vtoydir": ("folder", "Folder", "Browse", "tux"), "vtoyret": ("back", "Back", "Previous menu", "nixos"), "F5tool": ("wrench", "Tools", "Ventoy tools", "firmware"), "F4boot": ("firmware", "Local boot", "Boot from disk", "windows10")}
 MENU_ALIAS = {"debug_reboot": "reboot", "debug_halt": "shutdown", "debug_efisetup": "firmware", "boot_windows": "windows11"}      # items whose own scene already exists
@@ -35,7 +35,7 @@ def key_of(name, rules):
     if k: return k
     if re.search(r"win(dows)?[ _.\-]?10", low): return "windows10"
     if re.search(r"\bwin(dows)?\b|win(dows)?[ _.\-]?11|microsoft", low) or low.startswith("win"): return "windows11"
-    return "tux"
+    return "iso"      # not recognised: the grey disc scene
 
 def pick_key(name, others):
     """The `menu_class` key for one file. Ventoy checks it as a case-sensitive substring of the file name, but (verified on Ventoy 1.1.18) a key equal to the WHOLE name never matches
@@ -46,9 +46,15 @@ def pick_key(name, others):
             if not any(s in o for o in others): return s
     return None
 
-GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}; SYSTEM = {"tux", "firmware", "reboot", "shutdown", "windows10", "windows11"}
+GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}; SYSTEM = {"tux", "iso", "firmware", "reboot", "shutdown", "windows10", "windows11"}
 WIN_KEYS = [("windows10", ("Windows10", "Windows_10", "Windows-10", "Windows 10", "Win10", "Win_10", "Win-10", "Win 10")),
             ("windows11", ("Windows11", "Windows_11", "Windows-11", "Windows 11", "Win11", "Win_11", "Win-11", "Win 11", "Windows", "Win_", "Win-", "Win "))]
+# File-name pieces the catalog aliases do not cover (ISO names are not entry titles). Case-sensitive substrings; each is also tried in lower and UPPER case.
+# They sort after the longer alias rules, so they only catch what nothing more specific did. Names collected from the distros' download pages / mirrors and quickemu's quickget (not all checked against live mirrors).
+EXTRA_KEYS = {"mxlinux": ["MX-", "MX_"], "linuxmint": ["lmde", "LMDE"], "opensuse": ["Leap-", "SLE-", "SLES-"], "gentoo": ["install-amd64-minimal", "admincd-amd64", "livegui-amd64", "stage3-"],
+              "puppy": ["Pup64", "Pup32", "Puppy", "S15Pup", "fossapup", "bionicpup", "focalpup", "bookwormpup", "Pup_"], "openbsd": ["install7", "install6", "install8", "miniroot", "cd7", "cd8"],
+              "windows10": ["Win_Pro_10", "Win_Ent_10", "Win_Home_10", "Windows_10", "en_windows_10"], "windows11": ["Win_Pro_11", "Win_Ent_11", "windows_11", "windows_server"],
+              "raspberrypi": ["raspios", "RaspiOS", "Raspios", "raspbian"], "freebsd": ["FreeBSD"], "tails": ["tails-amd64"], "qubes": ["Qubes"], "centos": ["CentOS"]}
 def dynamic_rules(classes, titles):
     """Generic `menu_class` rules that need no list of files: every catalog alias and title in four letter-cases (as is, lower, UPPER, Capitalised), longest first.
     `key` is a case-sensitive substring in Ventoy, so the cases are what makes 'fedora-...', 'Fedora-...' and 'FEDORA-...' all match. Keys shorter than 4 chars are skipped (too many false hits)."""
@@ -59,6 +65,9 @@ def dynamic_rules(classes, titles):
             if a.lower() in GENERIC: continue
             for f in (a, a.lower(), a.upper(), a[:1].upper() + a[1:].lower()):
                 if len(f) >= 4 and 0 < len(f) <= 30: rules.setdefault(f, f"mg_{k}")
+    for k, keys in EXTRA_KEYS.items():
+        for s in keys:
+            for f in (s, s.lower(), s.upper()): rules.setdefault(f, f"mg_{k}")
     for k, keys in WIN_KEYS:
         for s in keys:
             for f in (s, s.lower(), s.upper()): rules.setdefault(f, f"mg_{k}")
@@ -157,13 +166,13 @@ for r in resl:
 
 dynamic = conf["MODE"] == "dynamic"      # dynamic: nothing depends on the files on the stick (generic rules, one scene per distro); snapshot: scenes are rendered for the files that are there now
 titles = json.loads((PKG / "titles.json").read_text())
-SECTIONS = [["tux"], ["windows11"], ["wrench"]]; section = lambda k: "windows11" if k in ("windows10", "windows11") else "wrench" if k in ("firmware", "reboot", "shutdown") else "tux"      # dynamic rail: one slot per section, the slot of the selected entry is lit
+SECTIONS = [["tux"], ["windows11"], ["wrench"]]; section = lambda k: "windows11" if k in ("windows10", "windows11") else "wrench" if k in ("firmware", "reboot", "shutdown") else "" if k == "iso" else "tux"      # dynamic rail: one slot per section, the slot of the selected entry is lit
 files = [] if dynamic else scan(stick)
 entries = []
 for rel in files:
     name = Path(rel).name; k = key_of(name, rules)
     entries.append({"class": mgrub.uid("ventoy", rel), "key": k, "kind": "plain", "level": "top", "title": name, "label": name, "path": rel})
-keys = sorted({e["key"] for e in entries}) or ["tux"]
+keys = sorted({e["key"] for e in entries}) or ["iso"]
 if dynamic: keys = list(classes)
 groups = mgscenes.groups_of(keys); by_class = {e["class"]: e for e in entries}
 menu = [{"level": "top", "items": [e["class"] for e in entries]}]
@@ -196,8 +205,8 @@ for res in resl:
         if style == "list": return R.render_list_fallback(k, PKG / "scenes" / aspect / "bg" / f"{k}.png", entries, opts)
         return R.render_class(k, cls_scene(k), groups, style, opts, menu)
     for k in keys: class_scene(k).save(tmp / "icons" / f"mg_{k}.png")
-    tux = Image.open(tmp / "icons" / "mg_tux.png") if "tux" in keys else class_scene("tux")
-    for c in VTOY_FALLBACK: tux.save(tmp / "icons" / f"{c}.png")
+    generic = Image.open(tmp / "icons" / "mg_iso.png") if "iso" in keys else class_scene("iso")      # Ventoy's own classes (vtoyiso, vtoywim, ...) and every file the rules do not recognise
+    for c in VTOY_FALLBACK: generic.save(tmp / "icons" / f"{c}.png")
     if dynamic:       # Ventoy's own menus: a scene each (folder, back, tools, local boot) and the existing scenes for power / firmware / Windows items
         for c, k in MENU_ALIAS.items(): shutil.copy(tmp / "icons" / f"mg_{k}.png", tmp / "icons" / f"{c}.png")
         for c, (glyph, title, sub, pal) in MENU.items():

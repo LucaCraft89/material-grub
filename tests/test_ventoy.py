@@ -30,7 +30,7 @@ class Names(unittest.TestCase):
     def test_keys(self):
         import mgrub; rules = mgrub.load_rules(PKG)
         for n, k in (("archlinux-2026.11.01-x86_64.iso", "arch"), ("Fedora-Workstation-Live-x86_64-44-1.7.iso", "fedora"), ("ubuntu-24.04.1-desktop-amd64.iso", "ubuntu"),
-                     ("Win11_24H2_English_x64.iso", "windows11"), ("Win10_22H2_x64.iso", "windows10"), ("gparted-live-1.6.iso", "tux"), ("KALI-linux-2026.3.iso", "kali")):
+                     ("Win11_24H2_English_x64.iso", "windows11"), ("Win10_22H2_x64.iso", "windows10"), ("gparted-live-1.6.iso", "iso"), ("KALI-linux-2026.3.iso", "kali")):
             self.assertEqual(key_of(n, rules), k, n)
 
 LSBLK = json.dumps({"blockdevices": [
@@ -56,12 +56,22 @@ def ventoy_class(rules, name):
 class Dynamic(unittest.TestCase):
     def test_rules(self):
         classes = json.loads((PKG / "classes.json").read_text()); titles = json.loads((PKG / "titles.json").read_text()); rules = dynamic_rules(classes, titles)
-        self.assertGreater(len(rules), 400); self.assertTrue(all(4 <= len(r["key"]) <= 30 or r["key"].lower().startswith("win") for r in rules))
+        self.assertGreater(len(rules), 400); self.assertTrue(all(3 <= len(r["key"]) <= 30 for r in rules))
         for name, cls in (("Fedora-Workstation-Live-x86_64-44-1.7.iso", "mg_fedora"), ("FEDORA-44.iso", "mg_fedora"), ("ubuntu-24.04.1-desktop-amd64.iso", "mg_ubuntu"), ("kubuntu-24.04.iso", "mg_kubuntu"),
                           ("archlinux-2026.11.01-x86_64.iso", "mg_arch"), ("linuxmint-22-cinnamon-64bit.iso", "mg_linuxmint"), ("EndeavourOS_Mercury-2026.iso", "mg_endeavouros"),
                           ("openSUSE-Tumbleweed-DVD-x86_64-Current.iso", "mg_opensuse"), ("Win11_24H2_English_x64.iso", "mg_windows11"), ("Win10_22H2_x64.iso", "mg_windows10"),
                           ("debian-live-13.0-amd64-gnome.iso", "mg_debian"), ("gparted-live-1.6.iso", None)):
             self.assertEqual(ventoy_class(rules, name), cls, name)
+
+@unittest.skipUnless((PKG / "res").is_dir(), "no built package")
+class RealNames(unittest.TestCase):
+    def test_iso_names(self):
+        classes = json.loads((PKG / "classes.json").read_text()); titles = json.loads((PKG / "titles.json").read_text()); rules = dynamic_rules(classes, titles); bad = []
+        rows = [l.split("\t") for l in (ROOT / "tests/iso_names.txt").read_text().splitlines() if l and not l.startswith("#")]
+        for name, key in rows:
+            c = ventoy_class(rules, name); got = c[3:] if c else "iso"
+            if got != key: bad.append((name, key, got))
+        self.assertGreater(len(rows), 100); self.assertEqual(bad, [])
 
 @unittest.skipUnless((PKG / "res").is_dir() and (PKG / "res/1920x1080").is_dir(), "no built 1920x1080 package")
 class DynamicStick(unittest.TestCase):
