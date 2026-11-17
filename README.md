@@ -136,11 +136,14 @@ Then reboot. That's it.
 ```sh
 sudo ./install.sh --res 1920x1200   # force a resolution instead of auto-detecting
 sudo ./install.sh --scheme light    # light variant instead of dark
+sudo ./install.sh --prebuilt        # download the release's prebuilt theme: no build tools, no pip
 sudo ./install.sh --no-deps         # you installed the dependencies yourself
 sudo ./install.sh --stage-only      # install deps and build, but do not touch GRUB
 sudo ./install.sh --keep-build      # keep the temporary build directory
 sudo ./install.sh --uninstall       # remove the theme and hooks
 ```
+
+**Prebuilt themes:** each release attaches the theme for every supported resolution and both schemes plus `SHA256SUMS` (built by `.github/workflows/release.yml` when a `vX.Y.Z` tag is pushed; the tag must equal `VERSION`). `--prebuilt` downloads the matching one, verifies the checksum and installs it. It is opt-in because the package contains scripts that run as root and the checksum comes from the same release (it guards against corruption, not a compromised release). There is no `--no-hints` variant. This is the easiest route on immutable systems. Until the first release that contains the assets is published, `--prebuilt` reports a download error; the release workflow itself has not run yet.
 
 **Supported resolutions:** `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `2880x1800`, `3440x1440`, `3840x1080`, `3840x1600`, `3840x2160`, `5120x1440`, `5120x2160`.
 Anything else snaps to the closest aspect ratio. The scene sets are 16:9, 16:10, 21:9 and 32:9; screens at least 1800 px high use a 2160-high set

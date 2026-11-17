@@ -1,0 +1,40 @@
+name: Release assets
+# On a version tag: build the theme for every resolution and scheme and attach it to the release with SHA256SUMS,
+# so `sudo ./install.sh --prebuilt` needs no build tools and no pip.
+on:
+  push: {tags: ["v*"]}
+permissions: {contents: write}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        res: [1280x720, 1920x1080, 1920x1200, 2560x1080, 2560x1440, 2880x1800, 3440x1440, 3840x1080, 3840x1600, 3840x2160, 5120x1440, 5120x2160]
+        scheme: [dark, light]
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag must match VERSION
+        run: '[ "v$(cat VERSION)" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME != VERSION $(cat VERSION)"; exit 1; }'
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
+      - run: .venv/bin/python scripts/package.py --res ${{ matrix.res }} --scheme ${{ matrix.scheme }}
+      - run: |
+          VER=$(cat VERSION)
+          tar --owner=0 --group=0 --numeric-owner -C dist -czf "material-grub-$VER-${{ matrix.res }}-${{ matrix.scheme }}.tar.gz" material-grub
+      - uses: actions/upload-artifact@v4
+        with: {name: "asset-${{ matrix.res }}-${{ matrix.scheme }}", path: "material-grub-*.tar.gz", retention-days: 1}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {pattern: "asset-*", merge-multiple: true, path: assets}
+      - name: Checksums and upload
+        env: {GH_TOKEN: "${{ github.token }}", GH_REPO: "${{ github.repository }}"}
+        run: |
+          cd assets && sha256sum material-grub-*.tar.gz > SHA256SUMS && cat SHA256SUMS
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "Material GRUB ${GITHUB_REF_NAME#v}" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" material-grub-*.tar.gz SHA256SUMS --clobber

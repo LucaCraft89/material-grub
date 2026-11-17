@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Prebuilt release assets: `release.yml` builds 12 resolutions x 2 schemes on a version tag and uploads them with `SHA256SUMS`; `./install.sh --prebuilt` downloads and verifies one (curl or wget, `MG_RELEASE_URL` to override). New `VERSION` file. Tested against a local server (Fedora, Alpine/busybox, tampered checksum, missing asset); the GitHub workflow has not run yet.
 - Config file `/etc/material-grub.conf` (RAW_NAME, COUNTDOWN, LOGO, TIMEOUT; never overwritten), `material-grub-apply`, path unit watches it; `--no-hints` build option. Verified in QEMU.
 - Fonts: bitmap fonts now cover Latin Extended-A/B, Vietnamese, general punctuation, currency and arrows. Non-Latin entry titles (Cyrillic, Greek, CJK, ...) fall back to GRUB's `unicode.pf2` (copied into the theme, loaded by `05_material` / the static block) and, in the info pills, to an installed system font. Verified in QEMU. Google Sans Flex itself has no Cyrillic/Greek/CJK glyphs.
 - CI (GitHub Actions): syntax + unit + fake-`/boot` pipeline tests, installer matrix over six distro containers (dark/light, several resolutions), QEMU boot smoke test per scheme with screenshots as artifacts. New `tests/`.

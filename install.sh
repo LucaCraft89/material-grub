@@ -5,6 +5,7 @@
 #   sudo ./install.sh --res 1920x1200 # force a resolution
 #   sudo ./install.sh --scheme light  # light Material 3 scheme instead of the default dark one
 #   sudo ./install.sh --no-hints      # leave the key-hint pills out of the screens
+#   sudo ./install.sh --prebuilt      # download the release's prebuilt theme (no build tools, no pip; checksum verified)
 #   sudo ./install.sh --uninstall
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
 #            --keep-build  keep the temporary build dir     --force  ignore the NixOS check
@@ -12,15 +13,15 @@
 #            --pkg DIR  install a package built elsewhere   --dist-out DIR  with --stage-only: copy the built package to DIR
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-RES=""; SCHEME=dark; IMM=0; YES=0; HINTS=1; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
+RES=""; SCHEME=dark; IMM=0; YES=0; HINTS=1; DL=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
 while [ $# -gt 0 ]; do
   case $1 in
     --res) RES=${2:?--res needs WxH}; shift;;
     --scheme) SCHEME=${2:?--scheme needs light or dark}; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
     --immutable) IMM=1;; --yes|-y) YES=1;; --pkg) PREBUILT=${2:?--pkg needs a directory}; shift;; --dist-out) DISTOUT=${2:?--dist-out needs a directory}; shift;;
-    --no-hints) HINTS=0;;
+    --no-hints) HINTS=0;; --prebuilt) DL=1;;
     --no-deps) DEPS=0;; --stage-only) STAGE=1;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
-    -h|--help) sed -n 2,12p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    -h|--help) sed -n 2,13p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2;;
   esac; shift
 done
@@ -123,7 +124,7 @@ VIA_CONTAINER=0
 if [ "$IMM" = 1 ]; then
   # immutable: never use the package manager. Only the BUILD tools may be missing (the target machine needs just python3).
   command -v python3 >/dev/null 2>&1 || die "python3 is required"
-  if [ -n "$PREBUILT" ]; then ok "using the prebuilt package $PREBUILT (no build tools needed)"
+  if [ -n "$PREBUILT" ] || [ "$DL" = 1 ]; then ok "using a prebuilt package (no build tools needed)"
   else
     MISS=$(missing | sed 's/grub-mkconfig //; s/python3-venv //; s/python3-pillow //')
     if [ -z "$MISS" ]; then ok "build tools found on the host"
@@ -131,7 +132,7 @@ if [ "$IMM" = 1 ]; then
     else die "missing build tools: $MISS. Install podman, or build the package elsewhere (./install.sh --stage-only --dist-out DIR) and pass --pkg DIR."; fi
   fi
 else
-  MISS=$(missing)
+  MISS=$(missing); if [ "$DL" = 1 ] || [ -n "$PREBUILT" ]; then MISS=$(printf %s "$MISS" | sed 's/grub-mkfont //; s/rsvg-convert //; s/python3-venv //'); fi   # a prebuilt package needs no build tools
   if [ -z "$MISS" ]; then ok "everything is already installed (the package manager will not be touched)"
   elif [ "$DEPS" = 0 ]; then die "missing: $MISS (drop --no-deps to let the installer install them)"
   else
@@ -178,6 +179,24 @@ cleanup() { [ "$KEEP" = 1 ] && info "build directory kept: $BUILD" || rm -rf "$B
 trap cleanup EXIT
 info "build directory: $BUILD (your clone stays untouched)"
 DIST=$BUILD/dist/material-grub
+if [ "$DL" = 1 ] && [ -z "$PREBUILT" ]; then
+  [ "$HINTS" = 1 ] || die "--prebuilt has no --no-hints variant: build from source instead."
+  VER=$(cat "$HERE/VERSION" 2>/dev/null) || die "VERSION file missing"
+  BASE=${MG_RELEASE_URL:-https://github.com/LucaCraft89/material-grub/releases/download/v$VER}
+  ASSET=material-grub-$VER-$BUILD_RES-$SCHEME.tar.gz
+  fetch() { if command -v curl >/dev/null 2>&1; then curl -fsSL -o "$2" "$1"; elif command -v wget >/dev/null 2>&1; then wget -q -O "$2" "$1"; else return 2; fi; }
+  info "downloading $ASSET from $BASE"
+  info "(trust: this is code that runs as root. The checksum file comes from the same release, so it protects against corruption, not against a compromised release.)"
+  mkdir -p "$BUILD/dl"
+  fetch "$BASE/SHA256SUMS" "$BUILD/dl/SHA256SUMS" || die "could not download $BASE/SHA256SUMS (curl or wget needed; is v$VER released?). Build from source by dropping --prebuilt."
+  fetch "$BASE/$ASSET" "$BUILD/dl/$ASSET" || die "could not download $ASSET (not every resolution/scheme is published; build from source by dropping --prebuilt)."
+  want=$(awk -v f="$ASSET" '$2==f || $2=="*" f {print $1}' "$BUILD/dl/SHA256SUMS")
+  [ -n "$want" ] || die "$ASSET is not listed in SHA256SUMS"
+  have=$(sha256sum "$BUILD/dl/$ASSET" | awk '{print $1}')
+  [ "$want" = "$have" ] || die "checksum mismatch for $ASSET (expected $want, got $have): refusing to install it."
+  ok "checksum verified"
+  tar -xzf "$BUILD/dl/$ASSET" -C "$BUILD/dl" && PREBUILT=$BUILD/dl/material-grub || die "could not unpack $ASSET"
+fi
 if [ -n "$PREBUILT" ]; then
   DIST=$PREBUILT; [ -d "$DIST/res" ] && [ -d "$DIST/scenes" ] || die "--pkg $PREBUILT is not a built package (expected res/ and scenes/ inside)."
   ok "skipping the build: using $DIST"
