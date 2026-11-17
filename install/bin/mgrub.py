@@ -40,8 +40,8 @@ def kind_of(title, key, is_submenu=False):
     return "kernel"
 
 
-CONF_DEFAULTS = {"RAW_NAME": "on", "COUNTDOWN": "on", "LOGO": "on", "COOKIE": "on", "HINTS": "on", "STYLE": "rail", "SCHEME": "dark", "TIMEOUT": ""}
-CONF_CHOICES = {"STYLE": ("rail", "clean", "list"), "SCHEME": ("dark", "light")}
+CONF_DEFAULTS = {"RAW_NAME": "on", "COUNTDOWN": "on", "LOGO": "on", "COOKIE": "on", "HINTS": "on", "STYLE": "rail", "SCHEME": "dark", "TIMEOUT": "", "MODE": "dynamic"}
+CONF_CHOICES = {"STYLE": ("rail", "clean", "list"), "SCHEME": ("dark", "light"), "MODE": ("dynamic", "snapshot")}
 def load_conf(path=None):
     """/etc/material-grub.conf: KEY=value lines, '#' comments. Unknown keys and bad values are ignored (never fatal in a boot-config path)."""
     import os

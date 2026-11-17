@@ -43,7 +43,8 @@ if __name__ == "__main__":
     for n in ("OFL.txt", "TRADEMARKS.md"): shutil.copy(ROOT / "fonts" / n, PKG / "fonts" / n)
     (PKG / "fonts" / "NOTICE.txt").write_text("Google Sans Flex: SIL Open Font License 1.1 (OFL.txt). Not affiliated with or endorsed by Google; see TRADEMARKS.md. The GRUB .pf2 fonts MG-* are Modified Versions derived from it and remain under the OFL.\n")
     (PKG / "glyphs").mkdir()
-    extra = {"gear": "vendor/material-symbols/settings.svg", "wrench": "vendor/material-symbols/build.svg", "kernel": "vendor/material-symbols/terminal.svg", "tag": "vendor/material-symbols/tag.svg"}
+    extra = {"gear": "vendor/material-symbols/settings.svg", "wrench": "vendor/material-symbols/build.svg", "kernel": "vendor/material-symbols/terminal.svg", "tag": "vendor/material-symbols/tag.svg",
+             "folder": "vendor/material-symbols/folder.svg", "back": "vendor/material-symbols/arrow_back.svg"}      # folder / back: Ventoy menu scenes
     from PIL import Image
     for k, _, _, g in C.ENTRIES:
         m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")

@@ -201,6 +201,19 @@ make install RES=1920x1200   # SCHEME=light for the light variant
 The Google Sans Flex font is bundled in `fonts/` (SIL OFL 1.1, unmodified upstream copy). Set `GSF_FONT=/path/to/font.ttf` to use another copy.
 </details>
 
+### Ventoy
+
+The theme also works on a [Ventoy](https://www.ventoy.net) stick: same styles (`rail`, `clean`, `list`), dark and light, cookie, hints. Ventoy builds its menu at boot from the files on the stick, so the theme is dynamic: it recognises distros by ISO file name (colour, logo, name on the scene) and the shown name is the raw file name. The cookie shows a static "V" instead of the firmware logo.
+
+```sh
+# build once (any resolution you want on the stick), then, with the stick mounted:
+make venv && .venv/bin/python scripts/package.py --res 1920x1080,2560x1080     # add --scheme light for the light variant
+python3 install/bin/material-grub-ventoy /run/media/$USER/Ventoy --pkg dist/material-grub --res 1920x1080,2560x1080
+python3 install/bin/material-grub-ventoy /run/media/$USER/Ventoy --uninstall
+```
+
+It needs no root, merges into `/ventoy/ventoy.json` (your own `menu_class` rules stay first, a backup is written) and reads options from `/ventoy/material-grub.conf` (`STYLE`, `COOKIE`, `LOGO`, `HINTS`, `RAW_NAME`, `MODE=dynamic|snapshot`). `snapshot` renders the exact list from the ISOs present now (re-run after changing them). Status: verified in QEMU/OVMF with Ventoy 1.1.18 (see [docs/plans/ventoy.md](docs/plans/ventoy.md)); not tried on real hardware, and not yet part of `install.sh`.
+
 ### Other distros
 
 The installer detects `grub2-mkconfig` (Fedora/RHEL) and `grub-mkconfig` (Debian, Ubuntu, Arch, ...). Classic
