@@ -83,6 +83,25 @@ class Pipeline(unittest.TestCase):
         self.assertEqual(a.size, b.size); self.assertEqual(a.getpixel((960, 5)) != b.getpixel((960, 5)), True, "peek band shows the neighbour's own colour")
         th = (self.boot / "grub2/themes/material/theme.txt").read_text()
         self.assertIn("left = 1686", th); self.assertIn("top = 176", th)
+    def test_list_style(self):      # list scenes for 1 entry, 22 kernels (windowing), non-Latin names; every scene is full size and differs per selection
+        from PIL import Image, ImageChops
+        for v in range(3, 25): (self.entries / f"ostree-{v}-fedora.conf").write_text(ENTRY.format(v=f"44.{v}", n=v))
+        (self.entries / "ostree-30-fedora.conf").write_text(ENTRY.format(v="44.9", n=30).replace("(Silverblue)", "(Рабочая станция 日本語)"))
+        conf = self.d / "m.conf"; conf.write_text("STYLE=list\n"); os.environ["MATERIAL_CONF"] = str(conf)
+        try: self.run_all()
+        finally: del os.environ["MATERIAL_CONF"]
+        ents = json.loads(self.state.read_text()); menu = json.loads((self.state.parent / "menu.json").read_text()); icons = self.boot / "grub2/themes/material/icons"
+        self.assertGreater(len(menu[1]["items"]), 20); size = Image.open(icons / f"{ents[0]['class']}.png").size
+        ims = [Image.open(icons / f"{c}.png").convert("RGB") for c in menu[1]["items"][:6]]
+        for im in ims: self.assertEqual(im.size, size)
+        self.assertIsNotNone(ImageChops.difference(ims[0], ims[3]).getbbox(), "selection moves the highlight")
+        # single entry level: no crash, scene exists
+        shutil.rmtree(self.entries); self.entries.mkdir(); (self.entries / "ostree-1-fedora.conf").write_text(ENTRY.format(v="44.1", n=1)); self.cfg.write_text(STATIC)
+        shutil.rmtree(self.bk, ignore_errors=True); shutil.rmtree(self.state.parent)
+        conf.write_text("STYLE=list\n"); os.environ["MATERIAL_CONF"] = str(conf)
+        try: self.run_all()
+        finally: del os.environ["MATERIAL_CONF"]
+        self.assertTrue(any(icons.glob("mg_*.png")))
     def test_non_latin_titles(self):      # pills fall back to another installed font; the theme ships GRUB's unicode.pf2 when the system has it
         (self.entries / "ostree-4-fedora.conf").write_text(ENTRY.format(v="44.1", n=4).replace("(Silverblue)", "(Рабочая станция 日本語)"))
         self.run_all(); self.assertTrue(any((self.boot / "grub2/themes/material/icons").glob("mg_*.png")))
