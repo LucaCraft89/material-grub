@@ -25,6 +25,7 @@ WIRE = {
  "rail": ["+------------------+", "|[o]          (o) |", "| o     ( icon )  |", "| o     Fedora    |", "|[o]   [pills]    |", "+------[hints]-----+"],
  "clean": ["+------------------+", "| (next panel peek)|", "|  ( chip )   (o)  |", "|  (  icon  )      |", "|  ( chip )        |", "| (next panel peek)|"],
  "split": ["+------------------+", "|   (o)    (o) Fedora|", "|  ( icon )  (o) Windows|", "|  Fedora    (o) Restart|", "|                   |", "+------[hints]-----+"],
+ "full": ["+------------------+", "|[^]         (o)  |", "|[v]  ( logo )     |", "|        Fedora    |", "|   (  file name ) |", "+------------------+"],
  "list": ["+------------------+", "|            (o)  |", "|  (o) [ Fedora  ] |", "|  (o) [ Windows ] |", "|  (o) [ Restart ] |", "+------[hints]-----+"],
 }
 
@@ -46,9 +47,8 @@ def ventoy_steps(presets, monitors, sticks):
     steps.append({"id": "RESX", "title": "More resolutions", "type": "multi", "cur": 0, "rows": [
         {"id": r, "kind": "toggle", "label": r, "val": False, "help": "Add a theme for this size (about 8 to 14 MB). Ventoy switches to the matching theme when you change the resolution with F5 Tools -> Resolution Configuration."} for r in ("1280x720", "1920x1080", "2560x1440", "3840x2160")]})
     steps.append({"id": "STYLE", "title": "Style", "type": "choice", "cur": 0, "options": [
-        opt("rail", "Full screen with a left rail", "A big hero panel for the selected ISO's distro and a small rail with three sections (Linux, Windows, Tools) on the left."),
-        opt("clean", "Full screen, no rail", "A big panel per distro with label chips on the edges. The neighbour peeks only exist in snapshot mode."),
-        opt("list", "Centred list", "The distro's logo and name on the left and the ISO list on the right, drawn by GRUB itself so it follows the files on the stick.")]})
+        opt("full", "Full screen", "The ISO picker is one full-screen scene: the distro's logo and name, a pill with the real file name, and two small arrows on the left that hint at scrolling. Every other Ventoy menu (F2 to F5, folders, boot modes) uses the list."),
+        opt("list", "List", "The distro's logo and name on the left and the ISO list on the right, drawn by GRUB itself so it follows the files on the stick.")]})
     steps.append({"id": "SCHEME", "title": "Colour scheme", "type": "choice", "cur": 0, "options": [
         opt("dark", "Dark", "Deep Material 3 surfaces."), opt("light", "Light", "Light Material 3 surfaces.")]})
     steps.append({"id": "LOGO", "title": "Cookie and logo", "type": "choice", "cur": 0, "options": [
@@ -146,7 +146,7 @@ def answers(steps, presets):
     if a.get("COOKIE") == "off": a["LOGO"] = "off"
     return a
 
-CHECK = {"RES": RES_RE, "STYLE": re.compile(r"^(rail|clean|list|split)$"), "SCHEME": re.compile(r"^(dark|light)$"), "COOKIE": re.compile(r"^(on|off)$"), "LOGO": re.compile(r"^(on|off)$"),
+CHECK = {"RES": RES_RE, "STYLE": re.compile(r"^(rail|clean|list|split|full)$"), "SCHEME": re.compile(r"^(dark|light)$"), "COOKIE": re.compile(r"^(on|off)$"), "LOGO": re.compile(r"^(on|off)$"),
          "HINTS": re.compile(r"^(on|off)$"), "RAW_NAME": re.compile(r"^(on|off)$"), "COUNTDOWN": re.compile(r"^(on|off)$"), "TIMEOUT": re.compile(r"^[0-9]{0,4}$"),
          "IMMUTABLE": re.compile(r"^(yes|no)$"), "TARGET": re.compile(r"^(grub|ventoy)$"), "MODE": re.compile(r"^(dynamic|snapshot)$"),
          "STICK": re.compile(r"^(dev:/dev/[A-Za-z0-9/_.-]+|/[^'\x00-\x1f]*)$"), "RESX": re.compile(r"^([0-9]{3,5}x[0-9]{3,5}(,[0-9]{3,5}x[0-9]{3,5})*)?$")}

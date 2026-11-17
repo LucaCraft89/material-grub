@@ -2,7 +2,7 @@
 
 Back to the [README](../README.md) · [Gallery](gallery.md) · [Supported distros](distros.md)
 
-The same Material 3 theme, on the menu of a [Ventoy](https://www.ventoy.net) USB stick: the three styles (`rail`, `clean`, `list`), dark and light, the cookie, Ventoy's own key hints, and a scene per distro in that distro's colour. The shown name is the ISO's raw file name.
+The same Material 3 theme, on the menu of a [Ventoy](https://www.ventoy.net) USB stick: the two styles (`full` screen picker and `list`), dark and light, the cookie, Ventoy's own key hints, and a scene per distro in that distro's colour. The shown name is the ISO's raw file name.
 
 It follows the files on the stick: **add, rename or remove ISOs on any computer (Windows included) and the theme keeps working, nothing to run again.**
 
@@ -39,14 +39,14 @@ Without the UI:
 
 ```sh
 ./install.sh --ventoy /run/media/$USER/Ventoy --style list --scheme dark --res 1920x1080 --yes
-./install.sh --ventoy /run/media/$USER/Ventoy --style rail --scheme light --res 1920x1080,2560x1440,3840x2160 --no-logo --no-hints --yes
+./install.sh --ventoy /run/media/$USER/Ventoy --style full --scheme light --res 1920x1080,2560x1440,3840x2160 --no-logo --no-hints --yes
 ./install.sh --uninstall --ventoy /run/media/$USER/Ventoy
 ```
 
 | Option | Meaning |
 |---|---|
 | `--ventoy [MOUNTPOINT]` | Install on a Ventoy stick. The mount point is the Ventoy data partition (the big one, with the `ventoy` folder). Leave it out to pick the stick in the UI. |
-| `--style rail\|clean\|list` | Same three styles as on a PC. |
+| `--style full\|list` | `full`: the ISO picker is full screen, every other Ventoy menu is the list. `list`: the list everywhere. (`rail` and `clean` from older versions mean `full`.) |
 | `--scheme dark\|light` | Colour scheme (chosen when the images are built). |
 | `--res A,B,C` | One theme per screen size; see [Resolutions](#resolutions). The first is the size Ventoy starts in. |
 | `--mode dynamic\|snapshot` | `dynamic` (default) follows the files on the stick; see [Dynamic and snapshot](#dynamic-and-snapshot). |
@@ -58,13 +58,12 @@ Options are saved on the stick in `/ventoy/material-grub.conf` (`STYLE`, `SCHEME
 ## What you see
 
 - **The scene** for the highlighted ISO: its distro's colour, logo and name, in the style you chose. The small muted line at the bottom is the raw file name exactly as Ventoy lists it (`RAW_NAME=off` hides it).
-- **`rail` / `clean` (full screen)** only change the ISO picker. Under the smaller distro name sits a wide pill with the distro logo, a disc icon (it is a disk image) and the real file name in a larger font (`RAW_NAME=off` removes the pill). Every other Ventoy menu (F2 browse, F3 folders, F4 local boot, F5 tools, the boot-mode menu) falls back to the list layout: the logo and name on the left, GRUB's own list on the right.
-- **`rail`**: a rail on the left with three sections (Linux, Windows, Tools); the section of the highlighted entry is lit.
-- **`clean`**: a big rounded panel with label chips on its edges.
+- **`full` (full screen)** only changes the ISO picker: no rail, no neighbours, no key hints; two small rounded arrows on the left hint that the list scrolls. Under the smaller distro name sits a wide pill with the distro logo, a disc icon (it is a disk image) and the real file name in a larger font (`RAW_NAME=off` removes the pill). Every other Ventoy menu (F2 browse, F3 folders, F4 local boot, F5 tools, the boot-mode menu) falls back to the list layout: the logo and name on the left, GRUB's own list on the right.
 - **`list`**: the distro's logo and name on the left and the ISO list on the right.
 - **Key hints** at the bottom show every key on Ventoy's own bar (Ventoy 1.1.18): the arrows and Enter, **L** Language, **F1** Help, **F2** Browse (boot a file from the local disk), **F3** Tree view (folders instead of one flat list), **F4** Local boot (boot Windows or another disk, a UEFI file), **F5** Tools (resolution, theme, power, hardware info, keyboard layout), **F6** Ext menu (your own `/ventoy/ventoy_grub.cfg`).
 - **Ventoy's own menus** have scenes too: folders in tree view (Folder, Back), F4 (Windows, Local boot), F5 (Tools, with Restart, Shut down and Firmware items using their own scenes).
 - **The boot-mode menu** (Enter on an image) has a scene per mode, each in its own colour with its own icon: Normal mode (green, play), GRUB2 mode (amber, terminal), WIMBOOT mode (blue, window), Memdisk mode (violet, chip), File checksum (cyan, hash) and Back. Ventoy only offers the modes that fit the image.
+- **PNLug (Pordenone Linux User Group):** any image whose name contains `pnlug` in any letter case (`pnlug_zilla_f.iso`, `PNLUG-Fedora.iso`, ...) gets the association's own colours (its red) and its logo on a white card, in both styles. It wins over every other match, even if the name also says Fedora. The logo is `vendor/pnlug/logo.png`.
 - **Windows ISOs** are recognised as Windows 10 or Windows 11 from the name (`Win10`, `Windows_11`, ...); a plain "Windows" name gets Windows 11.
 - **Anything it does not recognise** (a rescue tool such as GParted or Clonezilla, an unknown distro, a `.wim` or `.img` file) gets a neutral **gray "Disk image" scene with a disc icon**, in every style and in both schemes. The raw file name is still shown, and the entry boots as usual.
 
@@ -75,8 +74,6 @@ Ventoy builds its menu at boot from whatever files are on the stick, and GRUB ca
 **Dynamic (default).** Nothing depends on the files. The installer puts a scene for every supported distro on the stick plus about 600 generic matching rules (see [How matching works](#how-matching-works)). Any ISO you add later is recognised on its name alone. In the `list` style the rows are drawn by GRUB itself, so the list is always the real one and scrolls for any number of ISOs. The price:
 
 - in `list`, the highlighted row has a neutral colour (GRUB theme colours are global) and rows have no per-row icons or section dividers (GRUB draws a row's icon from the same image file as the full-screen scene, so a small icon next to each ISO cannot be made without losing the per-distro backgrounds); the distro's logo and colour are in the big scene beside the list;
-- in `clean`, the neighbouring entries do not peek in above and below;
-- in `rail`, the rail shows three sections instead of one slot per installed distro.
 
 **Snapshot.** The installer looks at the ISOs on the stick right now and draws the exact PC look for them: the list with an icon in a shape per row, each row highlighted in its own distro's colour, section dividers, neighbours peeking in `clean`. The catch: run the installer again after you change the files. A file added later still boots and is recognised by name only if its name matches; its scene shows the whole list without a highlight.
 
@@ -122,7 +119,7 @@ The installer does not use `gfxmode: "max"`: it gave a broken display in the tes
 
 Verified with real Ventoy 1.1.18 booted in QEMU + OVMF (UEFI), with no root:
 
-- `rail`, `clean` and `list`, dark and light, in both modes; the cookie, logo, hints and raw-name switches.
+- `full` and `list`, dark and light, in both modes; the cookie, logo, hints and raw-name switches.
 - 28 ISOs with long, Cyrillic and Japanese names (the list scrolls, long names are shortened).
 - Ventoy's F3 tree view, F4 local boot and F5 tools menus.
 - Themes for 1920x1080, 2560x1080 and 3840x2160 on one stick, picked by Ventoy for the screen size.

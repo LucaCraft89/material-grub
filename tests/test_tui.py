@@ -31,7 +31,7 @@ class VentoyFlow(unittest.TestCase):
             return r, (out.read_text() if out.exists() else "")
     def test_target_question_then_ventoy_steps(self):
         # target 2 (Ventoy), stick 1, main res 2 (1920x1080), more res: only 2560x1440, style list, light, logo/hints/mode default, raw line default, confirm
-        r, t = self.run_tui(["--ask-target"], "2\n1\n2\nn\nn\ny\nn\n3\n2\n\n\n\n\ny\n")
+        r, t = self.run_tui(["--ask-target"], "2\n1\n2\nn\nn\ny\nn\n2\n2\n\n\n\n\ny\n")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         for want in ("TARGET='ventoy'", "STICK='/run/media/u/Ventoy'", "RES='1920x1080'", "RESX='2560x1440'", "STYLE='list'", "SCHEME='light'", "MODE='dynamic'"): self.assertIn(want, t)
         self.assertIn("./install.sh --ventoy '/run/media/u/Ventoy' --res 1920x1080,2560x1440 --style list --scheme light", r.stdout)
@@ -87,7 +87,7 @@ ENTER, DOWN, LEFT = b"\r", b"\x1bOB", b"\x1bOD"   # xterm application-keypad seq
 class VentoyCurses(unittest.TestCase):
     def test_target_stick_picker_and_answers(self):
         # target: Ventoy | stick: the detected one | main res | more res (none) | style list | scheme dark | logo | hints | mode | raw-name | summary: install
-        keys = [DOWN, ENTER, ENTER, ENTER, ENTER, DOWN, DOWN, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER]
+        keys = [DOWN, ENTER, ENTER, ENTER, ENTER, DOWN, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER]
         code, screen, out = drive(keys, extra=["--ask-target"], sticks=STICKS); self.assertEqual(code, 0, screen[-900:]); t = out.read_text()
         for want in ("TARGET='ventoy'", "STICK='/run/media/u/Ventoy'", "RES='2560x1440'", "RESX=''", "STYLE='list'", "SCHEME='dark'", "MODE='dynamic'"): self.assertIn(want, t)
     def test_picker_shows_the_stick(self):

@@ -98,8 +98,8 @@ class DynamicStick(unittest.TestCase):
         subprocess.run([sys.executable, str(TOOL), str(self.d), "--pkg", str(PKG), "--res", "1920x1080"], capture_output=True, text=True, check=True)
         return json.loads((self.d / "ventoy/ventoy.json").read_text()), self.d / "ventoy/themes/material_1920x1080"
     def test_every_class_has_an_icon_and_no_file_is_needed(self):       # a stick with NO ISO at all: the theme must already cover every class a rule or a Ventoy menu can produce
-        for style in ("rail", "clean", "list"):
-            j, th = self.run_tool(style); need = {r["class"] for r in j["menu_class"]} | {"vtoyiso", "vtoydir", "vtoyret", "F5tool", "F4boot", "debug_reboot", "debug_halt", "debug_efisetup", "boot_windows", "second_normal", "second_grub2", "second_wimboot", "second_memdisk", "second_checksum", "second_return"}      # the last six: Ventoy's boot-mode menu
+        for style in ("full", "list"):
+            j, th = self.run_tool(style); need = {r["class"] for r in j["menu_class"]} | {"vtoyiso", "vtoydir", "vtoyret", "F5tool", "F4boot", "debug_reboot", "debug_halt", "debug_efisetup", "boot_windows", "second_normal", "second_grub2", "second_wimboot", "second_memdisk", "second_checksum", "second_return", "mg_pnlug"}      # second_*: Ventoy's boot-mode menu
             for c in need: self.assertTrue((th / "icons" / f"{c}.png").exists(), (style, c))
             th_w, th_h = 1920, 1080; txt = (th / "theme.txt").read_text(); self.assertIn("mgrow_*.png", txt)      # every style has GRUB's own list; in rail / clean it lies below the scene
             self.assertTrue((th / "mgsel_c.png").exists()); self.assertEqual("mg:filename" in txt, style != "list", style)      # full screen: the file name pill under the title
@@ -107,6 +107,8 @@ class DynamicStick(unittest.TestCase):
                 from PIL import Image as I
                 self.assertEqual(I.open(th / "icons/mg_fedora.png").convert("RGBA").getpixel((th_w // 2, round(th_h * .68) + 36))[3], 0, "hole for the file-name pill in the ISO scene")
                 self.assertEqual(I.open(th / "icons/second_normal.png").convert("RGBA").getpixel((int(th_w * .47) + 300, 148))[3], 0, "hole at the first row of a menu scene")
+            self.assertEqual([r["class"] for r in j["menu_class"][:32]], ["mg_pnlug"] * 32, "PNLug in any letter case comes first"); self.assertEqual(len({r["key"] for r in j["menu_class"][:32]}), 32)
+            self.assertIn("PnLuG", {r["key"] for r in j["menu_class"][:32]})
             logo = Image.open(th / "machine-logo.png").convert("RGBA"); px = [logo.getpixel((x, y)) for x in range(logo.width) for y in range(logo.height)]
             self.assertTrue(any(a > 200 and b > r + 40 for r, g, b, a in px), "the real Ventoy logo is blue, not a dark V")
 
@@ -124,7 +126,7 @@ class Stick(unittest.TestCase):
         orig = json.loads(self.vj.read_text()); self.run_tool(); self.run_tool()      # twice: idempotent
         j = json.loads(self.vj.read_text())
         self.assertEqual(j["control"], orig["control"]); self.assertEqual(j["menu_class"][0], {"key": "mine", "class": "x"})   # the user's settings and rules survive, theirs first
-        self.assertEqual(len(j["menu_class"]), 1 + 3); self.assertEqual(j["theme"]["gfxmode"], "1920x1080")
+        self.assertEqual(len(j["menu_class"]), 1 + 32 + 3); self.assertEqual(j["theme"]["gfxmode"], "1920x1080")
         icons = self.d / "ventoy/themes/material_1920x1080/icons"
         for m in j["menu_class"][1:]: self.assertTrue((icons / f"{m['class']}.png").exists(), m)
         self.assertTrue((self.d / "ventoy/ventoy.json.material-grub.bak").exists())

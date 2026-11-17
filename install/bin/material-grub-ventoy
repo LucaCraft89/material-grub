@@ -32,6 +32,7 @@ def scan(stick):
     return sorted(out, key=lambda r: (Path(r).name.casefold(), r))
 
 def key_of(name, rules):
+    if "pnlug" in name.lower(): return "pnlug"      # Pordenone Linux User Group: any letter case
     """Catalog key from an ISO file name: the PC matcher (case-insensitive tokens), then Windows 10/11 by name, else the Tux fallback."""
     stem = re.sub(r"\.[^.]+$", "", name); low = stem.lower()
     k = mgrub.key_for(stem, rules)
@@ -58,6 +59,10 @@ EXTRA_KEYS = {"mxlinux": ["MX-", "MX_"], "linuxmint": ["lmde", "LMDE"], "opensus
               "puppy": ["Pup64", "Pup32", "Puppy", "S15Pup", "fossapup", "bionicpup", "focalpup", "bookwormpup", "Pup_"], "openbsd": ["install7", "install6", "install8", "miniroot", "cd7", "cd8"],
               "windows10": ["Win_Pro_10", "Win_Ent_10", "Win_Home_10", "Windows_10", "en_windows_10"], "windows11": ["Win_Pro_11", "Win_Ent_11", "windows_11", "windows_server"],
               "raspberrypi": ["raspios", "RaspiOS", "Raspios", "raspbian"], "freebsd": ["FreeBSD"], "tails": ["tails-amd64"], "qubes": ["Qubes"], "centos": ["CentOS"]}
+def pnlug_rules():
+    """`key` is a case-sensitive substring in Ventoy, so every upper / lower combination of 'pnlug' is a rule (32). They go in front of everything else: PNLug-Fedora... is a PNLug image."""
+    import itertools
+    return [{"key": "".join(c), "class": "mg_pnlug"} for c in itertools.product(*[(ch, ch.upper()) for ch in "pnlug"])]
 def dynamic_rules(classes, titles):
     """Generic `menu_class` rules that need no list of files: every catalog alias and title in four letter-cases (as is, lower, UPPER, Capitalised), longest first.
     `key` is a case-sensitive substring in Ventoy, so the cases are what makes 'fedora-...', 'Fedora-...' and 'FEDORA-...' all match. Keys shorter than 4 chars are skipped (too many false hits)."""
@@ -188,7 +193,7 @@ if "--uninstall" in sys.argv: uninstall(); sys.exit(0)
 try: import mgscenes; from PIL import Image
 except ImportError: sys.exit("material-grub-ventoy: Pillow is required")
 conf = mgrub.load_conf(arg("--conf", str(stick / "ventoy/material-grub.conf"))); style = conf["STYLE"]
-if style == "split": style = "list"      # the Ventoy list already is hero-left / list-right
+style = "list" if style in ("list", "split") else "full"      # Ventoy has two styles: the full-screen ISO picker (rail / clean from older versions map to it) and the list (`split` is the same thing: its list already is hero-left / list-right)
 conf["COUNTDOWN"] = "on" if conf["TIMEOUT"] else "off"          # Ventoy has no timeout unless one is configured
 rules = mgrub.load_rules(PKG); classes = json.loads((PKG / "classes.json").read_text())
 avail = sorted(p.name for p in (PKG / "res").iterdir())
@@ -198,7 +203,9 @@ for r in resl:
 
 dynamic = conf["MODE"] == "dynamic"      # dynamic: nothing depends on the files on the stick (generic rules, one scene per distro); snapshot: scenes are rendered for the files that are there now
 titles = json.loads((PKG / "titles.json").read_text())
-SECTIONS = [["tux"], ["windows11"], ["wrench"]]; section = lambda k: "windows11" if k in ("windows10", "windows11") else "wrench" if k in ("firmware", "reboot", "shutdown") else "" if k == "iso" else "tux"      # dynamic rail: one slot per section, the slot of the selected entry is lit
+LOGOS = {}      # full-colour logos of catalog entries that have their own (PNLug)
+_pn = next((c for c in (PKG / "ventoy/pnlug.png", Path(__file__).resolve().parents[2] / "vendor/pnlug/logo.png") if c.exists()), None)
+if _pn and "pnlug" in classes: LOGOS["pnlug"] = Image.open(_pn).convert("RGB")
 files = [] if dynamic else scan(stick)
 entries = []
 for rel in files:
@@ -206,10 +213,11 @@ for rel in files:
     entries.append({"class": mgrub.uid("ventoy", rel), "key": k, "kind": "plain", "level": "top", "title": name, "label": name, "path": rel})
 keys = sorted({e["key"] for e in entries}) or ["iso"]
 if dynamic: keys = list(classes)
+elif "pnlug" in classes and "pnlug" not in keys: keys.append("pnlug")      # its rules are always written, so its scene must exist
 groups = mgscenes.groups_of(keys); by_class = {e["class"]: e for e in entries}
 menu = [{"level": "top", "items": [e["class"] for e in entries]}]
 opts = {"cookie": conf["COOKIE"] == "on", "hints": conf["HINTS"] == "on", "shape": "cookie"}
-per_entry = style != "rail"
+per_entry = style == "list"
 print(f"material-grub-ventoy: mode {conf['MODE']}, {len(entries)} images, {len(keys)} distros, style {style}, resolutions {', '.join(resl)}")
 
 theme_dirs, theme_files, fonts, menu_class = [], [], [], []
@@ -220,7 +228,7 @@ for res in resl:
         if f.name not in ("logo_size", "aspect"): shutil.copy(f, tmp / f.name)
     th = tmp / "theme.txt"; th.write_text(mgrub.apply_conf_to_theme(th.read_text(), conf))
     rw, rh = map(int, res.split("x")); light = (PKG / "scheme.txt").read_text().strip() == "light" if (PKG / "scheme.txt").exists() else False; q = round(76 * rh / 1080)
-    fs = style in ("rail", "clean")      # full screen: only the ISO picker keeps it; Ventoy's other menus are list scenes whose rows come from GRUB's own list below the scene
+    fs = style == "full"      # full screen: only the ISO picker keeps it; Ventoy's other menus are list scenes whose rows come from GRUB's own list below the scene
     if dynamic and style == "list":
         th.write_text(native_list(th.read_text(), rw, rh, light))
         pill_slices(tmp, "mgrow", q, (0, 0, 0, 20) if light else (255, 255, 255, 24)); pill_slices(tmp, "mgsel", q, (0, 0, 0, 52) if light else (255, 255, 255, 70))
@@ -235,8 +243,7 @@ for res in resl:
         if os.path.exists(cand): shutil.copy(cand, tmp / "unicode.pf2"); break
     if conf["LOGO"] == "on" and conf["COOKIE"] == "on": logo_png(tmp / "machine-logo.png", int((rdir / "logo_size").read_text().strip()), arg("--logo"))
     bgs = sorted((PKG / "scenes" / aspect / "bg").glob("*.png")); R = mgscenes.Renderer(PKG, Image.open(bgs[0]).height); R.bg_dir = PKG / "scenes" / aspect / "bg"; R.hint_labels = HINTS
-    cls_scene = lambda k: PKG / "scenes" / aspect / "icons" / f"{classes[k][0]}.png"
-    bgdir = PKG / "scenes" / aspect / "bg"; R.chip_disc = fs; R.cookie_off = (-24, 96) if style == "clean" else (0, 0); raw_on = conf["RAW_NAME"] == "on"
+    bgdir = PKG / "scenes" / aspect / "bg"; R.logos = LOGOS; raw_on = conf["RAW_NAME"] == "on"
     def rows_of(im): x0, y0, w, h, pitch, n = row_geom(*im.size); return [(x0, y0 + i * pitch, w, h) for i in range(n)]
     def carded(im):
         """A rounded card in the desktop colour behind the 7 row slots: slots without an entry show the desktop colour through their hole, so they melt into the card instead of showing as dark ghosts."""
@@ -259,15 +266,11 @@ for res in resl:
         for g, x in ((k, x1), ("iso", x2)): im.alpha_composite(R.glyph(g, s, ink), (x, T + (Hp - s) // 2))
         return im
     def class_scene(k):
-        if fs:
-            hero = tmp / "_hero" / f"{k}.png"
-            return finish_iso(R.render_class(k, hero, SECTIONS, style, opts, [], rail_sel=section(k)) if dynamic else R.render_class(k, hero, groups, style, opts, menu), k)
-
-        if dynamic and style == "list": return R.render_list_hero(k, PKG / "scenes" / aspect / "bg" / f"{k}.png", opts)
-        if dynamic: return R.render_class(k, cls_scene(k), SECTIONS, style, opts, [], rail_sel=section(k))      # rail with sections; clean without neighbours
-        # snapshot -- rail: the whole story. clean: a panel without neighbours. list: the whole list, nothing highlighted (also what an ISO added after install gets)
-        if style == "list": return R.render_list_fallback(k, PKG / "scenes" / aspect / "bg" / f"{k}.png", entries, opts)
-        return R.render_class(k, cls_scene(k), groups, style, opts, menu)
+        if fs:       # background + hero, the cookie, two scroll arrows on the left; no rail, no neighbours, no key hints
+            sc = Image.open(tmp / "_hero" / f"{k}.png").convert("RGBA"); R.decorate(sc, R.pal[k], dict(opts, hints=False)); R.draw_arrows(sc, R.pal[k]); return finish_iso(sc, k)
+        if dynamic: return R.render_list_hero(k, bgdir / f"{k}.png", opts)
+        # snapshot list: the whole list, nothing highlighted (also what an ISO added after install gets)
+        return R.render_list_fallback(k, bgdir / f"{k}.png", entries, opts)
     for k in keys: class_scene(k).save(tmp / "icons" / f"mg_{k}.png")
     generic = Image.open(tmp / "icons" / "mg_iso.png") if "iso" in keys else class_scene("iso")      # Ventoy's own classes (vtoyiso, vtoywim, ...) and every file the rules do not recognise
     for c in VTOY_FALLBACK: generic.save(tmp / "icons" / f"{c}.png")
@@ -275,20 +278,15 @@ for res in resl:
         for c, k in MENU_ALIAS.items(): list_scene(k).save(tmp / "icons" / f"{c}.png")
     elif dynamic:       # the existing scenes for Ventoy's power / firmware / Windows items
         for c, k in MENU_ALIAS.items(): shutil.copy(tmp / "icons" / f"mg_{k}.png", tmp / "icons" / f"{c}.png")
-    if dynamic or style != "list":       # Ventoy's own menus: a scene each (folder, back, tools, local boot, the boot modes); the snapshot list bakes its rows into the scenes, so it has none
+    if fs or dynamic:       # Ventoy's own menus: a scene each (folder, back, tools, local boot, the boot modes); the snapshot list bakes its rows into the scenes, so it has none
         for c, (glyph, title, sub, pal) in MENU.items():
             pk = f"mgm_{c}"; R.pal[pk] = R.pal[pal]; R.titles[pk] = title; R.galias[pk] = glyph; bg = PKG / "scenes" / aspect / "bg" / f"{pal}.png"
             if fs: img = punch(carded(R.render_list_hero(pk, bg, opts)), rows_of(Image.open(bg)))
-            elif style == "list": img = R.render_list_hero(pk, bg, opts)
-            else:
-                sc = Image.open(bg).convert("RGBA"); R.hero(sc, {"key": pk, "kind": "kernel", "title": sub}, R.pal[pk])
-                img = R.render_clean({"key": pk, "kind": "plain", "title": title}, sc, None, None, opts).convert("RGB") if style == "clean" else None
-                if img is None: R.decorate(sc, R.pal[pk], opts); R.draw_rail(sc, R.pal[pk], SECTIONS, "wrench"); img = sc.convert("RGB")
+            else: img = R.render_list_hero(pk, bg, opts)
             img.save(tmp / "icons" / f"{c}.png")
     if per_entry and not dynamic:
         for e in entries:
-            src = tmp / "_hero" / f"{e['key']}.png" if fs else PKG / "scenes" / aspect / ("icons" if style != "list" else "bg") / (f"{classes[e['key']][0]}.png" if style != "list" else f"{e['key']}.png")
-            im = R.render_entry(e, src, groups, style, opts, menu, by_class); (finish_iso(im, e["key"]) if fs else im).save(tmp / "icons" / f"{e['class']}.png")
+            im = R.render_entry(e, bgdir / f"{e['key']}.png", groups, "list", opts, menu, by_class); im.save(tmp / "icons" / f"{e['class']}.png")
     shutil.rmtree(tmp / "_hero", ignore_errors=True); shutil.rmtree(out, ignore_errors=True); os.replace(tmp, out)
     theme_dirs.append(rel_dir); theme_files.append(f"/{rel_dir}/theme.txt")
     fonts += [f"/{rel_dir}/{p.name}" for p in sorted(out.glob("*.pf2"))]
@@ -299,7 +297,8 @@ if vj_path.exists() and not bak.exists(): shutil.copy(vj_path, bak)
 vj = load_json(vj_path); old_mine = state.get("menu_class", [])
 user_mc = [m for m in vj.get("menu_class", []) if m not in old_mine]
 names = sorted({Path(e["path"]).name for e in entries})
-if dynamic: menu_class = dynamic_rules(classes, titles)
+if dynamic: menu_class = pnlug_rules() + dynamic_rules(classes, titles)
+else: menu_class = pnlug_rules()      # also for files added after the install
 for e in ([] if dynamic else entries):
     name = Path(e["path"]).name; key = pick_key(name, [o for o in names if o != name])
     if key is None: print(f"material-grub-ventoy: warning: no unique key for {name}; it keeps the generic scene"); continue

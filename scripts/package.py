@@ -50,7 +50,7 @@ if __name__ == "__main__":
         m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
     for k, g in extra.items():
         m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
-    (PKG / "ventoy").mkdir(); shutil.copy(ROOT / "vendor/ventoy/VentoyLogo.png", PKG / "ventoy" / "VentoyLogo.png")      # the Ventoy logo drawn in the cookie on a stick
+    (PKG / "ventoy").mkdir(); shutil.copy(ROOT / "vendor/ventoy/VentoyLogo.png", PKG / "ventoy" / "VentoyLogo.png"); shutil.copy(ROOT / "vendor/pnlug/logo.png", PKG / "ventoy" / "pnlug.png")      # the Ventoy logo drawn in the cookie on a stick
     (PKG / "scheme.txt").write_text(B.R.SCHEME + "\n")
     (PKG / "palettes.json").write_text(json.dumps({k: v for k, v in B.R.PAL.items()}))
     shutil.copytree(ROOT / "install/bin", PKG / "bin"); shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")

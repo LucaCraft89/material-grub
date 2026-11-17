@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Ventoy: the two full-screen styles (`rail`, `clean`) are replaced by one `full` style (old values still work and mean `full`): no rail, no neighbours, no key hints, only two rounded themed arrows on the left that hint at scrolling. The ISO picker is `full` or `list`; every other Ventoy menu stays the list.
+- Ventoy: an image with `pnlug` in its name in any letter case (all 32 case combinations are written as `menu_class` rules, in front of everything else) is themed with the Pordenone Linux User Group's red and its horizontal logo on a white card (new scene-only catalog entry `pnlug`).
+
 - Ventoy full-screen styles (`rail`, `clean`): only the ISO picker stays full screen. The distro name is a bit smaller and a wide pill under it shows the distro logo, a disc icon and the real file name in a larger font (the `clean` chips get the disc icon too). All other Ventoy menus use the list layout. How: GRUB's list lies below the scene; list scenes have holes where the rows are, ISO scenes are opaque and hide it, and the file name (a GRUB label) shows through a hole in the ISO scenes' pill.
 
 - New fourth style for the PC: `STYLE=split` (`install.sh --style split`). The centred list moved to the right, the selected entry's logo in a big cookie and its name on the left (Advanced / Rescue show their gear / wrench). Every row keeps its themed icon-in-a-shape, highlight colour and the separators between Linux, Windows and System. On a Ventoy stick `split` is the same as `list` (its list already has that layout).
