@@ -61,7 +61,21 @@ def apply_conf_to_theme(text, conf):
     """Drop the '# mg:begin NAME' .. '# mg:end NAME' blocks of theme.txt that the config switches off (no cookie also means no logo in it)."""
     for key, name in (("RAW_NAME", "raw"), ("COUNTDOWN", "countdown"), ("LOGO", "logo")):
         if conf[key] == "off" or (name == "logo" and conf["COOKIE"] == "off"): text = re.sub(rf"(?ms)^# mg:begin {name}\n.*?^# mg:end {name}\n", "", text)
+    if conf.get("STYLE") == "clean": text = _clean_layout(text)
     return text
+
+def _clean_layout(text):
+    """`clean` draws its panel inside a 24 px margin and 96 px top bar, so the BGRT logo moves with the cookie (design values scaled by the bundle's own factor, recovered from the logo width).
+    The raw-name line stays at the very bottom: GRUB shows as many rows as fit between its top and the screen edge, which is what keeps it a 1-item list."""
+    def block(name, fn):
+        return re.sub(rf"(?ms)^(# mg:begin {name}\n)(.*?)(^# mg:end {name}\n)", lambda m: m[1] + fn(m[2]) + m[3], text, count=1)
+    def num(body, k): m = re.search(rf"^\s*{k} = (-?\d+)$", body, re.M); return int(m[1]) if m else None
+    def setnum(body, k, v): return re.sub(rf"^(\s*{k} = )-?\d+$", rf"\g<1>{v}", body, count=1, flags=re.M)
+    def logo(b):
+        w, l, t = num(b, "width"), num(b, "left"), num(b, "top")
+        if None in (w, l, t): return b
+        f = w / 120; return setnum(setnum(b, "left", l - round(24 * f)), "top", t + round(96 * f))
+    return block("logo", logo)
 
 
 # `blscfg` is how GRUB loads BootLoaderSpec entries. Distros call it as a bare line (Fedora), indented inside an if, or with options.

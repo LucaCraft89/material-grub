@@ -167,12 +167,68 @@ class Renderer:
         d.text((cx, u(590)), title, font=self.font(tsz, 800, 135, 60), fill=hexc(p["primary"]) + (255,), anchor="mm")
         self.pill_row(self.info_pills(e), p, W, u(672), canvas)
 
-    def render_entry(self, e, bg_path, groups, style="rail", opts=None, menu=None):
-        """Per-entry scene (kernel / rescue / advanced): bg + cookie + hints + hero + info pills + style furniture."""
+    # ---- clean style: the first version's look (a big panel for the entry, the neighbours peek in above and below, label chips on the panel edges) ----
+    CLEAN = dict(margin=24, top=96, ph=888, gap=12, radius=64, chip_h=52, chip_pad=16)
+    def label_for(self, e):
+        """Chip / list-row label: kernel version for kernels inside a submenu, else the usual title."""
+        if e["kind"] == "kernel" and e.get("level") == "adv" and e.get("kver"): return e["kver"]
+        return self.title_for(e)
+    def chip(self, e, p, h=None):
+        u = self.u; h = h or u(self.CLEAN["chip_h"]); f = self.text_font(self.label_for(e), u(26), 560, 105); label = self.label_for(e)
+        icons = [e["key"]] + ([{"advanced": "gear", "rescue": "wrench"}[e["kind"]]] if e["kind"] in ("advanced", "rescue") else [])
+        ic = h - u(24); pad = u(22); w = pad * 2 + int(f.getlength(label)) + len(icons) * (ic + u(10))
+        im = self.rrect(w, h, h // 2, hexc(p["surfaceContainerHigh"]) + (255,)); x = pad
+        for g in icons: im.alpha_composite(self.glyph(g, ic, hexc(p["primary"]) + (255,)), (x, (h - ic) // 2)); x += ic + u(10)
+        ImageDraw.Draw(im).text((x, h // 2 + u(1)), label, font=f, fill=hexc(p["onSurface"]) + (255,), anchor="lm"); return im
+    def panel_from(self, scene, ctx):
+        """Crop the panel region out of a full-screen scene and round its corners (content keeps its absolute position)."""
+        m, t, ph = ctx; pw = scene.width - 2 * m; im = scene.crop((m, t, m + pw, t + ph)).convert("RGBA")
+        mask = self.rrect(pw, ph, self.u(self.CLEAN["radius"]), (255, 255, 255, 255)).getchannel("A"); im.putalpha(mask); return im
+    @staticmethod
+    def paste_clipped(canvas, im, x, y):
+        """alpha_composite that tolerates negative / overflowing positions."""
+        x0, y0 = max(0, -x), max(0, -y); x1, y1 = min(im.width, canvas.width - x), min(im.height, canvas.height - y)
+        if x1 > x0 and y1 > y0: canvas.alpha_composite(im.crop((x0, y0, x1, y1)), (x + x0, y + y0))
+    def render_clean(self, e, scene, prev, nxt, opts):
+        """`scene`: the full-screen scene of the entry (bg + hero). prev / nxt: neighbour entries (or None)."""
+        u = self.u; c = self.CLEAN; m, t, ph, gap = (u(c[k]) for k in ("margin", "top", "ph", "gap")); W, H = scene.size
+        base = self.pal.get("base", self.pal[e["key"]]); canvas = Image.new("RGBA", (W, H), hexc(base["surface"]) + (255,))
+        ctx = (m, t, ph); cp = u(c["chip_pad"])
+        for ne, y in ((prev, t - gap - ph), (nxt, t + ph + gap)):
+            if ne is None: continue
+            np_ = self.pal[ne["key"]]; pn = self.panel_from(Image.open(self.bg_dir / f"{ne['key']}.png").convert("RGBA"), ctx); ch = self.chip(ne, np_)
+            for cy in (cp, ph - ch.height - cp): pn.alpha_composite(ch, ((pn.width - ch.width) // 2, cy))
+            self.paste_clipped(canvas, pn, m, y)
+        p = self.pal[e["key"]]; pn = self.panel_from(scene, ctx); ch = self.chip(e, p)
+        for cy in (cp, ph - ch.height - cp): pn.alpha_composite(ch, ((pn.width - ch.width) // 2, cy))
+        canvas.alpha_composite(pn, (m, t))
+        if opts.get("cookie", True):
+            ck = self.shape("cookie", u(230), p["primaryContainer"]); canvas.alpha_composite(ck, (int(W - m - u(150) - ck.width / 2), int(t + u(140) - ck.height / 2)))
+        if opts.get("hints", True):
+            hint = self.key_hints(p); canvas.alpha_composite(hint, ((W - hint.width) // 2, t + ph - cp - ch.height - u(12) - hint.height))
+        return canvas
+
+    @staticmethod
+    def neighbours(menu, by_class, e, wrap=True):
+        """(previous, next) entries in the same menu level, as GRUB lists them; None where there is none (no menu info, single entry, no wrap at the ends)."""
+        for lv in menu or []:
+            if e.get("class") in lv["items"]:
+                items = [by_class[c] for c in lv["items"] if c in by_class]; n = len(items); i = next(k for k, x in enumerate(items) if x["class"] == e["class"])
+                if n < 2: return None, None
+                prev = items[i - 1] if (wrap or i > 0) else None; nxt = items[(i + 1) % n] if (wrap or i < n - 1) else None
+                return prev, nxt
+        return None, None
+
+    bg_dir = None   # set by the caller: <pkg>/scenes/<aspect>/bg (the neighbours' panels in `clean` come from there)
+    def render_entry(self, e, bg_path, groups, style="rail", opts=None, menu=None, by_class=None):
+        """Per-entry scene. Kernel / rescue / advanced: bg + hero + info pills. Plain entries in clean/list styles pass their class hero scene as bg_path."""
         opts = opts or {}; p = self.pal[e["key"]]; sc = Image.open(bg_path).convert("RGBA")
-        self.decorate(sc, p, opts); self.hero(sc, e, p)
-        self.draw_rail(sc, p, groups, e["key"]); return sc.convert("RGB")
+        if e["kind"] != "plain": self.hero(sc, e, p)
+        if style == "clean":
+            prev, nxt = self.neighbours(menu, by_class or {}, e, opts.get("wrap", True)); return self.render_clean(e, sc, prev, nxt, opts).convert("RGB")
+        self.decorate(sc, p, opts); self.draw_rail(sc, p, groups, e["key"]); return sc.convert("RGB")
     def render_class(self, key, icon_path, groups, style="rail", opts=None, menu=None):
-        """Class-level scene (plain entries and fallbacks): the build-time hero scene + cookie + hints + style furniture."""
+        """Class-level scene (fallbacks, and plain entries in the rail style): the build-time hero scene + cookie + hints + style furniture."""
         opts = opts or {}; p = self.pal[key]; sc = Image.open(icon_path).convert("RGBA")
+        if style == "clean": return self.render_clean({"key": key, "kind": "plain", "title": key}, sc, None, None, opts).convert("RGB")
         self.decorate(sc, p, opts); self.draw_rail(sc, p, groups, key); return sc.convert("RGB")

@@ -69,6 +69,20 @@ class Pipeline(unittest.TestCase):
         self.assertGreater(ImageChops.difference(full, nocookie).getbbox()[0], W * 0.8, "cookie is top right")
         bg = Image.open(sorted((PKG / "scenes/16x9/bg").glob("fedora.png"))[0]).convert("RGB")
         self.assertEqual(bg.getpixel((W - 150, 140)), bg.getpixel((W // 2, 40)), "the build-time bg must not carry the cookie")
+    def test_clean_style(self):      # per-entry scenes for every entry incl. plain ones; logo follows the panel; neighbours differ per entry
+        from PIL import Image, ImageChops
+        self.cfg.write_text(STATIC + "menuentry 'Windows Boot Manager (on /dev/sda1)' { true }\n")
+        conf = self.d / "m.conf"; conf.write_text("STYLE=clean\n"); os.environ["MATERIAL_CONF"] = str(conf)
+        try: self.run_all()
+        finally: del os.environ["MATERIAL_CONF"]
+        ents = json.loads(self.state.read_text()); icons = self.boot / "grub2/themes/material/icons"
+        for e in ents:
+            self.assertTrue((icons / f"{e['class']}.png").exists(), e["title"])
+        win = next(e for e in ents if e["key"] == "windows11"); fed = next(e for e in ents if e["kind"] == "kernel")
+        a, b = Image.open(icons / f"{win['class']}.png").convert("RGB"), Image.open(icons / f"{fed['class']}.png").convert("RGB")
+        self.assertEqual(a.size, b.size); self.assertEqual(a.getpixel((960, 5)) != b.getpixel((960, 5)), True, "peek band shows the neighbour's own colour")
+        th = (self.boot / "grub2/themes/material/theme.txt").read_text()
+        self.assertIn("left = 1686", th); self.assertIn("top = 176", th)
     def test_non_latin_titles(self):      # pills fall back to another installed font; the theme ships GRUB's unicode.pf2 when the system has it
         (self.entries / "ostree-4-fedora.conf").write_text(ENTRY.format(v="44.1", n=4).replace("(Silverblue)", "(Рабочая станция 日本語)"))
         self.run_all(); self.assertTrue(any((self.boot / "grub2/themes/material/icons").glob("mg_*.png")))
