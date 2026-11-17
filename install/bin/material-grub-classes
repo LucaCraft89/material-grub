@@ -2,6 +2,7 @@
 """Annotate grub.cfg for the Material theme and refresh BLS mirrors. stdlib only. Idempotent.
  - titles -> catalog class (case-insensitive), Windows 10/11 detection
  - unique per-entry classes (mg_xxxx) so each kernel/recovery/advanced entry gets its own scene
+ - menu.json: the entries in real GRUB menu order, per menu level (the list/clean styles draw the siblings of the selected entry)
  - Fedora BLS: top level = default kernel, 'Advanced options' submenu = the rest (via mirror dirs; system files untouched)
 usage: material-grub-classes GRUB_CFG [--pkg DIR] [--bls DIR] [--loader DIR] [--blsbase /loader] [--mirrors DIR --mirrorbase GRUBPATH] [--fallback-all] [--state FILE] [--default ID]
  --mirrors/--mirrorbase: where the structured BLS mirrors live (default: inside --loader). Immutable (ostree) systems keep them outside /boot/loader,
@@ -16,7 +17,7 @@ cfg = Path(sys.argv[1]); pkg = Path(arg("--pkg", "/usr/share/material-grub"))
 bls = Path(arg("--bls", "/boot/loader/entries")); loader = Path(arg("--loader", "/boot/loader"))
 blsbase = arg("--blsbase", "/loader" if os.path.ismount("/boot") else "/boot/loader")
 mirrors = Path(arg("--mirrors", str(loader))); mbase = arg("--mirrorbase", blsbase); FALLBACK = "--fallback-all" in sys.argv
-state = Path(arg("--state", "/var/lib/material-grub/entries.json")); cfgstate = state.with_name("cfg-entries.json")
+state = Path(arg("--state", "/var/lib/material-grub/entries.json")); cfgstate = state.with_name("cfg-entries.json"); cfgmeta = state.with_name("cfg-meta.json")
 MARK = "# material-grub: classes applied"
 rules = mgrub.load_rules(pkg); classes = json.loads((pkg / "classes.json").read_text())
 alias2key = {a: k for k, al in classes.items() for a in al}
@@ -58,23 +59,23 @@ def mkentry(title, key, kind, level, cls, **kw):
 text = cfg.read_text(); first = MARK not in text
 bls_confs = sorted(bls.glob("*.conf")) if bls.is_dir() else []
 if first:
-    out, cfg_entries, stack = [], [], []
+    out, cfg_entries, stack, pstack, bls_at = [], [], [], [], 0
     pat = re.compile(r"^(\s*)(menuentry|submenu)\s+(['\"])(.*?)\3(.*)$")
     for line in text.splitlines():
         m = pat.match(line)
         if m:
             ind, word, q, title, rest = m.groups(); level = "adv" if "submenu" in stack else "top"
             cls = re.findall(r"--class\s+(\S+)", rest); key = key_of(title, cls); kind = mgrub.kind_of(title, key, word == "submenu")
-            c = mgrub.uid(level, title) if kind != "plain" else key
+            c = mgrub.uid(level, title)      # unique per entry, also for plain ones (Windows, Firmware...): their key stays the 2nd class, so the shared class scene is the fallback
             if not re.search(rf"--class {re.escape(c)}\b", rest): line = f"{ind}{word} {q}{title}{q} --class {c}{(' --class ' + key) if c != key else ''}{rest}"
-            cfg_entries.append(mkentry(title, key, kind, level, c))
-            if line.rstrip().endswith("{"): stack.append(word)
-        elif line.strip() == "}" and stack: stack.pop()
+            cfg_entries.append(mkentry(title, key, kind, level, c, parent=pstack[-1] if pstack else None))
+            if line.rstrip().endswith("{"): stack.append(word); pstack.append(c)
+        elif line.strip() == "}" and stack: stack.pop(); pstack.pop()
         elif mgrub.bls_call(line) and (stack or not mgrub.bls_restructurable(mgrub.bls_call(line))):
             if not stack: print(f"material-grub: leaving `{line.strip()}` untouched (its options are not compatible with the Advanced-options structure); entries are themed by class only")
             out.append(line); continue
         elif mgrub.bls_restructurable(mgrub.bls_call(line)) and bls_confs:
-            osn = os_name(); k = key_of(osn); ac = mgrub.uid("adv-menu", osn); ind, bargs = mgrub.bls_call(line); bcmd = ("blscfg " + bargs).strip()
+            bls_at = len(cfg_entries); osn = os_name(); k = key_of(osn); ac = mgrub.uid("adv-menu", osn); ind, bargs = mgrub.bls_call(line); bcmd = ("blscfg " + bargs).strip()
             blk = ["# material-grub: structured BLS entries (default kernel here, the rest under Advanced options)",
                    f"set blsdir={mbase}/material-top", f"if {bcmd}; then true; else unset blsdir; {bcmd}; fi",
                    f"submenu 'Advanced options for {osn}' --class {ac} --class {k} --id material-advanced {{",
@@ -85,9 +86,11 @@ if first:
         out.append(line)
     tmp = cfg.with_name(cfg.name + ".material"); tmp.write_text(MARK + "\n" + "\n".join(out) + "\n")
     os.chmod(tmp, cfg.stat().st_mode); os.replace(tmp, cfg)
-    state.parent.mkdir(parents=True, exist_ok=True); cfgstate.write_text(json.dumps(cfg_entries))
+    state.parent.mkdir(parents=True, exist_ok=True); cfgstate.write_text(json.dumps(cfg_entries)); cfgmeta.write_text(json.dumps({"bls_at": bls_at}))
     print(f"material-grub: annotated {len(cfg_entries)} grub.cfg entries")
 cfg_entries = json.loads(cfgstate.read_text()) if cfgstate.exists() else []
+try: bls_at = json.loads(cfgmeta.read_text())["bls_at"]
+except Exception: bls_at = 0       # state from an older version: the BLS block is normally the first thing in the menu
 
 # ---------------- phase 2: BLS mirrors (always) ----------------
 bls_entries = []
@@ -127,4 +130,14 @@ if bls_confs:
 # ---------------- phase 3: state for the scene renderer ----------------
 allents = bls_entries + [e for e in cfg_entries if not (e["kind"] == "advanced" and bls_entries and e["title"].startswith("Advanced options for") and False)]
 state.write_text(json.dumps(allents, indent=0))
+# menu order: cfg entries in file order with the BLS block (default kernel, Advanced submenu) at the position of `blscfg`; its submenu contents are a level of their own.
+# The raw "All boot entries" fallback submenu is not listed. Level "adv" has the class of its submenu as "parent".
+top_bls = [e for e in bls_entries if e["level"] == "top"]; adv_bls = [e for e in bls_entries if e["level"] == "adv"]
+top_cfg = [e for e in cfg_entries if e.get("level", "top") == "top"]; at = min(bls_at, len(top_cfg))
+levels = {None: [e["class"] for e in top_cfg[:at] + top_bls + top_cfg[at:]]}
+for e in cfg_entries:
+    if e.get("level") == "adv": levels.setdefault(e.get("parent") or "cfg-adv", []).append(e["class"])
+if adv_bls: levels[top_bls[-1]["class"]] = [e["class"] for e in adv_bls]
+menu = [{"level": "top", "items": levels.pop(None)}] + [{"level": "adv", "parent": par, "items": items} for par, items in levels.items()]
+state.with_name("menu.json").write_text(json.dumps(menu, indent=0))
 print(f"material-grub: state has {len(allents)} entries ({len(bls_entries)} from BLS)")

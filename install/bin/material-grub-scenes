@@ -1,154 +1,43 @@
 #!/usr/bin/env python3
-"""Render per-entry scenes (hero, info pills, section rail) into the active theme. Needs Pillow.
+"""Render per-entry scenes (hero, info pills, cookie, key hints, style furniture) into the active theme. Needs Pillow.
+Style and options come from /etc/material-grub.conf (STYLE, COOKIE, HINTS); the drawing code is in mgscenes.py.
 usage: material-grub-scenes --theme DIR [--state entries.json] [--pkg DIR]"""
-import json, math, shutil, sys
+import json, shutil, sys
 from pathlib import Path
-try: from PIL import Image, ImageDraw, ImageFont
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try: import mgscenes; from PIL import Image
 except ImportError: print("material-grub: Pillow missing, per-entry scenes disabled", file=sys.stderr); sys.exit(0)
+import mgrub
 
 def arg(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 pkg = Path(arg("--pkg", "/usr/share/material-grub")); theme = Path(arg("--theme"))
 state = Path(arg("--state", "/var/lib/material-grub/entries.json"))
 entries = json.loads(state.read_text()) if state.exists() else []
-classes = json.loads((pkg / "classes.json").read_text()); pal = json.loads((pkg / "palettes.json").read_text())
-titles = json.loads((pkg / "titles.json").read_text())
-LIGHT = (pkg / "scheme.txt").read_text().strip() == "light" if (pkg / "scheme.txt").exists() else False
-aspect = (theme / ".aspect").read_text().strip(); FONT = str(pkg / "fonts/GoogleSansFlex-VF.ttf")
-WIN, SYS = {"windows10", "windows11"}, {"firmware", "reboot", "shutdown"}
+menu = json.loads(state.with_name("menu.json").read_text()) if state.with_name("menu.json").exists() else []
+classes = json.loads((pkg / "classes.json").read_text())
+conf = mgrub.load_conf(); style = conf["STYLE"]
+import os
+opts = {"cookie": conf["COOKIE"] == "on", "hints": conf["HINTS"] == "on", "shape": os.environ.get("MG_LIST_SHAPE", "cookie")}   # shape: prototype knob
+aspect = (theme / ".aspect").read_text().strip()
 bgs = sorted((pkg / "scenes" / aspect / "bg").glob("*.png"))
-S = Image.open(bgs[0]).height / 1080 if bgs else 1      # scene height / 1080: every coordinate below is a 1080-high design value
-u = lambda v: round(v * S)
-SS = 3 if S <= 1 else 2
-hexc = lambda c: tuple(int(c[i:i + 2], 16) for i in (1, 3, 5))
+R = mgscenes.Renderer(pkg, Image.open(bgs[0]).height if bgs else 1080); R.bg_dir = pkg / "scenes" / aspect / "bg"
+by_class = {e["class"]: e for e in entries if "class" in e}
+if style not in ("rail", "clean", "list"): print(f"material-grub: style '{style}' is not available yet, drawing 'rail'"); style = "rail"
 
-def font(size, wght=500, wdth=100, rond=0):
-    f = ImageFont.truetype(FONT, size)
-    want = {"optical": size * .75, "width": wdth, "weight": wght, "roundness": rond, "grade": 0, "slant": 0}
-    vals = []
-    for ax in f.get_variation_axes():   # by name: works with any version of the font (GRAD removed in v5)
-        n = ax["name"].decode() if isinstance(ax["name"], bytes) else ax["name"]
-        v = next((want[k] for k in want if k in n.lower()), ax["default"]); vals.append(min(max(v, ax["minimum"]), ax["maximum"]))
-    f.set_variation_by_axes(vals); return f
-import os, subprocess
-_nd = {}
-def _render(f, c):
-    im = Image.new("L", (96, 96)); ImageDraw.Draw(im).text((8, 8), c, font=f, fill=255); return im.tobytes()
-def has_glyphs(f, text):    # a character the font lacks renders as its .notdef glyph; compare with a codepoint no font maps
-    nd = _nd.setdefault(id(f), _render(f, "\U0010FFFF"))
-    return all(c.isspace() or _render(f, c) != nd for c in text)
-_fb = {}
-def fallback_font(text, size):
-    """Google Sans Flex is Latin only: for pills with other scripts use any installed font that has the characters (fontconfig, else common paths)."""
-    want = sorted({c for c in text if ord(c) > 0x24f})[:6]
-    key = tuple(want)
-    if key not in _fb:
-        cands = []
-        try: cands.append(subprocess.run(["fc-match", "-f", "%{file}", "sans:charset=" + " ".join("%x" % ord(c) for c in want)], capture_output=True, text=True, timeout=5).stdout.strip())
-        except Exception: pass
-        cands += ["/usr/share/fonts/noto/NotoSans-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", "/usr/share/fonts/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/TTF/DejaVuSans.ttf"]
-        _fb[key] = next((c for c in cands if c and os.path.exists(c)), None)
-    return ImageFont.truetype(_fb[key], size) if _fb[key] else None
-def text_font(text, size, wght=500, wdth=100, rond=0):
-    f = font(size, wght, wdth, rond)
-    if all(ord(c) < 0x250 for c in text) or has_glyphs(f, text): return f
-    return fallback_font(text, size) or f
-_g = {}
-def glyph(name, size, color):
-    a = _g.setdefault(name, Image.open(pkg / "glyphs" / f"{name}.png").convert("RGBA").getchannel("A"))
-    im = Image.new("RGBA", (size, size), color); im.putalpha(a.resize((size, size), Image.LANCZOS)); return im
-def rrect(w, h, r, fill):
-    im = Image.new("RGBA", (w * SS, h * SS), (0, 0, 0, 0)); ImageDraw.Draw(im).rounded_rectangle([0, 0, w * SS - 1, h * SS - 1], radius=r * SS, fill=fill)
-    return im.resize((w, h), Image.LANCZOS)
-def paste_c(dst, src, cx, cy): dst.alpha_composite(src, (round(cx - src.width / 2), round(cy - src.height / 2)))
-
-def pill(text, p, style="plain", icon=None, h=None):
-    h = h or u(58)
-    f = text_font(text, u(28), 560, 104); tw = int(f.getlength(text)); ic = u(30) if icon else 0
-    w = u(28) * 2 + tw + (ic + u(10) if icon else 0)
-    bg, fg = ((hexc(p["primaryContainer"]), hexc(p["onPrimaryContainer"])) if style == "accent" else (hexc(p["surfaceContainerHigh"]), hexc(p["onSurface"])))
-    im = rrect(w, h, h // 2, bg + (255,)); d = ImageDraw.Draw(im); x = u(28)
-    if icon: im.alpha_composite(glyph(icon, ic, fg + (255,)), (x, (h - ic) // 2)); x += ic + u(10)
-    d.text((x, h // 2 + u(1)), text, font=f, fill=fg + (255,), anchor="lm"); return im
-
-def pill_row(items, p, W, y, canvas):
-    pills = [pill(*i[:1], p, *i[1:]) for i in items]
-    g = u(14)
-    while pills and sum(x.width for x in pills) + g * (len(pills) - 1) > W * 0.78: pills.pop()
-    tot = sum(x.width for x in pills) + g * (len(pills) - 1); x = (W - tot) // 2
-    for pl in pills: canvas.alpha_composite(pl, (x, y)); x += pl.width + g
-
-def info_pills(e):
-    k, kind = e["key"], e["kind"]; os_ = " ".join(x for x in (e.get("os"), e.get("osver")) if x)
-    if kind == "kernel":
-        out = [(e["kver"], "accent", "kernel")] if e.get("kver") else []
-        if os_: out.append((os_, "plain", None))
-        if e.get("edition"): out.append((e["edition"], "plain", None))
-        if e.get("default"): out.append(("Default", "plain", "tag"))
-        return out or [(e["title"], "plain", None)]
-    if kind == "rescue":
-        out = [("Rescue mode", "accent", "wrench")]
-        if e.get("kver") and not e["kver"].startswith("0-rescue"): out.append((e["kver"], "plain", "kernel"))
-        if os_: out.append((os_, "plain", None))
-        return out
-    if kind == "advanced":
-        out = [("Advanced options", "accent", "gear")]
-        if e.get("count"): out.append((f"{e['count']} more entries", "plain", None))
-        return out
-    return []
-
-def title_for(e):
-    return {"advanced": "Advanced", "rescue": "Rescue"}.get(e["kind"]) or titles.get(e["key"], e["key"])
-
-# ---- rail ----
-SLOT, GAP, DIV, PADV, RW, LM = u(72), u(10), u(30), u(22), u(100), u(52)
-def groups_of(keys):
-    return [g for g in ([k for k in keys if k not in WIN | SYS], [k for k in keys if k in WIN], [k for k in ("firmware", "reboot", "shutdown") if k in keys]) if g]
-def draw_rail(canvas, p, groups, sel):
-    n = sum(map(len, groups)); Hr = n * SLOT + (n - len(groups)) * GAP + (len(groups) - 1) * DIV + 2 * PADV
-    W, H = canvas.size; top = (H - Hr) // 2
-    layer = Image.new("RGBA", (RW * SS, Hr * SS), (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
-    d.rounded_rectangle([0, 0, RW * SS - 1, Hr * SS - 1], radius=RW * SS // 2, fill=hexc(p["surfaceContainerHigh"]) + (255,))
-    y = PADV; slots = []
-    for gi, g in enumerate(groups):
-        if gi:
-            ly = y + DIV // 2 - GAP // 2
-            d.rounded_rectangle([(RW // 2 - u(14)) * SS, ly * SS, (RW // 2 + u(14)) * SS, (ly + u(2)) * SS], radius=SS, fill=hexc(p["outline"]) + (150,)); y += DIV - GAP
-        for k in g: slots.append((k, y)); y += SLOT + GAP
-    for k, sy in slots:
-        if k == sel: d.rounded_rectangle([(RW - SLOT) // 2 * SS, sy * SS, ((RW + SLOT) // 2) * SS - 1, (sy + SLOT) * SS - 1], radius=u(26) * SS, fill=hexc(p["primaryContainer"]) + (255,))
-    layer = layer.resize((RW, Hr), Image.LANCZOS)
-    for k, sy in slots:
-        layer.alpha_composite(glyph(k, u(40), hexc(p["onPrimaryContainer"]) + (255,) if k == sel else (hexc(p["onSurfaceVariant"]) + (255,) if LIGHT else (244, 244, 247, 235))), ((RW - u(40)) // 2, sy + (SLOT - u(40)) // 2))
-    canvas.alpha_composite(layer, (LM, top))
-
-def render(e, groups):
-    p = pal[e["key"]]; bg = pkg / "scenes" / aspect / "bg" / f"{e['key']}.png"
-    sc = Image.open(bg).convert("RGBA"); W, H = sc.size; cx = W // 2
-    paste_c(sc, rrect(u(600), u(320), u(160), hexc(p["surfaceContainerHigh"]) + (255,)), cx, u(360))
-    paste_c(sc, rrect(u(560), u(280), u(140), hexc(p["primaryContainer"]) + (255,)), cx, u(360))
-    ink = hexc(p["onPrimaryContainer"]) + (255,)
-    acc = {"advanced": "gear", "rescue": "wrench"}.get(e["kind"])
-    if acc: paste_c(sc, glyph(e["key"], u(190), ink), cx - u(92), u(360)); paste_c(sc, glyph(acc, u(120), ink), cx + u(140), u(360))
-    else: paste_c(sc, glyph(e["key"], u(230), ink), cx, u(360))
-    d = ImageDraw.Draw(sc); title = title_for(e); tsz = u(150)
-    while tsz > u(60) and font(tsz, 800, 135, 60).getlength(title) > W * .62: tsz -= u(6)
-    d.text((cx, u(590)), title, font=font(tsz, 800, 135, 60), fill=hexc(p["primary"]) + (255,), anchor="mm")
-    pill_row(info_pills(e), p, W, u(672), sc)
-    draw_rail(sc, p, groups, e["key"]); return sc.convert("RGB")
-
-# ---- plan: class-level fallback scenes for every key present + per-entry scenes ----
 tops = [e for e in entries if e.get("level", "top") == "top"] or entries
 keys = []
 for e in tops + entries:
     if e["key"] not in keys: keys.append(e["key"])
-groups = groups_of(keys)
+groups = mgscenes.groups_of(keys)
 if not groups: sys.exit(0)
 done = 0
-for k in keys:       # class scenes (no pills): used by plain entries (Windows, Firmware...) and as fallbacks
-    p = pal[k]; src = pkg / "scenes" / aspect / "icons" / f"{classes[k][0]}.png"; sc = Image.open(src).convert("RGBA"); draw_rail(sc, p, groups, k)
-    first = theme / "icons" / f"{classes[k][0]}.png"; sc.convert("RGB").save(first)
+for k in keys:       # class scenes: used by plain entries (Windows, Firmware...) and as fallbacks
+    first = theme / "icons" / f"{classes[k][0]}.png"
+    R.render_class(k, pkg / "scenes" / aspect / ("bg" if style == "list" else "icons") / (f"{k}.png" if style == "list" else f"{classes[k][0]}.png"), groups, style, opts, menu).save(first)
     for a in classes[k][1:]: shutil.copyfile(first, theme / "icons" / f"{a}.png")
+per_entry = ("kernel", "rescue", "advanced") + (("plain",) if style != "rail" else ())    # clean/list: neighbours differ per entry, so plain entries need their own scene too
 for e in entries:
-    if e.get("class", "").startswith("mg_") and e["kind"] in ("kernel", "rescue", "advanced"):
-        render(e, groups).save(theme / "icons" / f"{e['class']}.png"); done += 1
-print(f"material-grub: {done} entry scenes + {len(keys)} class scenes baked; rail: {' | '.join(' '.join(g) for g in groups)}")
+    if e.get("class", "").startswith("mg_") and e["kind"] in per_entry:
+        src = pkg / "scenes" / aspect / ("icons" if e["kind"] == "plain" and style != "list" else "bg") / (f"{classes[e['key']][0]}.png" if e["kind"] == "plain" and style != "list" else f"{e['key']}.png")
+        R.render_entry(e, src, groups, style, opts, menu, by_class).save(theme / "icons" / f"{e['class']}.png"); done += 1
+print(f"material-grub: {done} entry scenes + {len(keys)} class scenes baked; style {style}; rail: {' | '.join(' '.join(g) for g in groups)}")

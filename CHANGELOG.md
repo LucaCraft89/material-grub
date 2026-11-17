@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 (2026-11-17)
+
+Runtime styles (rail, clean, list), TUI installer, distro gallery. Prebuilt downloads removed.
+
+- Phase 0, no visual change: the top-right cookie and the key-hint pills are no longer baked into the release images; `material-grub-scenes` draws them at install/apply time. New shared renderer module `install/bin/mgscenes.py` (importable, Pillow only). `/etc/material-grub.conf` gains `STYLE`, `COOKIE`, `HINTS` (and `SCHEME`, informational); `COOKIE=off` also hides the logo. `--no-hints` now writes `HINTS=off` (works with `--prebuilt` too; at package build time it is a no-op). New `install/install.sh --set KEY=value`. Checked: with the same package inputs the scenes GRUB uses are pixel-identical to v0.3 at 1920x1080 and the cookie/hints code is identical at 2x scale.
+- `material-grub-classes` writes `menu.json` (entries in real menu order per menu level) and gives plain entries (Windows, Firmware, Restart, Shut down) their own unique class in addition to the shared one, so duplicates can be told apart. Installs annotated by older versions keep the old classes until grub.cfg is regenerated.
+- Phase 1: `STYLE=clean` (full screen without the rail: the previous/next entry of the same menu level peek in above and below in their own colours, label chips on the panel edges, wrapping at the ends). The BGRT logo overlay moves with the cookie; plain entries get per-entry scenes. Verified in QEMU (1920x1080, dark and light, BLS Advanced submenu); other resolutions not yet.
+- Phase 2: `STYLE=list` (the whole menu level is baked into each entry's scene: icon in a cookie shape plus name in a pill, gear/wrench before the name for Advanced/Rescue, selection box and background in the selected entry's palette, section dividers wherever the menu order changes group, windowing with "+N more" chips beyond about 7 rows, countdown moved below the list). Verified in QEMU at 1920x1080 (dark and light, all entries), 1920x1200, 2560x1080 and 3840x1080 (dark); 2160-high sets and real hardware not yet.
+- Phase 3: monitor detection (`install/monitors.py`: xrandr primary, GNOME/KDE/wlroots Wayland as the sudo user, DRM sysfs, `GRUB_GFXMODE`), curses TUI installer (`install/tui.py`, plain-prompt fallback) started by `install.sh` when choices are missing; new flags `--style`, `--cookie/--no-cookie`, `--logo/--no-logo`, `--hints`, `--tui`, `--no-tui`. Tested with fixtures and a pty at 80x24; not run on real multi-monitor or Wayland sessions.
+- Phase 4: distro gallery: `scripts/gen_distro_table.py` renders a sample scene per catalog entry (54) from the shared renderer into `docs/distros/`, generates `docs/distros.md` (full table) and a grid in the README; CI job `gallery` fails when the tables or the image list are stale (PNG bytes are not compared), `workflow_dispatch` regenerates the images as an artifact. The GitHub jobs have not run yet.
+- Phase 5: `tests/boot_smoke.py` takes a style; CI boots rail, clean and list in dark plus rail and list in light. Locally verified in QEMU (dark): all three styles at 1920x1080, 2560x1080 and 3840x2160; list also at 1920x1200 and 3840x1080 (screenshots, not the automated test). NOT verified: 5120-wide modes (OVMF cannot create them), real hardware, real ostree boot, list/clean on a classic Debian-style menu in QEMU (only the fake-/boot pipeline test), light scheme beyond 1920x1080, the GitHub workflows themselves.
+- Prebuilt downloads are gone: `--prebuilt`, the TUI install-source step and `release.yml` (release assets, `SHA256SUMS`) are removed; the installer always builds from source (`--pkg DIR` still installs a package built elsewhere).
+- Without Pillow the scenes now also lack the cookie and hints (before: only the rail).
+
 ## 0.3.0 (2026-11-17)
 
 CI, non-Latin titles, a config file and prebuilt release assets.

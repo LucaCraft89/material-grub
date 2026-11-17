@@ -23,16 +23,15 @@ WD = 1920  # set per aspect in scene()
 LIGHT = R.SCHEME == "light"
 # theme colours are global (GRUB cannot recolour per entry), so these are neutral M3 greys chosen per scheme
 INK_TRACK, INK_FILL, INK_TEXT = ("#CAC4D0", "#49454F", "#49454F") if LIGHT else ("#49454F", "#E6E1E5", "#CAC4D0")
-HINTS = os.environ.get("MG_HINTS", "1") != "0"          # --no-hints: leave the key-hint pills out of the scenes (build time)
-SCENES = ROOT / ("build/scenes" + ("-light" if LIGHT else "") + ("" if HINTS else "-nohints"))   # separate render cache per scheme
+# the cookie and the key-hint pills are NOT baked in any more: install/bin/mgscenes.py draws them at config time (COOKIE / HINTS in /etc/material-grub.conf)
+SCENES = ROOT / ("build/scenes2" + ("-light" if LIGHT else ""))   # separate render cache per scheme (scenes2: no cookie/hints baked in)
 DESKTOP, RAWNAME = ("#F6F4F7", "#5F5B66") if LIGHT else ("#0D1411", "#6E7681")
 
 def scene(entry, hero=True):
     key = entry[0]; p = R.PAL[key]
     s = R.SC; Wp, Hp = WD * s, 1080 * s
-    im, _ = R.panel(entry, Wp + R.u(48), ph=Hp, yoff=R.u(60), dyn=False, hero=hero)     # pw == Wp
+    im, _ = R.panel(entry, Wp + R.u(48), ph=Hp, yoff=R.u(60), dyn=False, hero=hero, cookie_on=False)     # pw == Wp
     canvas = Image.new("RGBA", (Wp, Hp), R.hx(p["surface"]) + (255,)); canvas.alpha_composite(im)
-    if HINTS: hint = R.key_hints(p); canvas.alpha_composite(hint, ((Wp - hint.width) // 2, Hp - R.u(120)))
     return canvas.convert("RGB")
 
 OUT = None

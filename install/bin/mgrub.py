@@ -40,7 +40,8 @@ def kind_of(title, key, is_submenu=False):
     return "kernel"
 
 
-CONF_DEFAULTS = {"RAW_NAME": "on", "COUNTDOWN": "on", "LOGO": "on", "TIMEOUT": ""}
+CONF_DEFAULTS = {"RAW_NAME": "on", "COUNTDOWN": "on", "LOGO": "on", "COOKIE": "on", "HINTS": "on", "STYLE": "rail", "SCHEME": "dark", "TIMEOUT": ""}
+CONF_CHOICES = {"STYLE": ("rail", "clean", "list"), "SCHEME": ("dark", "light")}
 def load_conf(path=None):
     """/etc/material-grub.conf: KEY=value lines, '#' comments. Unknown keys and bad values are ignored (never fatal in a boot-config path)."""
     import os
@@ -51,15 +52,42 @@ def load_conf(path=None):
             if not m or m[1] not in c: continue
             k, v = m[1], m[2].strip()
             if k == "TIMEOUT": c[k] = v if v.isdigit() else ""
+            elif k in CONF_CHOICES: c[k] = v.lower() if v.lower() in CONF_CHOICES[k] else c[k]
             elif v.lower() in ("on", "off", "yes", "no", "true", "false", "1", "0"): c[k] = "on" if v.lower() in ("on", "yes", "true", "1") else "off"
     except OSError: pass
     return c
 
 def apply_conf_to_theme(text, conf):
-    """Drop the '# mg:begin NAME' .. '# mg:end NAME' blocks of theme.txt that the config switches off."""
+    """Drop the '# mg:begin NAME' .. '# mg:end NAME' blocks of theme.txt that the config switches off (no cookie also means no logo in it)."""
     for key, name in (("RAW_NAME", "raw"), ("COUNTDOWN", "countdown"), ("LOGO", "logo")):
-        if conf[key] == "off": text = re.sub(rf"(?ms)^# mg:begin {name}\n.*?^# mg:end {name}\n", "", text)
+        if conf[key] == "off" or (name == "logo" and conf["COOKIE"] == "off"): text = re.sub(rf"(?ms)^# mg:begin {name}\n.*?^# mg:end {name}\n", "", text)
+    if conf.get("STYLE") == "clean": text = _clean_layout(text)
+    if conf.get("STYLE") == "list": text = _list_layout(text)
     return text
+
+def _list_layout(text):
+    """`list` centres the menu on the screen, so the countdown moves down between the list and the key hints (1080-high design: bar 868, label 884)."""
+    m = re.search(r"(?ms)^# mg:begin countdown\n(.*?)^# mg:end countdown\n", text)
+    if not m: return text
+    body = m[1]; lab = re.search(r"label \{.*?\n\}", body, re.S); hh = re.search(r"^\s*height = (\d+)$", lab[0], re.M) if lab else None
+    if not (lab and hh): return text
+    f = int(hh[1]) / 34
+    def settop(chunk, v): return re.sub(r"^(\s*top = )-?\d+$", rf"\g<1>{v}", chunk, count=1, flags=re.M)
+    parts = body.split("+ label {"); parts[0] = settop(parts[0], round(868 * f)); parts[1] = settop(parts[1], round(884 * f))
+    return text[:m.start(1)] + "+ label {".join(parts) + text[m.end(1):]
+
+def _clean_layout(text):
+    """`clean` draws its panel inside a 24 px margin and 96 px top bar, so the BGRT logo moves with the cookie (design values scaled by the bundle's own factor, recovered from the logo width).
+    The raw-name line stays at the very bottom: GRUB shows as many rows as fit between its top and the screen edge, which is what keeps it a 1-item list."""
+    def block(name, fn):
+        return re.sub(rf"(?ms)^(# mg:begin {name}\n)(.*?)(^# mg:end {name}\n)", lambda m: m[1] + fn(m[2]) + m[3], text, count=1)
+    def num(body, k): m = re.search(rf"^\s*{k} = (-?\d+)$", body, re.M); return int(m[1]) if m else None
+    def setnum(body, k, v): return re.sub(rf"^(\s*{k} = )-?\d+$", rf"\g<1>{v}", body, count=1, flags=re.M)
+    def logo(b):
+        w, l, t = num(b, "width"), num(b, "left"), num(b, "top")
+        if None in (w, l, t): return b
+        f = w / 120; return setnum(setnum(b, "left", l - round(24 * f)), "top", t + round(96 * f))
+    return block("logo", logo)
 
 
 # `blscfg` is how GRUB loads BootLoaderSpec entries. Distros call it as a bare line (Fedora), indented inside an if, or with options.

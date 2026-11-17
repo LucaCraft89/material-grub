@@ -112,7 +112,7 @@ def machine_logo(p, size):
     g = Image.open(ROOT / "build/bgrt.png").convert("L").resize((size, size), Image.LANCZOS)
     return tinted(g, p["onPrimaryContainer"])
 
-def panel(entry, W, ph=888, yoff=0, dyn=True, hero=True):
+def panel(entry, W, ph=888, yoff=0, dyn=True, hero=True, cookie_on=True):
     key, title, sub, icon = entry; p = PAL[key]
     pw = W - u(48); R64 = u(64)
     im = fill(rrect(pw, ph, R64), p["surface"]); d = ImageDraw.Draw(im)
@@ -146,7 +146,7 @@ def panel(entry, W, ph=888, yoff=0, dyn=True, hero=True):
         d.ellipse([x0 + int(bw * .62) + 3, by - 6, x0 + int(bw * .62) + 9, by + 6], fill=hx(p["primary"]))
         text_c(d, (cx, 735), "Booting in 5s", font(24, 480, 100), p["onSurfaceVariant"])
     # machine logo in cookie (top-right)
-    paste_c(im, fill(cookie(u(230)), p["primaryContainer"]), pw - u(150), u(140))
+    if cookie_on: paste_c(im, fill(cookie(u(230)), p["primaryContainer"]), pw - u(150), u(140))
     c = chip(title, icon, p, h=52)    # edge label chip (mockup only)
     return im, c
 

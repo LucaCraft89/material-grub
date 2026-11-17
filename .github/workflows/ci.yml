@@ -2,6 +2,7 @@ name: CI
 on:
   push: {branches: [main]}
   pull_request:
+  workflow_dispatch:      # also regenerates the distro gallery images (job gallery-render)
 permissions: {contents: read}
 
 jobs:
@@ -37,18 +38,43 @@ jobs:
 
   boot:
     # Fedora container: its GRUB build has blscfg.mod (Debian/Ubuntu's does not), which the BLS test menu needs. Software emulation, so long waits.
-    name: Boot in QEMU (${{ matrix.scheme }})
+    name: Boot in QEMU (${{ matrix.scheme }}, ${{ matrix.style }})
     runs-on: ubuntu-latest
     container: registry.fedoraproject.org/fedora:latest
     strategy:
       fail-fast: false
-      matrix: {scheme: [dark, light]}
+      matrix:
+        include:      # every style in dark, plus rail and list in light
+          - {scheme: dark,  style: rail}
+          - {scheme: dark,  style: clean}
+          - {scheme: dark,  style: list}
+          - {scheme: light, style: rail}
+          - {scheme: light, style: list}
     steps:
       - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
       - uses: actions/checkout@v4
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080 --scheme ${{ matrix.scheme }}
-      - run: BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/boot_smoke.py 1920x1080 ${{ matrix.scheme }}
+      - run: BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/boot_smoke.py 1920x1080 ${{ matrix.scheme }} ${{ matrix.style }}
       - uses: actions/upload-artifact@v4
         if: always()
-        with: {name: "boot-${{ matrix.scheme }}", path: build/ci-shots/}
+        with: {name: "boot-${{ matrix.scheme }}-${{ matrix.style }}", path: build/ci-shots/}
+
+  gallery:
+    name: Distro gallery is up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 scripts/gen_distro_table.py --check      # tables vs catalog + image file list; PNG bytes are never compared
+
+  gallery-render:
+    name: Regenerate distro gallery images (manual)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
+      - run: .venv/bin/python scripts/package.py --res 1920x1080 --scheme dark && .venv/bin/python scripts/gen_distro_table.py
+      - uses: actions/upload-artifact@v4
+        with: {name: distro-gallery, path: "docs/distros.md\ndocs/distros/"}
