@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Generate real GRUB screenshots (QEMU + OVMF) from the built package. Needs: dist/material-grub (scripts/package.py).
 usage: make_screenshots.py [WxH ...]   (default: 1920x1080 2560x1080)  -> docs/screenshots/
+       make_screenshots.py --styles    (every style, in the scheme of the package) -> styles/<style>-<scheme>-<n>.png
        make_screenshots.py --light     (needs a package built with --scheme light) -> light-*.png"""
 import shutil, subprocess, sys
 from pathlib import Path
@@ -47,10 +48,16 @@ def shoot(res, keys, names):
     OUT.mkdir(parents=True, exist_ok=True)
     for i, n in enumerate(names):
         if n.startswith("_"): continue
-        from PIL import Image; Image.open(ROOT / f"build/tree-{i}.png").save(OUT / f"{n}.png", optimize=True)
+        from PIL import Image; (OUT / n).parent.mkdir(parents=True, exist_ok=True); Image.open(ROOT / f"build/tree-{i}.png").save(OUT / f"{n}.png", optimize=True)
 
 if __name__ == "__main__":
     resl = [a for a in sys.argv[1:] if not a.startswith("--")] or ["1920x1080", "2560x1080"]
+    if "--styles" in sys.argv:      # two shots of every style in the scheme the package was built with -> docs/screenshots/styles/<style>-<scheme>-<n>.png
+        import os; scheme = (PKG / "scheme.txt").read_text().strip(); conf = ROOT / "build/shots.conf"
+        for style in ("rail", "clean", "list", "split"):
+            conf.parent.mkdir(exist_ok=True); conf.write_text(f"STYLE={style}\n"); os.environ["MATERIAL_CONF"] = str(conf)
+            shoot("1920x1080", ["down", "down"], [f"styles/{style}-{scheme}-1", "_", f"styles/{style}-{scheme}-2"])
+        sys.exit(0)
     if "--light" in sys.argv:
         shoot("1920x1080", ["down", "down", "down", "down"], ["light-fedora", "_adv", "light-windows", "light-arch", "_ubuntu"]); sys.exit(0)
     if "1920x1080" in resl:

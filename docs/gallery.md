@@ -1,8 +1,116 @@
 # Gallery
 
-Real GRUB output captured in QEMU + OVMF (`make screenshots`), and a rendered sample of every supported distro. Back to the [README](../README.md); Ventoy screenshots are in [ventoy.md](ventoy.md).
+Real GRUB output captured in QEMU + OVMF (`make screenshots`, `scripts/make_screenshots.py --styles`), the same for a Ventoy stick, and a rendered sample of every supported distro. Back to the [README](../README.md); the Ventoy page is [ventoy.md](ventoy.md).
 
-## Styles and schemes
+## The four styles
+
+Two shots of each in the dark and in the light scheme (`--style rail|clean|list|split`, `--scheme dark|light`).
+
+### Rail (default)
+
+A big hero panel and an icon rail on the left, grouped Linux | Windows | System.
+
+<table>
+<tr>
+<td><img src="screenshots/styles/rail-dark-1.png" alt="Rail (default), dark, Fedora"></td>
+<td><img src="screenshots/styles/rail-dark-2.png" alt="Rail (default), dark, Windows 11"></td>
+</tr>
+<tr>
+<td><img src="screenshots/styles/rail-light-1.png" alt="Rail (default), light, Fedora"></td>
+<td><img src="screenshots/styles/rail-light-2.png" alt="Rail (default), light, Windows 11"></td>
+</tr>
+</table>
+
+### Clean
+
+Full screen without the rail: the previous and next entry peek in above and below in their own colours, label chips on the panel edges.
+
+<table>
+<tr>
+<td><img src="screenshots/styles/clean-dark-1.png" alt="Clean, dark, Fedora"></td>
+<td><img src="screenshots/styles/clean-dark-2.png" alt="Clean, dark, Windows 11"></td>
+</tr>
+<tr>
+<td><img src="screenshots/styles/clean-light-1.png" alt="Clean, light, Fedora"></td>
+<td><img src="screenshots/styles/clean-light-2.png" alt="Clean, light, Windows 11"></td>
+</tr>
+</table>
+
+### List
+
+The whole menu as a centred list: each entry is an icon in a Material shape plus its name in a pill, separators between the groups.
+
+<table>
+<tr>
+<td><img src="screenshots/styles/list-dark-1.png" alt="List, dark, Fedora"></td>
+<td><img src="screenshots/styles/list-dark-2.png" alt="List, dark, Windows 11"></td>
+</tr>
+<tr>
+<td><img src="screenshots/styles/list-light-1.png" alt="List, light, Fedora"></td>
+<td><img src="screenshots/styles/list-light-2.png" alt="List, light, Windows 11"></td>
+</tr>
+</table>
+
+### Split
+
+The same list moved to the right, the selected entry's logo and name big on the left.
+
+<table>
+<tr>
+<td><img src="screenshots/styles/split-dark-1.png" alt="Split, dark, Fedora"></td>
+<td><img src="screenshots/styles/split-dark-2.png" alt="Split, dark, Windows 11"></td>
+</tr>
+<tr>
+<td><img src="screenshots/styles/split-light-1.png" alt="Split, light, Fedora"></td>
+<td><img src="screenshots/styles/split-light-2.png" alt="Split, light, Windows 11"></td>
+</tr>
+</table>
+
+## Ventoy
+
+A Ventoy stick, real Ventoy 1.1.18 in QEMU + OVMF (`scripts/make_ventoy_screenshots.py`). Two styles, dark and light; the second shot of each is an image with `pnlug` in its name. Details and install: [ventoy.md](ventoy.md).
+
+### Full screen
+
+<table>
+<tr>
+<td><img src="screenshots/ventoy/full-dark-1.png" alt="Ventoy Full screen, dark, Fedora"></td>
+<td><img src="screenshots/ventoy/full-dark-2.png" alt="Ventoy Full screen, dark, PNLug"></td>
+</tr>
+<tr>
+<td><img src="screenshots/ventoy/full-light-1.png" alt="Ventoy Full screen, light, Fedora"></td>
+<td><img src="screenshots/ventoy/full-light-2.png" alt="Ventoy Full screen, light, PNLug"></td>
+</tr>
+</table>
+
+### List
+
+<table>
+<tr>
+<td><img src="screenshots/ventoy/list-dark-1.png" alt="Ventoy List, dark, Fedora"></td>
+<td><img src="screenshots/ventoy/list-dark-2.png" alt="Ventoy List, dark, PNLug"></td>
+</tr>
+<tr>
+<td><img src="screenshots/ventoy/list-light-1.png" alt="Ventoy List, light, Fedora"></td>
+<td><img src="screenshots/ventoy/list-light-2.png" alt="Ventoy List, light, PNLug"></td>
+</tr>
+</table>
+
+### Ventoy's own menus
+
+The boot-mode menu (Enter on an image), the F5 tools menu and the F3 tree view; every menu except the ISO picker is the list in both styles.
+
+<table>
+<tr>
+<td><img src="screenshots/ventoy/full-boot-modes.png" alt="Ventoy boot-mode menu"></td>
+<td><img src="screenshots/ventoy/tools-menu.png" alt="Ventoy F5 Tools menu"></td>
+</tr>
+<tr>
+<td><img src="screenshots/ventoy/tree-view.png" alt="Ventoy F3 tree view"></td>
+</tr>
+</table>
+
+## Entries, the light scheme and ultrawide (rail style)
 
 <table>
 <tr>

@@ -35,7 +35,7 @@ sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](ht
 
 ## Gallery
 
-Screenshots of every style, the light scheme and the ultrawide layout, plus a rendered sample of all 54 supported distros: **[docs/gallery.md](docs/gallery.md)**. Using a Ventoy stick? See **[docs/ventoy.md](docs/ventoy.md)**.
+Two screenshots of every style (rail, clean, list, split) in dark and light, the same for a Ventoy stick, the ultrawide layout and a rendered sample of all 54 supported distros: **[docs/gallery.md](docs/gallery.md)**. Using a Ventoy stick? See **[docs/ventoy.md](docs/ventoy.md)**.
 
 ## How it works (and what GRUB cannot do)
 
@@ -140,13 +140,15 @@ The Google Sans Flex font is bundled in `fonts/` (SIL OFL 1.1, unmodified upstre
 
 ### Ventoy
 
-The same theme works on a [Ventoy](https://www.ventoy.net) USB stick (all three styles, dark and light), and it follows the ISOs on the stick without installing again: add, rename or remove files on any computer. No root needed:
+The same theme works on a [Ventoy](https://www.ventoy.net) USB stick, and it follows the ISOs on the stick without installing again: add, rename or remove files on any computer, nothing to run again. Two styles: **`full`** (a full-screen ISO picker with the real file name, two scroll arrows, no key hints) and **`list`**, dark or light. Ventoy's own menus (F2 to F5, folders, boot modes) are themed too, and an image with `pnlug` in its name (any letter case) gets the Pordenone Linux User Group's colours and logo. You need a stick that already runs Ventoy (this does not install Ventoy itself). No root needed:
 
 ```sh
-./install.sh --ventoy        # a TUI picks the stick, resolutions, style and scheme
+./install.sh --ventoy                                  # a TUI picks the stick, resolutions, style and scheme
+./install.sh --ventoy /run/media/$USER/Ventoy --style full --scheme dark --res 1920x1080 --yes    # no questions
+./install.sh --uninstall --ventoy /run/media/$USER/Ventoy                                          # remove it again (your own ventoy.json settings stay)
 ```
 
-Everything about it (screenshots, options, how matching works, limits, what was tested): **[docs/ventoy.md](docs/ventoy.md)**.
+Screenshots, every option, how matching works, limits and what was tested: **[docs/ventoy.md](docs/ventoy.md)**.
 
 ### Other distros
 

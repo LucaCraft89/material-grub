@@ -8,18 +8,20 @@ It follows the files on the stick: **add, rename or remove ISOs on any computer 
 
 <table>
 <tr>
-<td><img src="screenshots/ventoy/list-dark.png" alt="List style, dark"></td>
-<td><img src="screenshots/ventoy/rail-dark.png" alt="Rail style, dark"></td>
+<td><img src="screenshots/ventoy/full-dark-1.png" alt="Full screen picker, dark"></td>
+<td><img src="screenshots/ventoy/full-light-1.png" alt="Full screen picker, light"></td>
 </tr>
 <tr>
-<td><img src="screenshots/ventoy/list-light.png" alt="List style, light"></td>
-<td><img src="screenshots/ventoy/clean-light.png" alt="Clean style, light"></td>
+<td><img src="screenshots/ventoy/list-dark-1.png" alt="List style, dark"></td>
+<td><img src="screenshots/ventoy/list-light-2.png" alt="List style, light, PNLug image"></td>
 </tr>
 <tr>
-<td><img src="screenshots/ventoy/tools-menu.png" alt="Ventoy's F5 Tools menu"></td>
-<td><img src="screenshots/ventoy/tree-view.png" alt="Ventoy's F3 tree view"></td>
+<td><img src="screenshots/ventoy/full-boot-modes.png" alt="Boot-mode menu"></td>
+<td><img src="screenshots/ventoy/tools-menu.png" alt="F5 Tools menu"></td>
 </tr>
 </table>
+
+More (both styles, dark and light, PNLug, F3 tree view): the [gallery](gallery.md#ventoy).
 
 <sub>Real Ventoy 1.1.18 booted in QEMU + OVMF. In the top-right cookie the Ventoy logo replaces the firmware logo used on a PC. Ventoy's own menus (F3 tree view, F4 local boot, F5 tools) are themed too.</sub>
 
