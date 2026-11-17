@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased (0.4 in progress)
+## 0.4.0 (2026-11-17)
+
+Runtime styles (rail, clean, list), TUI installer, distro gallery. Prebuilt downloads removed.
 
 - Phase 0, no visual change: the top-right cookie and the key-hint pills are no longer baked into the release images; `material-grub-scenes` draws them at install/apply time. New shared renderer module `install/bin/mgscenes.py` (importable, Pillow only). `/etc/material-grub.conf` gains `STYLE`, `COOKIE`, `HINTS` (and `SCHEME`, informational); `COOKIE=off` also hides the logo. `--no-hints` now writes `HINTS=off` (works with `--prebuilt` too; at package build time it is a no-op). New `install/install.sh --set KEY=value`. Checked: with the same package inputs the scenes GRUB uses are pixel-identical to v0.3 at 1920x1080 and the cookie/hints code is identical at 2x scale.
 - `material-grub-classes` writes `menu.json` (entries in real menu order per menu level) and gives plain entries (Windows, Firmware, Restart, Shut down) their own unique class in addition to the shared one, so duplicates can be told apart. Installs annotated by older versions keep the old classes until grub.cfg is regenerated.
