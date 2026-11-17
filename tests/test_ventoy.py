@@ -41,6 +41,21 @@ LSBLK = json.dumps({"blockdevices": [
     {"name": "sdc", "path": "/dev/sdc", "type": "disk", "model": "Other", "children": [
         {"name": "sdc1", "path": "/dev/sdc1", "label": "Ventoy", "fstype": "ntfs", "size": 1000000000, "type": "part", "mountpoints": [None]},
         {"name": "sdc2", "path": "/dev/sdc2", "label": "VTOYEFI", "fstype": "vfat", "size": 33554432, "type": "part", "mountpoints": [None]}]}]})
+LSBLK_L = json.dumps({"blockdevices": [
+    {"path": "/dev/sda1", "label": "EFI", "type": "part", "pkname": "sda"}, {"path": "/dev/sdb", "label": None, "type": "disk", "pkname": None},
+    {"path": "/dev/sdb1", "label": "Ventoy", "type": "part", "pkname": "sdb"}, {"path": "/dev/sdb2", "label": "VTOYEFI", "type": "part", "pkname": "sdb"},
+    {"path": "/dev/sdc1", "label": "USBDATA", "type": "part", "pkname": "sdc"}]})
+class Verify(unittest.TestCase):
+    def test_sibling_vtoyefi(self):
+        sys.path.insert(0, str(ROOT / "install")); import ventoy_sticks as vs
+        self.assertTrue(vs.sibling_vtoyefi(LSBLK_L, "/dev/sdb1"))          # fresh Ventoy data partition: verified even without a /ventoy folder
+        self.assertFalse(vs.sibling_vtoyefi(LSBLK_L, "/dev/sdc1"))         # an ordinary USB disk, even if it has a folder called ventoy
+        self.assertFalse(vs.sibling_vtoyefi(LSBLK_L, "/dev/nope")); self.assertFalse(vs.sibling_vtoyefi("garbage", "/dev/sdb1"))
+    def test_folder_only_is_accepted_but_labelled(self):
+        sys.path.insert(0, str(ROOT / "install")); import ventoy_sticks as vs
+        with tempfile.TemporaryDirectory() as d:
+            self.assertIsNone(vs.check(d)); (Path(d) / "ventoy").mkdir(); self.assertEqual(vs.check(d), "folder")
+
 class Sticks(unittest.TestCase):
     def test_parse_lsblk(self):
         sys.path.insert(0, str(ROOT / "install")); import ventoy_sticks as vs

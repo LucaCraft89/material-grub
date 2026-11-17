@@ -133,7 +133,7 @@ fi
 [ "$VENTOY" = 1 ] && TOTAL=5
 if [ "$VENTOY" = 1 ]; then       # fail early, before a multi-minute build
   [ -n "$STICK" ] || die "no Ventoy stick given: ./install.sh --ventoy /run/media/you/Ventoy   (or run it in a terminal to pick one)"
-  case $STICK in dev:*) ;; *) [ -d "$STICK/ventoy" ] || die "$STICK has no /ventoy folder: it is not the data partition of a Ventoy stick.";; esac
+  case $STICK in dev:*) ;; *) python3 "$HERE/install/ventoy_sticks.py" --check "$STICK" >/dev/null || die "$STICK is not the data partition of a Ventoy stick (its disk has no VTOYEFI partition and it has no /ventoy folder). Use the big partition of a stick prepared with Ventoy.";; esac
 fi
 [ -z "$CONFSETS" ] || info "settings for $( [ "$VENTOY" = 1 ] && echo the Ventoy stick || echo /etc/material-grub.conf ):$(echo $CONFSETS | sed 's/--set / /g')"
 if [ "$IMM" = 1 ] && [ "$STAGE" = 0 ]; then
@@ -296,7 +296,8 @@ if [ "$VENTOY" = 1 ]; then
     if [ "$(id -u)" -eq 0 ]; then mount "$DEV" "$MNT" || die "could not mount $DEV"; MOUNTED_BY_US=$MNT
     else rmdir "$MNT"; U=$(udisksctl mount -b "$DEV" 2>&1) || die "could not mount $DEV (mount it in your file manager, or run with sudo): $U"; MNT=$(printf '%s' "$U" | sed -n 's/.* at \(.*\)\.$/\1/p'); [ -d "$MNT" ] || die "mounted $DEV but could not find where: $U"; UDISKS_DEV=$DEV; fi
     STICK=$MNT; info "mounted $DEV at $STICK";; esac
-  [ -d "$STICK/ventoy" ] || die "$STICK has no /ventoy folder: it is not the data partition of a Ventoy stick."
+  HOW=$(python3 "$HERE/install/ventoy_sticks.py" --check "$STICK") || die "$STICK is not the data partition of a Ventoy stick (its disk has no VTOYEFI partition and it has no /ventoy folder)."
+  [ -d "$STICK/ventoy" ] || { mkdir -p "$STICK/ventoy" && info "created $STICK/ventoy (a fresh Ventoy stick has none)"; }     # only after the check above: Ventoy was found through its VTOYEFI partition
   CONF="$STICK/ventoy/material-grub.conf"; : > "$CONF"
   for w in $CONFSETS; do case $w in --set) ;; *) printf '%s\n' "$w" >> "$CONF";; esac; done
   info "options written to $CONF:$(tr '\n' ' ' < "$CONF")"

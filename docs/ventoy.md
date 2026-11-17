@@ -109,8 +109,8 @@ The installer does not use `gfxmode: "max"`: it gave a broken display in the tes
 
 | Symptom | Cause / fix |
 |---|---|
-| The installer does not list my stick | It must be a Ventoy stick (a small `VTOYEFI` partition next to the data partition). Mount the data partition and pass its mount point: `--ventoy /run/media/you/Ventoy`. |
-| `has no /ventoy folder` | The path is not the Ventoy data partition. Use the big partition, not `VTOYEFI`. |
+| The installer does not list my stick | It must be a Ventoy stick (a small `VTOYEFI` partition next to the data partition; this is also how the installer verifies a stick). Mount the data partition and pass its mount point: `--ventoy /run/media/you/Ventoy`. |
+| `is not the data partition of a Ventoy stick` | The installer checks that the disk behind the path has Ventoy's small `VTOYEFI` partition (or, as a fallback, that the path already has a `/ventoy` folder). Use the big data partition of a stick prepared with Ventoy, not `VTOYEFI` and not an ordinary USB stick. A fresh Ventoy stick has no `/ventoy` folder yet; the installer creates it. |
 | A black screen with only Ventoy's plain text | Ventoy could not find or load a scene icon for that menu item. Re-run the installer; if it persists, open an issue with your Ventoy version and the item's name. |
 | The theme looks cut off or too small | The screen size does not match an installed theme. Add that resolution with `--res`, or set Ventoy's resolution in F5 Tools. |
 | I want the default Ventoy look back | `./install.sh --uninstall --ventoy MOUNTPOINT`, or restore `ventoy.json.material-grub.bak`. |

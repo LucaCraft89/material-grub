@@ -11,7 +11,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 BUILTIN = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split()
 RES_RE = re.compile(r"^[0-9]{3,5}x[0-9]{3,5}$")
-def stick_ok(p): return bool(CHECK["STICK"].match(p)) and Path(p, "ventoy").is_dir()
+def stick_ok(p):
+    """A typed mount point must be a Ventoy data partition: its disk has a VTOYEFI partition (a fresh stick has no /ventoy folder yet) or it holds a /ventoy folder."""
+    if not CHECK["STICK"].match(p): return False
+    try: import ventoy_sticks; return bool(ventoy_sticks.check(p))
+    except Exception: return Path(p, "ventoy").is_dir()
 def snap(res):
     """Same rule as install.sh / material-grub-assemble: exact size, else the closest aspect ratio, then the closest height."""
     w, h = map(int, res.split("x")); size = lambda r: tuple(map(int, r.split("x")))
@@ -32,7 +36,7 @@ def ventoy_steps(presets, monitors, sticks):
     def opt(v, label, help): return {"v": v, "label": label, "help": help}
     steps = []
     so = [opt(s["path"], describe_stick(s), "A Ventoy stick" + ("" if s["mounted"] else ": it is not mounted, the installer mounts it for the copy and unmounts it afterwards") + ". Everything is added under /ventoy; your ventoy.json is merged, not replaced (a backup is kept).") for s in sticks or []]
-    so.append(opt("custom", "Type a mount point..." if sticks else "Type the stick's mount point...", "The folder where the Ventoy data partition is mounted, for example /run/media/you/Ventoy. It must contain a /ventoy folder." + ("" if sticks else "\n\nNo Ventoy stick was detected: plug it in and mount it, or type the path.")))
+    so.append(opt("custom", "Type a mount point..." if sticks else "Type the stick's mount point...", "The folder where the Ventoy data partition is mounted, for example /run/media/you/Ventoy. It must be a Ventoy stick (a fresh one is fine)." + ("" if sticks else "\n\nNo Ventoy stick was detected: plug it in and mount it, or type the path.")))
     steps.append({"id": "STICK", "title": "Ventoy stick", "type": "choice", "options": so, "cur": 0})
     mons = monitors or [{"name": "default", "w": 1920, "h": 1080, "primary": False, "source": "default"}]
     ro = [opt(f"{m['w']}x{m['h']}", f"{m['w']}x{m['h']} {m['name']}" + (" (primary)" if m.get("primary") else ""), "The screen mode Ventoy starts in, and the first theme size. Pick the resolution of the screen you boot on most; the next step adds others for other computers.") for m in mons]
@@ -188,7 +192,7 @@ def run_plain(steps, presets, inp=input, out=print, final=True):
                 while True:
                     r = inp("  mount point of the Ventoy stick: " if st["id"] == "STICK" else "  resolution WxH: ").strip()
                     if st["id"] == "STICK" and stick_ok(r) or st["id"] != "STICK" and RES_RE.match(r): st["custom"] = r; break
-                    out("  expected a folder that contains /ventoy" if st["id"] == "STICK" else "  expected WxH, for example 2560x1440")
+                    out("  expected the mount point of a Ventoy data partition" if st["id"] == "STICK" else "  expected WxH, for example 2560x1440")
         else:
             for r in st["rows"]:
                 if r["kind"] == "toggle": x = inp(f"  {r['label']} [{'Y/n' if r['val'] else 'y/N'}]: ").strip().lower(); r["val"] = r["val"] if not x else x.startswith("y")
