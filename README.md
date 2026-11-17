@@ -19,6 +19,23 @@ distro's brand colour. Move the selection and the entire screen, rail and pills 
 Kernel versions, system versions and recovery entries are shown as info pills, and a
 sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](https://fonts.google.com/specimen/Google+Sans+Flex).
 
+## Ventoy
+
+The same theme runs on the menu of a [Ventoy](https://www.ventoy.net) USB stick, and it follows the ISOs on the stick: add, rename or remove files on any computer and nothing needs to run again. A full-screen picker with the real file name, or a list; dark or light; Ventoy's own menus are themed too, and an image with `pnlug` in its name gets the Pordenone Linux User Group's colours and logo.
+
+<table>
+<tr>
+<td><img src="docs/screenshots/ventoy/full-dark-1.png" alt="Ventoy, full-screen picker, dark"></td>
+<td><img src="docs/screenshots/ventoy/list-light-1.png" alt="Ventoy, list, light"></td>
+</tr>
+</table>
+
+```sh
+./install.sh --ventoy        # no root; a TUI picks the stick, resolutions, style and scheme
+```
+
+Install options, all screenshots and what was tested: **[docs/ventoy.md](docs/ventoy.md)** · [install section below](#ventoy-1).
+
 ## Features
 
 - **Per-entry dynamic colour.** 54 catalog entries (48 distros, Windows 10/11, Firmware, Restart, Shut down, plus a Tux fallback), each with a seed colour fed through the Material 3 *Expressive* dark scheme.
@@ -31,6 +48,7 @@ sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](ht
 - **Many screens, one package.** Scenes are rendered per aspect ratio (16:9, 16:10, 21:9, 32:9) and a tiny `theme.txt` is generated per resolution: 1280×720, 1920×1080, 1920×1200, 2560×1080, 2560×1440, 2880×1800, 3440×1440, 3840×1080, 3840×1600, 3840×2160, 5120×1440, 5120×2160. Screens 1800 or more pixels high (4K, 2880×1800, 5120×2160) get **native 2160-high scenes** instead of an upscaled 1080 design, so text, glyphs and the rail stay sharp.
 - **Dark (default) or light.** `sudo ./install.sh --scheme light` builds the light Material 3 Expressive scheme: neutral countdown, raw-name and progress colours, the desktop colour and the rail glyphs switch with it (contrast checked: all text at least 5:1; see the [gallery](docs/gallery.md)).
 - **Non-Latin names.** The bundled font is Latin (incl. Latin Extended and Vietnamese). Cyrillic, Greek, CJK and other titles use GRUB's own `unicode.pf2` as glyph fallback in the menu line, and any installed system font (via fontconfig) in the info pills.
+- **Ventoy sticks too.** `./install.sh --ventoy` themes the menu of a Ventoy USB stick (full-screen picker or list, dark or light), see [Ventoy](#ventoy).
 - **Menu always visible.** Fedora hides the GRUB menu after a successful boot; the installer keeps it on screen.
 
 ## Gallery
@@ -140,7 +158,7 @@ The Google Sans Flex font is bundled in `fonts/` (SIL OFL 1.1, unmodified upstre
 
 ### Ventoy
 
-The same theme works on a [Ventoy](https://www.ventoy.net) USB stick, and it follows the ISOs on the stick without installing again: add, rename or remove files on any computer, nothing to run again. Two styles: **`full`** (a full-screen ISO picker with the real file name, two scroll arrows, no key hints) and **`list`**, dark or light. Ventoy's own menus (F2 to F5, folders, boot modes) are themed too, and an image with `pnlug` in its name (any letter case) gets the Pordenone Linux User Group's colours and logo. You need a stick that already runs Ventoy (this does not install Ventoy itself). No root needed:
+Instructions (more in [docs/ventoy.md](docs/ventoy.md)). The same theme works on a [Ventoy](https://www.ventoy.net) USB stick, and it follows the ISOs on the stick without installing again: add, rename or remove files on any computer, nothing to run again. Two styles: **`full`** (a full-screen ISO picker with the real file name, two scroll arrows, no key hints) and **`list`**, dark or light. Ventoy's own menus (F2 to F5, folders, boot modes) are themed too, and an image with `pnlug` in its name (any letter case) gets the Pordenone Linux User Group's colours and logo. You need a stick that already runs Ventoy (this does not install Ventoy itself). No root needed:
 
 ```sh
 ./install.sh --ventoy                                  # a TUI picks the stick, resolutions, style and scheme
