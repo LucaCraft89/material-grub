@@ -174,7 +174,7 @@ The installer detects `grub2-mkconfig` (Fedora/RHEL) and `grub-mkconfig` (Debian
 `menuentry`/`submenu` entries (Debian-family and Arch style "Advanced options for ...") are annotated and themed
 directly. Fedora's BootLoaderSpec (BLS) entries get the *default kernel on top, rest under Advanced options*
 structure through mirror directories in `/boot/loader/material-top` and `/boot/loader/material-adv`; Fedora's own
-files are never edited. **Fedora 44 is the primary target; other distros have not been tested on real hardware.**
+files are never edited. Systems without `blscfg` (Debian, Ubuntu, Arch: classic `menuentry`/`submenu`) are themed directly from `grub.cfg`; `blscfg` calls with `--path` or `--show-*` options are left untouched (themed by class, no pills or Advanced grouping). **Fedora 44 is the primary target; other distros have not been tested on real hardware.**
 
 ### Immutable systems (ostree / bootc: Silverblue, Kinoite, Bazzite, uCore, ...) - experimental
 

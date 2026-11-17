@@ -45,6 +45,15 @@ class Match(unittest.TestCase):
         self.assertIsNone(mgrub.key_for("Some Unknown OS", self.rules))
         self.assertIsNone(mgrub.key_for("Windows Boot Manager", self.rules))    # Windows is resolved separately (10 vs 11)
 
+class Bls(unittest.TestCase):
+    def test_calls(self):
+        c = mgrub.bls_call
+        self.assertEqual(c("blscfg"), ("", "")); self.assertEqual(c("\t  blscfg  # load"), ("\t  ", ""))
+        self.assertEqual(c("    blscfg --enable-fallback"), ("    ", "--enable-fallback"))
+        for no in ("insmod blscfg", "if blscfg; then true; fi", "set blsdir=/x", "# blscfg", "blscfgx"): self.assertIsNone(c(no), no)
+        self.assertTrue(mgrub.bls_restructurable(c("blscfg"))); self.assertTrue(mgrub.bls_restructurable(c("blscfg --enable-fallback")))
+        for opt in ("--path /loader/entries", "--show-default", "--show-non-default"): self.assertFalse(mgrub.bls_restructurable(c("blscfg " + opt)), opt)
+
 class Conf(unittest.TestCase):
     def test_conf(self):
         import tempfile, os

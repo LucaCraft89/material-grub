@@ -25,6 +25,20 @@ class Pipeline(unittest.TestCase):
         subprocess.run([py, BIN / "material-grub-classes", self.cfg, "--pkg", PKG, "--bls", self.entries, "--loader", self.boot / "loader", "--mirrors", gd / "material",
                         "--mirrorbase", "/grub2/material", "--fallback-all", "--state", self.state], check=True, capture_output=True)
         subprocess.run([py, BIN / "material-grub-scenes", "--theme", gd / "themes/material", "--pkg", PKG, "--state", self.state], check=True, capture_output=True)
+    def test_blscfg_variants(self):
+        gd = self.boot / "grub2"
+        for body, structured in (("    blscfg --enable-fallback\n", True), ("blscfg --path /loader/entries\n", False), ("blscfg --show-default\n", False)):
+            self.cfg.write_text(STATIC.replace("blscfg\n", body)); shutil.rmtree(self.bk, ignore_errors=True); shutil.rmtree(self.state.parent, ignore_errors=True)
+            self.run_all(); t = self.cfg.read_text()
+            self.assertIn("set theme=$prefix/themes/material/theme.txt", t, "theme must load whatever the blscfg form")
+            self.assertEqual("material-top" in t, structured, body)
+            if structured: self.assertIn("    set blsdir=", t); self.assertIn("blscfg --enable-fallback", t)
+            else: self.assertIn(body.strip(), t)
+    def test_no_blscfg_at_all(self):      # classic menuentry system (Debian/Arch style) run through the static path: theme + entries, no mirrors
+        self.cfg.write_text("set timeout=5\nmenuentry 'Arch Linux' --class arch --class gnu-linux { true }\nsubmenu 'Advanced options for Arch' { menuentry 'Arch fallback' { true } }\n")
+        self.run_all(); t = self.cfg.read_text()
+        self.assertIn("static theme begin", t); self.assertNotIn("material-top", t); self.assertIn("--class arch", t)
+        self.assertLess(t.index("static theme begin"), t.index("menuentry 'Arch Linux'"))
     def test_conf(self):
         conf = self.d / "m.conf"; conf.write_text("RAW_NAME=off\nCOUNTDOWN=off\nLOGO=off\nTIMEOUT=9\n"); os.environ["MATERIAL_CONF"] = str(conf)
         try: self.run_all()

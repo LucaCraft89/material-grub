@@ -70,13 +70,17 @@ if first:
             cfg_entries.append(mkentry(title, key, kind, level, c))
             if line.rstrip().endswith("{"): stack.append(word)
         elif line.strip() == "}" and stack: stack.pop()
-        elif line.strip() == "blscfg" and bls_confs:
-            osn = os_name(); k = key_of(osn); ac = mgrub.uid("adv-menu", osn)
-            out += ["# material-grub: structured BLS entries (default kernel here, the rest under Advanced options)",
-                    f"set blsdir={mbase}/material-top", "if blscfg; then true; else unset blsdir; blscfg; fi",
-                    f"submenu 'Advanced options for {osn}' --class {ac} --class {k} --id material-advanced {{",
-                    f"\tset blsdir={mbase}/material-adv", "\tblscfg", "}", "unset blsdir"]
-            if FALLBACK: out += [f"submenu 'All boot entries (raw, always current)' --class {k} --id material-fallback {{", "\tblscfg", "}"]
+        elif mgrub.bls_call(line) and (stack or not mgrub.bls_restructurable(mgrub.bls_call(line))):
+            if not stack: print(f"material-grub: leaving `{line.strip()}` untouched (its options are not compatible with the Advanced-options structure); entries are themed by class only")
+            out.append(line); continue
+        elif mgrub.bls_restructurable(mgrub.bls_call(line)) and bls_confs:
+            osn = os_name(); k = key_of(osn); ac = mgrub.uid("adv-menu", osn); ind, bargs = mgrub.bls_call(line); bcmd = ("blscfg " + bargs).strip()
+            blk = ["# material-grub: structured BLS entries (default kernel here, the rest under Advanced options)",
+                   f"set blsdir={mbase}/material-top", f"if {bcmd}; then true; else unset blsdir; {bcmd}; fi",
+                   f"submenu 'Advanced options for {osn}' --class {ac} --class {k} --id material-advanced {{",
+                   f"\tset blsdir={mbase}/material-adv", f"\t{bcmd}", "}", "unset blsdir"]
+            if FALLBACK: blk += [f"submenu 'All boot entries (raw, always current)' --class {k} --id material-fallback {{", f"\t{bcmd}", "}"]
+            out += [ind + l for l in blk]
             continue
         out.append(line)
     tmp = cfg.with_name(cfg.name + ".material"); tmp.write_text(MARK + "\n" + "\n".join(out) + "\n")

@@ -70,7 +70,7 @@ menuentry 'Shut down' --class shutdown --id material-halt {{ halt }}
 # on every run (and re-trigger the path unit that watches it)
 had_system = C in text
 body = strip(text, [(A, B)] + ([] if had_system else [(C, D)])); lines = body.splitlines(keepends=True)
-at = next((i for i, l in enumerate(lines) if l.strip() == "blscfg" or l.startswith("# material-grub: structured BLS")), None)
+at = next((i for i, l in enumerate(lines) if mgrub.bls_call(l) is not None or l.startswith("# material-grub: structured BLS") or l.strip().startswith("# material-grub: structured BLS")), None)
 if at is None: at = next((i for i, l in enumerate(lines) if re.match(r"\s*(menuentry|submenu)\b", l)), len(lines))
 if lines and not lines[-1].endswith("\n"): lines[-1] += "\n"
 new = "".join(lines[:at]) + block + "".join(lines[at:]) + ("" if had_system else system)

@@ -60,3 +60,14 @@ def apply_conf_to_theme(text, conf):
     for key, name in (("RAW_NAME", "raw"), ("COUNTDOWN", "countdown"), ("LOGO", "logo")):
         if conf[key] == "off": text = re.sub(rf"(?ms)^# mg:begin {name}\n.*?^# mg:end {name}\n", "", text)
     return text
+
+
+# `blscfg` is how GRUB loads BootLoaderSpec entries. Distros call it as a bare line (Fedora), indented inside an if, or with options.
+_BLS = re.compile(r"^(?P<ind>\s*)blscfg(?P<args>(?:\s+[^#;|&]*?)?)\s*(?:#.*)?$")
+def bls_call(line):
+    """None if the line is not a blscfg call. Else (indent, args). Only a bare call or --enable-fallback can be restructured:
+    options that pick the directory or filter entries (--path, --show-default, --show-non-default) would fight our mirrors."""
+    m = _BLS.match(line)
+    return (m["ind"], m["args"].strip()) if m else None
+def bls_restructurable(call):
+    return call is not None and call[1] in ("", "--enable-fallback")

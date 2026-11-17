@@ -4,13 +4,14 @@
 
 CI, non-Latin titles, a config file and prebuilt release assets.
 
+- `blscfg` handling is now general: bare, indented, or `--enable-fallback` calls are restructured (arguments and indentation preserved); calls with directory/filter options, or inside a menu entry, are left alone with a message; systems without `blscfg` (Debian, Ubuntu, Arch: classic menuentries) are themed directly. Covered by tests.
 - Prebuilt release assets: `release.yml` builds 12 resolutions x 2 schemes on a version tag and uploads them with `SHA256SUMS`; `./install.sh --prebuilt` downloads and verifies one (curl or wget, `MG_RELEASE_URL` to override). New `VERSION` file. Tested against a local server (Fedora, Alpine/busybox, tampered checksum, missing asset); the GitHub workflow has not run yet.
 - Config file `/etc/material-grub.conf` (RAW_NAME, COUNTDOWN, LOGO, TIMEOUT; never overwritten), `material-grub-apply`, path unit watches it; `--no-hints` build option. Verified in QEMU.
 - Fonts: bitmap fonts now cover Latin Extended-A/B, Vietnamese, general punctuation, currency and arrows. Non-Latin entry titles (Cyrillic, Greek, CJK, ...) fall back to GRUB's `unicode.pf2` (copied into the theme, loaded by `05_material` / the static block) and, in the info pills, to an installed system font. Verified in QEMU. Google Sans Flex itself has no Cyrillic/Greek/CJK glyphs.
 - CI (GitHub Actions): syntax + unit + fake-`/boot` pipeline tests, installer matrix over six distro containers (dark/light, several resolutions), QEMU boot smoke test per scheme with screenshots as artifacts. New `tests/`.
 - QEMU helpers find OVMF on Debian/Ubuntu/Arch/Fedora layouts (or `OVMF_CODE`), work without KVM, and no longer need ImageMagick.
 
-Known limitations: neither GitHub workflow had run in a release before this tag; `--prebuilt` is untested on an immutable host; a `blscfg` call with arguments is not recognised (entries are then themed by class only).
+Known limitations: neither GitHub workflow had run in a release before this tag; `--prebuilt` is untested on an immutable host; `blscfg` calls with `--path`/`--show-*` options are left untouched (entries are themed by class only, no pills or Advanced grouping).
 
 ## 0.2.0 (2026-11-16)
 
