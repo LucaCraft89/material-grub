@@ -61,7 +61,7 @@ Options are saved on the stick in `/ventoy/material-grub.conf` (`STYLE`, `SCHEME
 - **`rail`**: a rail on the left with three sections (Linux, Windows, Tools); the section of the highlighted entry is lit.
 - **`clean`**: a big rounded panel with label chips on its edges.
 - **`list`**: the distro's logo and name on the left and the ISO list on the right.
-- **Key hints** at the bottom use Ventoy's keys: F1 Help, F2 Browse, F3 Tree, F4 Local boot, F5 Tools.
+- **Key hints** at the bottom show every key on Ventoy's own bar (Ventoy 1.1.18): the arrows and Enter, **L** Language, **F1** Help, **F2** Browse (boot a file from the local disk), **F3** Tree view (folders instead of one flat list), **F4** Local boot (boot Windows or another disk, a UEFI file), **F5** Tools (resolution, theme, power, hardware info, keyboard layout), **F6** Ext menu (your own `/ventoy/ventoy_grub.cfg`).
 - **Ventoy's own menus** have scenes too: folders in tree view (Folder, Back), F4 (Windows, Local boot), F5 (Tools, with Restart, Shut down and Firmware items using their own scenes).
 - **Windows ISOs** are recognised as Windows 10 or Windows 11 from the name (`Win10`, `Windows_11`, ...); a plain "Windows" name gets Windows 11.
 - **Anything it does not recognise** (a rescue tool such as GParted or Clonezilla, an unknown distro, a `.wim` or `.img` file) gets a neutral **gray "Disk image" scene with a disc icon**, in every style and in both schemes. The raw file name is still shown, and the entry boots as usual.

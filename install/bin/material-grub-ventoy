@@ -17,7 +17,7 @@ VTOY_FALLBACK = ("vtoyiso", "vtoywim", "vtoyimg", "vtoyvhd", "vtoyefi", "vtoydir
 # Ventoy's own menus (F2 browse, F3 tree, F4 local boot, F5 tools). class -> (glyph, title, subtitle, palette borrowed from a catalog entry). Verified class list: Ventoy 1.1.18 grub/*.cfg.
 MENU = {"vtoydir": ("folder", "Folder", "Browse", "tux"), "vtoyret": ("back", "Back", "Previous menu", "nixos"), "F5tool": ("wrench", "Tools", "Ventoy tools", "firmware"), "F4boot": ("firmware", "Local boot", "Boot from disk", "windows10")}
 MENU_ALIAS = {"debug_reboot": "reboot", "debug_halt": "shutdown", "debug_efisetup": "firmware", "boot_windows": "windows11"}      # items whose own scene already exists
-HINTS = ["Arrows  select", "Enter  boot", "F1  Help", "F2  Browse", "F3  Tree", "F4  Local boot", "F5  Tools"]
+HINTS = ["Arrows  select", "Enter  boot", "L  Language", "F1  Help", "F2  Browse", "F3  Tree", "F4  Local boot", "F5  Tools", "F6  Ext menu"]      # every key on Ventoy 1.1.18's own bar: L:Language F1:Help F2:Browse F3:TreeView F4:Localboot F5:Tools F6:ExMenu
 THEMES = "ventoy/themes"; STATE = "ventoy/material-grub-state.json"
 
 def scan(stick):
