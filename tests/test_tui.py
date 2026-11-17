@@ -10,12 +10,12 @@ class Logic(unittest.TestCase):
     def test_snap(self):
         self.assertEqual(tui.snap("2560x1440"), "2560x1440"); self.assertEqual(tui.snap("1600x1000"), "1920x1200"); self.assertEqual(tui.snap("2000x1125"), "1920x1080")
     def test_presets_skip_steps(self):
-        steps = tui.build_steps({"RES": "1920x1080", "STYLE": "list", "SCHEME": "dark"}, MONS, False, False)
+        steps = tui.build_steps({"RES": "1920x1080", "STYLE": "list", "SCHEME": "dark"}, MONS, False)
         self.assertEqual([s["id"] for s in steps], ["LOGO", "HINTS", "EXTRAS"])
         a = tui.answers(steps, {"RES": "1920x1080", "STYLE": "list", "SCHEME": "dark"}); self.assertEqual((a["RES"], a["STYLE"], a["COOKIE"], a["LOGO"]), ("1920x1080", "list", "on", "on"))
     def test_cookie_off_implies_no_logo(self):
-        steps = tui.build_steps({}, MONS, True, True); [s for s in steps if s["id"] == "LOGO"][0]["cur"] = 2
-        a = tui.answers(steps, {}); self.assertEqual((a["COOKIE"], a["LOGO"]), ("off", "off")); self.assertEqual([s["id"] for s in steps][-2:], ["SOURCE", "IMMUTABLE"])
+        steps = tui.build_steps({}, MONS, True); [s for s in steps if s["id"] == "LOGO"][0]["cur"] = 2
+        a = tui.answers(steps, {}); self.assertEqual((a["COOKIE"], a["LOGO"]), ("off", "off")); self.assertEqual([s["id"] for s in steps][-1:], ["IMMUTABLE"])
     def test_output_is_validated(self):
         with tempfile.NamedTemporaryFile() as f:
             for bad in ({"RES": "1920x1080; rm -rf /"}, {"STYLE": "list'"}, {"TIMEOUT": "12a"}, {"NOPE": "x"}):
@@ -35,7 +35,7 @@ def drive(keys, env_extra=None, size=(24, 80), cmd=None):
     d = tempfile.mkdtemp(); mon = Path(d) / "m.json"; mon.write_text(json.dumps(MONS)); out = Path(d) / "o"
     pid, fd = pty.fork()
     if pid == 0:
-        os.environ.update({"TERM": "xterm", "LINES": str(size[0]), "COLUMNS": str(size[1])}); os.execv(*(cmd or (sys.executable, [sys.executable, TUI, "--out", str(out), "--monitors", str(mon), "--prebuilt-ok"])))
+        os.environ.update({"TERM": "xterm", "LINES": str(size[0]), "COLUMNS": str(size[1])}); os.execv(*(cmd or (sys.executable, [sys.executable, TUI, "--out", str(out), "--monitors", str(mon)])))
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", size[0], size[1], 0, 0)); buf = b""
     def pump(t):
         nonlocal buf; end = time.time() + t
@@ -68,10 +68,9 @@ class Curses(unittest.TestCase):
                 DOWN, DOWN, ENTER,                # logo: neither
                 DOWN, ENTER,                      # hints: off
                 ENTER,                            # extras: keep
-                DOWN, ENTER,                      # source: build
                 ENTER]                            # summary: install
         code, screen, out = drive(keys); self.assertEqual(code, 0, screen[-600:]); t = out.read_text()
-        for want in ("RES='1920x1080'", "STYLE='list'", "SCHEME='light'", "COOKIE='off'", "LOGO='off'", "HINTS='off'", "SOURCE='build'"): self.assertIn(want, t)
+        for want in ("RES='1920x1080'", "STYLE='list'", "SCHEME='light'", "COOKIE='off'", "LOGO='off'", "HINTS='off'"): self.assertIn(want, t)
         for text in ("Material GRUB installer", "Resolution", "(primary)", "Summary"): self.assertIn(text, screen)
     def test_quit_and_back(self):
         code, screen, out = drive([ENTER, ENTER, LEFT, b"q"]); self.assertEqual(code, 1); self.assertFalse(out.exists())

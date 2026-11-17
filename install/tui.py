@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Material GRUB installer questions (curses TUI with a plain-prompt fallback). stdlib only.
 It only COLLECTS answers: install.sh does the work. Answers go to --out as shell-safe KEY=value lines (every value is validated first).
-usage: tui.py --out FILE [--preset KEY=value ...] [--prebuilt-ok] [--immutable] [--plain] [--monitors JSON]
-  presets (answers given by installer flags) are not asked again: RES STYLE SCHEME COOKIE LOGO HINTS RAW_NAME COUNTDOWN TIMEOUT SOURCE
+usage: tui.py --out FILE [--preset KEY=value ...] [--immutable] [--plain] [--monitors JSON]
+  presets (answers given by installer flags) are not asked again: RES STYLE SCHEME COOKIE LOGO HINTS RAW_NAME COUNTDOWN TIMEOUT
 exit status: 0 = confirmed, 1 = cancelled."""
 import json, os, re, sys, textwrap
 from pathlib import Path
@@ -21,7 +21,7 @@ WIRE = {
  "list": ["+------------------+", "|            (o)  |", "|  (o) [ Fedora  ] |", "|  (o) [ Windows ] |", "|  (o) [ Restart ] |", "+------[hints]-----+"],
 }
 
-def build_steps(presets, monitors, prebuilt_ok, immutable):
+def build_steps(presets, monitors, immutable):
     def opt(v, label, help): return {"v": v, "label": label, "help": help}
     steps = []
     mons = monitors or [{"name": "default", "w": 1920, "h": 1080, "primary": False, "source": "default"}]
@@ -37,7 +37,7 @@ def build_steps(presets, monitors, prebuilt_ok, immutable):
         opt("clean", "Full screen, no rail", "The very first design: a big panel per entry, with the previous and next entry peeking in above and below in their own colours and small label chips on the edges."),
         opt("list", "Centered list", "The whole menu as a centred list: each entry is an icon in a Material shape plus its name in a pill; the selected row is highlighted and the background follows its colour.")]})
     steps.append({"id": "SCHEME", "title": "Colour scheme", "type": "choice", "cur": 0, "options": [
-        opt("dark", "Dark", "Deep Material 3 surfaces, easy on the eyes in a dark room. This is the colour scheme baked into the scene images (it needs a build or a matching prebuilt download)."),
+        opt("dark", "Dark", "Deep Material 3 surfaces, easy on the eyes in a dark room. This is the colour scheme baked into the scene images."),
         opt("light", "Light", "Light Material 3 surfaces. The scheme is chosen when the images are built, so switching later means installing again.")]})
     steps.append({"id": "LOGO", "title": "Cookie and firmware logo", "type": "choice", "cur": 0, "options": [
         opt("both", "Cookie with the firmware logo", "The cookie shape at the top right with your machine's own boot logo (from the firmware BGRT table) inside it."),
@@ -50,10 +50,6 @@ def build_steps(presets, monitors, prebuilt_ok, immutable):
         {"id": "RAW_NAME", "kind": "toggle", "label": "Raw entry name line", "val": True, "help": "The small muted line at the bottom with the entry title exactly as GRUB sees it. Useful when something looks wrong."},
         {"id": "COUNTDOWN", "kind": "toggle", "label": "Countdown bar", "val": True, "help": "The 'Booting in N seconds' bar and label."},
         {"id": "TIMEOUT", "kind": "text", "label": "Timeout (seconds)", "val": "", "help": "Seconds before the default entry boots. Empty keeps GRUB_TIMEOUT (or 5). Press Enter to edit."}]})
-    if prebuilt_ok:
-        steps.append({"id": "SOURCE", "title": "Install source", "type": "choice", "cur": 0, "options": [
-            opt("prebuilt", "Download the prebuilt theme", "Fast and needs no build tools, but it is code that runs as root and its checksum comes from the same release page. Only published sizes and schemes exist."),
-            opt("build", "Build from source", "Renders everything on this machine (1 to 6 minutes, needs fonttools, librsvg and grub-mkfont; the installer fetches what is missing).")]})
     if immutable:
         steps.append({"id": "IMMUTABLE", "title": "Immutable system", "type": "choice", "cur": 1, "options": [
             opt("no", "Cancel", "Do not change anything."),
@@ -95,7 +91,7 @@ def answers(steps, presets):
 
 CHECK = {"RES": RES_RE, "STYLE": re.compile(r"^(rail|clean|list)$"), "SCHEME": re.compile(r"^(dark|light)$"), "COOKIE": re.compile(r"^(on|off)$"), "LOGO": re.compile(r"^(on|off)$"),
          "HINTS": re.compile(r"^(on|off)$"), "RAW_NAME": re.compile(r"^(on|off)$"), "COUNTDOWN": re.compile(r"^(on|off)$"), "TIMEOUT": re.compile(r"^[0-9]{0,4}$"),
-         "SOURCE": re.compile(r"^(prebuilt|build)$"), "IMMUTABLE": re.compile(r"^(yes|no)$")}
+         "IMMUTABLE": re.compile(r"^(yes|no)$")}
 def write_out(path, a):
     lines = []
     for k, v in a.items():
@@ -108,7 +104,6 @@ def command_line(a):
     if a.get("COOKIE") == "off": c.append("--no-cookie")
     elif a.get("LOGO") == "off": c.append("--no-logo")
     if a.get("HINTS") == "off": c.append("--no-hints")
-    if a.get("SOURCE") == "prebuilt": c.append("--prebuilt")
     return " ".join(x for x in c if x)
 
 def summary_lines(steps, a):
@@ -246,7 +241,7 @@ def main(argv):
     if mons is None and "RES" not in presets:
         try: import monitors; mons = monitors.detect()
         except Exception: mons = None
-    steps = build_steps(presets, mons, "--prebuilt-ok" in argv, "--immutable" in argv); defaults(steps, presets)
+    steps = build_steps(presets, mons, "--immutable" in argv); defaults(steps, presets)
     if "COOKIE" in presets and "LOGO" not in presets: presets.setdefault("LOGO", "on")
     plain = "--plain" in argv or not sys.stdin.isatty() or not sys.stdout.isatty() or os.environ.get("TERM", "dumb") in ("dumb", "")
     if not plain:
