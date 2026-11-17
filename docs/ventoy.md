@@ -21,7 +21,7 @@ It follows the files on the stick: **add, rename or remove ISOs on any computer 
 </tr>
 </table>
 
-<sub>Real Ventoy 1.1.18 booted in QEMU + OVMF. In the top-right cookie a static "V" replaces the firmware logo used on a PC. Ventoy's own menus (F3 tree view, F4 local boot, F5 tools) are themed too.</sub>
+<sub>Real Ventoy 1.1.18 booted in QEMU + OVMF. In the top-right cookie the Ventoy logo replaces the firmware logo used on a PC. Ventoy's own menus (F3 tree view, F4 local boot, F5 tools) are themed too.</sub>
 
 ## Install
 
@@ -63,6 +63,7 @@ Options are saved on the stick in `/ventoy/material-grub.conf` (`STYLE`, `SCHEME
 - **`list`**: the distro's logo and name on the left and the ISO list on the right.
 - **Key hints** at the bottom show every key on Ventoy's own bar (Ventoy 1.1.18): the arrows and Enter, **L** Language, **F1** Help, **F2** Browse (boot a file from the local disk), **F3** Tree view (folders instead of one flat list), **F4** Local boot (boot Windows or another disk, a UEFI file), **F5** Tools (resolution, theme, power, hardware info, keyboard layout), **F6** Ext menu (your own `/ventoy/ventoy_grub.cfg`).
 - **Ventoy's own menus** have scenes too: folders in tree view (Folder, Back), F4 (Windows, Local boot), F5 (Tools, with Restart, Shut down and Firmware items using their own scenes).
+- **The boot-mode menu** (Enter on an image) has a scene per mode, each in its own colour with its own icon: Normal mode (green, play), GRUB2 mode (amber, terminal), WIMBOOT mode (blue, window), Memdisk mode (violet, chip), File checksum (cyan, hash) and Back. Ventoy only offers the modes that fit the image.
 - **Windows ISOs** are recognised as Windows 10 or Windows 11 from the name (`Win10`, `Windows_11`, ...); a plain "Windows" name gets Windows 11.
 - **Anything it does not recognise** (a rescue tool such as GParted or Clonezilla, an unknown distro, a `.wim` or `.img` file) gets a neutral **gray "Disk image" scene with a disc icon**, in every style and in both schemes. The raw file name is still shown, and the entry boots as usual.
 
@@ -72,7 +73,7 @@ Ventoy builds its menu at boot from whatever files are on the stick, and GRUB ca
 
 **Dynamic (default).** Nothing depends on the files. The installer puts a scene for every supported distro on the stick plus about 600 generic matching rules (see [How matching works](#how-matching-works)). Any ISO you add later is recognised on its name alone. In the `list` style the rows are drawn by GRUB itself, so the list is always the real one and scrolls for any number of ISOs. The price:
 
-- in `list`, the highlighted row has a neutral colour (GRUB theme colours are global) and rows have no per-row icons or section dividers; the distro's logo and colour are in the big scene beside the list;
+- in `list`, the highlighted row has a neutral colour (GRUB theme colours are global) and rows have no per-row icons or section dividers (GRUB draws a row's icon from the same image file as the full-screen scene, so a small icon next to each ISO cannot be made without losing the per-distro backgrounds); the distro's logo and colour are in the big scene beside the list;
 - in `clean`, the neighbouring entries do not peek in above and below;
 - in `rail`, the rail shows three sections instead of one slot per installed distro.
 
@@ -100,7 +101,7 @@ The installer does not use `gfxmode: "max"`: it gave a broken display in the tes
 ## Good to know
 
 - The **countdown bar and `TIMEOUT` are not used** on Ventoy (it has its own timeout setting).
-- The cookie shows a Material "V" mark that is drawn by this project, not Ventoy's artwork. To use another image give the tool `--logo FILE` (run `python3 install/bin/material-grub-ventoy` directly), or hide the logo with `--no-logo`.
+- The cookie shows the Ventoy logo (taken from the Ventoy release, see [THIRD_PARTY.md](../THIRD_PARTY.md)). To use another image give the tool `--logo FILE` (run `python3 install/bin/material-grub-ventoy` directly), or hide the logo with `--no-logo`.
 - Empty (0 byte) files are ignored by Ventoy itself, so they never show up.
 - Fonts for non-Latin names: Latin text uses the bundled Google Sans Flex bitmap fonts; other scripts fall back to GRUB's own `unicode.pf2` in the list (if present on the machine that runs the installer) and are drawn with an installed system font on the scenes.
 - A very long file name is clipped at the edge of its row in the dynamic list and shortened with an ellipsis in the snapshot list and the `clean` chips; the small bottom line shows the name as far as it fits.

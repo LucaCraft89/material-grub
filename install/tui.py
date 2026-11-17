@@ -51,7 +51,7 @@ def ventoy_steps(presets, monitors, sticks):
     steps.append({"id": "SCHEME", "title": "Colour scheme", "type": "choice", "cur": 0, "options": [
         opt("dark", "Dark", "Deep Material 3 surfaces."), opt("light", "Light", "Light Material 3 surfaces.")]})
     steps.append({"id": "LOGO", "title": "Cookie and logo", "type": "choice", "cur": 0, "options": [
-        opt("both", "Cookie with the logo", "The cookie shape at the top right with a static logo inside (a Material V mark; pass --logo FILE to the Ventoy tool for another image)."),
+        opt("both", "Cookie with the logo", "The cookie shape at the top right with a static logo inside (the Ventoy logo on a stick; pass --logo FILE to the Ventoy tool for another image)."),
         opt("cookie", "Cookie only", "The cookie shape without the logo."), opt("none", "Neither", "No cookie and no logo.")]})
     steps.append({"id": "HINTS", "title": "Key hints", "type": "choice", "cur": 0, "options": [
         opt("on", "Show key hints", "Small pills at the bottom with Ventoy's keys: L Language, F1 Help, F2 Browse, F3 Tree, F4 Local boot, F5 Tools, F6 Ext menu."), opt("off", "No key hints", "Cleaner screen; the keys keep working.")]})

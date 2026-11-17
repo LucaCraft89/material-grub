@@ -1,5 +1,6 @@
 """Unit tests for the Ventoy target (no Ventoy, no QEMU): menu_class key selection, name matching, a full run on a fake stick, idempotency and uninstall.
 usage: python3 tests/test_ventoy.py   (the run on a fake stick is skipped when dist/material-grub is not built)"""
+from PIL import Image
 import importlib.machinery, importlib.util, json, shutil, subprocess, sys, tempfile, unittest
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent; PKG = ROOT / "dist/material-grub"; TOOL = ROOT / "install/bin/material-grub-ventoy"
@@ -98,10 +99,12 @@ class DynamicStick(unittest.TestCase):
         return json.loads((self.d / "ventoy/ventoy.json").read_text()), self.d / "ventoy/themes/material_1920x1080"
     def test_every_class_has_an_icon_and_no_file_is_needed(self):       # a stick with NO ISO at all: the theme must already cover every class a rule or a Ventoy menu can produce
         for style in ("rail", "clean", "list"):
-            j, th = self.run_tool(style); need = {r["class"] for r in j["menu_class"]} | {"vtoyiso", "vtoydir", "vtoyret", "F5tool", "F4boot", "debug_reboot", "debug_halt", "debug_efisetup", "boot_windows"}
+            j, th = self.run_tool(style); need = {r["class"] for r in j["menu_class"]} | {"vtoyiso", "vtoydir", "vtoyret", "F5tool", "F4boot", "debug_reboot", "debug_halt", "debug_efisetup", "boot_windows", "second_normal", "second_grub2", "second_wimboot", "second_memdisk", "second_checksum", "second_return"}      # the last six: Ventoy's boot-mode menu
             for c in need: self.assertTrue((th / "icons" / f"{c}.png").exists(), (style, c))
             txt = (th / "theme.txt").read_text(); self.assertEqual("mgrow_*.png" in txt, style == "list", style)
             if style == "list": self.assertTrue((th / "mgsel_c.png").exists())
+            logo = Image.open(th / "machine-logo.png").convert("RGBA"); px = [logo.getpixel((x, y)) for x in range(logo.width) for y in range(logo.height)]
+            self.assertTrue(any(a > 200 and b > r + 40 for r, g, b, a in px), "the real Ventoy logo is blue, not a dark V")
 
 @unittest.skipUnless((PKG / "res").is_dir() and (PKG / "res/1920x1080").is_dir(), "no built 1920x1080 package")
 class Stick(unittest.TestCase):

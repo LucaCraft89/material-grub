@@ -15,7 +15,10 @@ def arg(n, d=None): return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else
 EXTS = (".iso", ".wim", ".img", ".vhd", ".vhdx", ".vtoy")
 VTOY_FALLBACK = ("vtoyiso", "vtoywim", "vtoyimg", "vtoyvhd", "vtoyefi", "vtoydir", "vtoyret", "vtoyvtoy")   # built-in Ventoy classes: shown when no menu_class matches (the grey disc scene)
 # Ventoy's own menus (F2 browse, F3 tree, F4 local boot, F5 tools). class -> (glyph, title, subtitle, palette borrowed from a catalog entry). Verified class list: Ventoy 1.1.18 grub/*.cfg.
-MENU = {"vtoydir": ("folder", "Folder", "Browse", "tux"), "vtoyret": ("back", "Back", "Previous menu", "nixos"), "F5tool": ("wrench", "Tools", "Ventoy tools", "firmware"), "F4boot": ("firmware", "Local boot", "Boot from disk", "windows10")}
+MENU = {"vtoydir": ("folder", "Folder", "Browse", "tux"), "vtoyret": ("back", "Back", "Previous menu", "nixos"), "F5tool": ("wrench", "Tools", "Ventoy tools", "firmware"), "F4boot": ("firmware", "Local boot", "Boot from disk", "windows10"),
+        # the boot-mode menu Ventoy shows after Enter on an image (classes read from Ventoy 1.1.18's grub binary): each mode gets its own colour, background and icon
+        "second_normal": ("play", "Normal mode", "Boot as usual", "reboot"), "second_grub2": ("kernel", "GRUB2 mode", "Boot through GRUB2", "tux"), "second_wimboot": ("windows11", "WIMBOOT mode", "Windows image", "windows11"),
+        "second_memdisk": ("firmware", "Memdisk mode", "Load into RAM", "firmware"), "second_checksum": ("tag", "File checksum", "Verify the image", "parrot"), "second_return": ("back", "Back", "Previous menu", "nixos")}
 MENU_ALIAS = {"debug_reboot": "reboot", "debug_halt": "shutdown", "debug_efisetup": "firmware", "boot_windows": "windows11"}      # items whose own scene already exists
 HINTS = ["Arrows  select", "Enter  boot", "L  Language", "F1  Help", "F2  Browse", "F3  Tree", "F4  Local boot", "F5  Tools", "F6  Ext menu"]      # every key on Ventoy 1.1.18's own bar: L:Language F1:Help F2:Browse F3:TreeView F4:Localboot F5:Tools F6:ExMenu
 THEMES = "ventoy/themes"; STATE = "ventoy/material-grub-state.json"
@@ -114,18 +117,14 @@ def native_list(text, W, H, light):
     mark = "# GRUB draws the first-declared component on top"
     return text.replace(mark, block + mark, 1) if mark in text else text + block
 
-def logo_png(path, size, ink, src=None):
-    """Static logo for the cookie. `src`: any image (used as a silhouette by its alpha / darkness), else a plain Material 'V' mark drawn here (not the Ventoy artwork)."""
-    from PIL import Image, ImageDraw
-    if src:
-        im = Image.open(src).convert("RGBA"); im.thumbnail((size, size), Image.LANCZOS)
-        a = im.getchannel("A") if im.getextrema()[3][0] < 255 else im.convert("L").point(lambda v: 255 - v)
-        out = Image.new("RGBA", (size, size), ink + (0,)); sil = Image.new("RGBA", im.size, ink + (255,)); sil.putalpha(a); out.alpha_composite(sil, ((size - im.width) // 2, (size - im.height) // 2))
-    else:
-        import mgscenes
-        out = Image.new("RGBA", (size, size), ink + (0,)); f = mgscenes.Renderer(PKG, 1080).font(int(size * .92), 800, 125, 60)
-        ImageDraw.Draw(out).text((size / 2, size / 2 + size * .03), "V", font=f, fill=ink + (255,), anchor="mm")
-    out.save(path)
+def logo_png(path, size, src=None):
+    """The logo drawn in the cookie: the real Ventoy logo (blue disc with a USB stick, shipped in the package, full colour) or `src`, any image of your own. Both keep their colours."""
+    from PIL import Image
+    src = Path(src) if src else next((c for c in (PKG / "ventoy/VentoyLogo.png", Path(__file__).resolve().parents[2] / "vendor/ventoy/VentoyLogo.png") if c.exists()), None)
+    if src is None: sys.exit("material-grub-ventoy: the Ventoy logo is missing from the package (ventoy/VentoyLogo.png); pass --logo FILE or --no-logo")
+    im = Image.open(src).convert("RGBA"); bb = im.getchannel("A").point(lambda v: 255 if v > 8 else 0).getbbox(); im = im.crop(bb) if bb else im      # trim the empty border
+    s = size / max(im.size); im = im.resize((max(1, round(im.width * s)), max(1, round(im.height * s))), Image.LANCZOS)
+    out = Image.new("RGBA", (size, size), (0, 0, 0, 0)); out.alpha_composite(im, ((size - im.width) // 2, (size - im.height) // 2)); out.save(path)
 
 def load_json(p):
     try: return json.loads(Path(p).read_text() or "{}")
@@ -195,7 +194,7 @@ for res in resl:
         if (PKG / "fonts" / n).exists(): shutil.copy(PKG / "fonts" / n, tmp / n)
     for cand in ("/usr/share/grub/unicode.pf2", "/usr/share/grub2/unicode.pf2", "/usr/share/fonts/grub/unicode.pf2", "/usr/share/fonts/truetype/unifont/unicode.pf2", "/boot/grub/fonts/unicode.pf2", "/boot/grub2/fonts/unicode.pf2"):
         if os.path.exists(cand): shutil.copy(cand, tmp / "unicode.pf2"); break
-    if conf["LOGO"] == "on" and conf["COOKIE"] == "on": logo_png(tmp / "machine-logo.png", int((rdir / "logo_size").read_text().strip()), (0x14, 0x14, 0x18), arg("--logo"))
+    if conf["LOGO"] == "on" and conf["COOKIE"] == "on": logo_png(tmp / "machine-logo.png", int((rdir / "logo_size").read_text().strip()), arg("--logo"))
     bgs = sorted((PKG / "scenes" / aspect / "bg").glob("*.png")); R = mgscenes.Renderer(PKG, Image.open(bgs[0]).height); R.bg_dir = PKG / "scenes" / aspect / "bg"; R.hint_labels = HINTS
     cls_scene = lambda k: PKG / "scenes" / aspect / "icons" / f"{classes[k][0]}.png"
     def class_scene(k):
@@ -207,8 +206,9 @@ for res in resl:
     for k in keys: class_scene(k).save(tmp / "icons" / f"mg_{k}.png")
     generic = Image.open(tmp / "icons" / "mg_iso.png") if "iso" in keys else class_scene("iso")      # Ventoy's own classes (vtoyiso, vtoywim, ...) and every file the rules do not recognise
     for c in VTOY_FALLBACK: generic.save(tmp / "icons" / f"{c}.png")
-    if dynamic:       # Ventoy's own menus: a scene each (folder, back, tools, local boot) and the existing scenes for power / firmware / Windows items
+    if dynamic:       # the existing scenes for Ventoy's power / firmware / Windows items
         for c, k in MENU_ALIAS.items(): shutil.copy(tmp / "icons" / f"mg_{k}.png", tmp / "icons" / f"{c}.png")
+    if dynamic or style != "list":       # Ventoy's own menus: a scene each (folder, back, tools, local boot, the boot modes); the snapshot list bakes its rows into the scenes, so it has none
         for c, (glyph, title, sub, pal) in MENU.items():
             pk = f"mgm_{c}"; R.pal[pk] = R.pal[pal]; R.titles[pk] = title; R.galias[pk] = glyph; bg = PKG / "scenes" / aspect / "bg" / f"{pal}.png"
             if style == "list": img = R.render_list_hero(pk, bg, opts)
