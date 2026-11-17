@@ -136,12 +136,17 @@ Then reboot. That's it.
 ```sh
 sudo ./install.sh --res 1920x1200   # force a resolution instead of auto-detecting
 sudo ./install.sh --scheme light    # light variant instead of dark
+sudo ./install.sh --style list      # rail (default) | clean | list; also --no-hints, --no-cookie, --no-logo
 sudo ./install.sh --prebuilt        # download the release's prebuilt theme: no build tools, no pip
 sudo ./install.sh --no-deps         # you installed the dependencies yourself
 sudo ./install.sh --stage-only      # install deps and build, but do not touch GRUB
 sudo ./install.sh --keep-build      # keep the temporary build directory
 sudo ./install.sh --uninstall       # remove the theme and hooks
 ```
+
+**Interactive installer (TUI).** Run in a terminal without `--yes`, `./install.sh` asks for whatever you did not give as a flag (resolution, style, colour scheme, cookie/logo, key hints, extras, install source; on immutable systems also your consent). Left: the current question and a tab strip of the steps; right: a call-out explaining the highlighted option; the last tab is a summary with the equivalent non-interactive command. The resolution step proposes your **primary monitor** (X11 `xrandr`, then GNOME/KDE/wlroots Wayland tools run as your own user, then the DRM sysfs, then `GRUB_GFXMODE`) and lets you pick another detected screen or type `WxH`. GRUB draws on whichever output the firmware chooses, usually the primary one. `--no-tui` (or `--yes`, or no terminal) keeps the old fully automatic behaviour; `--tui` forces the questions. Without curses or with a dumb terminal it falls back to plain prompts. Status: the parsers are unit-tested on sample outputs and the TUI is driven through a pty at 80x24 in the tests; the GNOME (Mutter) parser has only been tested on a hand-written sample, and none of the desktop tools have been run on real multi-monitor setups here.
+
+**Styles** (`STYLE` in `/etc/material-grub.conf`, change with `sudo material-grub-apply`; the images are the same for all of them): `rail` is the full-screen design with an icon rail, `clean` is full screen with the previous and next entries peeking in above and below and label chips on the edges, `list` is a centred list of icon-in-shape plus name pill. `COOKIE`, `LOGO` and `HINTS` switch the top-right cookie, the firmware logo inside it and the key-hint pills.
 
 **Prebuilt themes:** each release attaches the theme for every supported resolution and both schemes plus `SHA256SUMS` (built by `.github/workflows/release.yml` when a `vX.Y.Z` tag is pushed; the tag must equal `VERSION`). `--prebuilt` downloads the matching one, verifies the checksum and installs it. It is opt-in because the package contains scripts that run as root and the checksum comes from the same release (it guards against corruption, not a compromised release). `--no-hints` works with it too, because the hints are drawn at install time. This is the easiest route on immutable systems. Until the first release that contains the assets is published, `--prebuilt` reports a download error; the release workflow itself has not run yet.
 

@@ -4,24 +4,28 @@
 #   sudo ./install.sh                 # auto-detects resolution, installs missing dependencies, builds and installs
 #   sudo ./install.sh --res 1920x1200 # force a resolution
 #   sudo ./install.sh --scheme light  # light Material 3 scheme instead of the default dark one
-#   sudo ./install.sh --no-hints      # leave the key-hint pills out of the screens (sets HINTS=off in /etc/material-grub.conf)
+#   sudo ./install.sh --style list    # rail (default) | clean | list      --no-hints  no key-hint pills      --no-cookie / --no-logo  hide the cookie / only the firmware logo
+#   sudo ./install.sh                 # in a terminal, missing choices (resolution, style, scheme, ...) are asked in a TUI; --no-tui or --yes skips it, --tui forces it
 #   sudo ./install.sh --prebuilt      # download the release's prebuilt theme (no build tools, no pip; checksum verified)
 #   sudo ./install.sh --uninstall
+#   Runtime options (STYLE, HINTS, COOKIE, LOGO) go to /etc/material-grub.conf and can be changed later without rebuilding: sudo material-grub-apply
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
 #            --keep-build  keep the temporary build dir     --force  ignore the NixOS check
 #            --immutable  use the ostree/bootc layout (automatic when /run/ostree-booted exists)   --yes  do not ask for confirmation
 #            --pkg DIR  install a package built elsewhere   --dist-out DIR  with --stage-only: copy the built package to DIR
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-RES=""; SCHEME=dark; IMM=0; YES=0; HINTS=1; DL=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
+RES=""; SCHEME=dark; SCHEME_SET=0; STYLE=""; COOKIE=""; LOGO=""; HINTS=1; HINTS_SET=0; TUIMODE=auto; IMM=0; YES=0; DL=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
 while [ $# -gt 0 ]; do
   case $1 in
     --res) RES=${2:?--res needs WxH}; shift;;
-    --scheme) SCHEME=${2:?--scheme needs light or dark}; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
+    --style) STYLE=${2:?--style needs rail, clean or list}; shift; case $STYLE in rail|clean|list) ;; *) echo "--style must be rail, clean or list" >&2; exit 2;; esac;;
+    --cookie) COOKIE=on;; --no-cookie) COOKIE=off;; --logo) LOGO=on;; --no-logo) LOGO=off;; --hints) HINTS=1; HINTS_SET=1;; --tui) TUIMODE=force;; --no-tui) TUIMODE=no;;
+    --scheme) SCHEME=${2:?--scheme needs light or dark}; SCHEME_SET=1; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
     --immutable) IMM=1;; --yes|-y) YES=1;; --pkg) PREBUILT=${2:?--pkg needs a directory}; shift;; --dist-out) DISTOUT=${2:?--dist-out needs a directory}; shift;;
-    --no-hints) HINTS=0;; --prebuilt) DL=1;;
+    --no-hints) HINTS=0; HINTS_SET=1;; --prebuilt) DL=1;;
     --no-deps) DEPS=0;; --stage-only) STAGE=1;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
-    -h|--help) sed -n 2,13p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    -h|--help) sed -n 2,15p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2;;
   esac; shift
 done
@@ -75,6 +79,38 @@ fi
 [ "$UNINSTALL" = 1 ] && exec sh "$HERE/install/uninstall.sh"
 [ -e /etc/NIXOS ] && [ "$FORCE" = 0 ] && die "NixOS manages GRUB declaratively; this installer does not support it."
 [ -e /run/ostree-booted ] && IMM=1
+# ---------- questions (TUI) ----------
+CONFSETS=""; TUIRAN=0
+want_tui() {
+  [ "$TUIMODE" != no ] && [ "$YES" = 0 ] && [ -t 0 ] && [ -t 1 ] && command -v python3 >/dev/null 2>&1 || return 1
+  [ "$TUIMODE" = force ] && return 0
+  [ "$STAGE" = 0 ] && { [ -z "$RES" ] || [ -z "$STYLE" ] || [ "$SCHEME_SET" = 0 ]; }
+}
+if want_tui; then
+  ANS=$(mktemp /var/tmp/material-grub-tui.XXXXXX); PRE=""
+  [ -n "$RES" ] && PRE="$PRE --preset RES=$RES"; [ -n "$STYLE" ] && PRE="$PRE --preset STYLE=$STYLE"; [ "$SCHEME_SET" = 1 ] && PRE="$PRE --preset SCHEME=$SCHEME"
+  [ -n "$COOKIE" ] && PRE="$PRE --preset COOKIE=$COOKIE"; [ -n "$LOGO" ] && PRE="$PRE --preset LOGO=$LOGO"
+  [ "$HINTS_SET" = 1 ] && PRE="$PRE --preset HINTS=$( [ "$HINTS" = 1 ] && echo on || echo off )"
+  OFFER=""; [ "$DL" = 0 ] && [ -z "$PREBUILT" ] && OFFER=--prebuilt-ok
+  IMMQ=""; [ "$IMM" = 1 ] && [ "$STAGE" = 0 ] && IMMQ=--immutable
+  # shellcheck disable=SC2086
+  python3 "$HERE/install/tui.py" --out "$ANS" $PRE $OFFER $IMMQ || { rm -f "$ANS"; die "cancelled, nothing was changed"; }
+  sed 's/^/A_/' "$ANS" > "$ANS.sh"; . "$ANS.sh"; rm -f "$ANS" "$ANS.sh"
+  [ -n "${A_RES:-}" ] && RES=$A_RES; [ -n "${A_STYLE:-}" ] && STYLE=$A_STYLE; [ -n "${A_SCHEME:-}" ] && { SCHEME=$A_SCHEME; SCHEME_SET=1; }
+  [ -n "${A_COOKIE:-}" ] && COOKIE=$A_COOKIE; [ -n "${A_LOGO:-}" ] && LOGO=$A_LOGO
+  [ -n "${A_HINTS:-}" ] && { [ "$A_HINTS" = off ] && HINTS=0 || HINTS=1; HINTS_SET=1; }
+  [ "${A_SOURCE:-}" = prebuilt ] && DL=1; [ "${A_IMMUTABLE:-}" = yes ] && YES=1
+  for k in RAW_NAME COUNTDOWN; do eval "v=\${A_$k:-}"; [ -n "$v" ] && [ "$v" = off ] && CONFSETS="$CONFSETS --set $k=off"; done
+  [ -n "${A_TIMEOUT:-}" ] && CONFSETS="$CONFSETS --set TIMEOUT=$A_TIMEOUT"
+  TUIRAN=1
+fi
+[ -n "$STYLE" ] && CONFSETS="$CONFSETS --set STYLE=$STYLE"
+[ -n "$COOKIE" ] && CONFSETS="$CONFSETS --set COOKIE=$COOKIE"
+[ "$COOKIE" = off ] && LOGO=off
+[ -n "$LOGO" ] && CONFSETS="$CONFSETS --set LOGO=$LOGO"
+[ "$HINTS_SET" = 1 ] && CONFSETS="$CONFSETS --set HINTS=$( [ "$HINTS" = 1 ] && echo on || echo off )"
+[ "$SCHEME_SET" = 1 ] && CONFSETS="$CONFSETS --set SCHEME=$SCHEME"
+[ -z "$CONFSETS" ] || info "settings for /etc/material-grub.conf:$(echo $CONFSETS | sed 's/--set / /g')"
 if [ "$IMM" = 1 ] && [ "$STAGE" = 0 ]; then
   warn "immutable (ostree/bootc) system: using the immutable layout. Support for it is EXPERIMENTAL and could not be tested on a real ostree boot."
   cat <<MSG
@@ -164,7 +200,7 @@ detect_res() {
   [ -n "$best" ] && { echo "$best"; return; }
   echo 1920x1080
 }
-if [ -n "$RES" ]; then info "resolution: $RES (from --res)"; else RES=$(detect_res); info "resolution: $RES (auto-detected)"; fi
+if [ -n "$RES" ]; then info "resolution: $RES ($( [ "$TUIRAN" = 1 ] && echo chosen || echo from --res))"; else RES=$(detect_res); info "resolution: $RES (auto-detected)"; fi
 # the bundle to build: the exact resolution if supported, else the closest aspect ratio, then the closest height (same rule as material-grub-assemble)
 BUILD_RES=$(python3 -c 'import sys
 a="1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split(); w,h=map(int,sys.argv[1].split("x"))
@@ -238,7 +274,7 @@ fi
 
 # ---------- [5/6] install ----------
 step "Installing into GRUB"
-sh "$HERE/install/install.sh" --res "$RES" --pkg "$DIST" $( [ "$IMM" = 1 ] && echo --immutable ) $( [ "$HINTS" = 0 ] && echo --set HINTS=off )
+sh "$HERE/install/install.sh" --res "$RES" --pkg "$DIST" $( [ "$IMM" = 1 ] && echo --immutable ) $CONFSETS
 
 # ---------- [6/6] done ----------
 step "Finished"
