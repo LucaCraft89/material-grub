@@ -29,7 +29,7 @@ classes = json.loads((pkg / "classes.json").read_text())
 for key, names in classes.items():
     src = pkg / "scenes" / aspect / "icons" / f"{names[0]}.png"
     for n in names: shutil.copyfile(src, tmp / "icons" / f"{n}.png")
-if conf["LOGO"] == "on": subprocess.run([sys.executable, str(pkg / "bin/bgrt-logo.py"), str(tmp / "machine-logo.png"), "--size", (res / "logo_size").read_text().strip()],
+if conf["LOGO"] == "on" and conf["COOKIE"] == "on": subprocess.run([sys.executable, str(pkg / "bin/bgrt-logo.py"), str(tmp / "machine-logo.png"), "--size", (res / "logo_size").read_text().strip()],
                check=False, stdout=subprocess.DEVNULL)
 shutil.rmtree(out, ignore_errors=True); os.replace(tmp, out)
 print(best)

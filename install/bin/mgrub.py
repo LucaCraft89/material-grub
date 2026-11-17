@@ -40,7 +40,8 @@ def kind_of(title, key, is_submenu=False):
     return "kernel"
 
 
-CONF_DEFAULTS = {"RAW_NAME": "on", "COUNTDOWN": "on", "LOGO": "on", "TIMEOUT": ""}
+CONF_DEFAULTS = {"RAW_NAME": "on", "COUNTDOWN": "on", "LOGO": "on", "COOKIE": "on", "HINTS": "on", "STYLE": "rail", "SCHEME": "dark", "TIMEOUT": ""}
+CONF_CHOICES = {"STYLE": ("rail", "clean", "list"), "SCHEME": ("dark", "light")}
 def load_conf(path=None):
     """/etc/material-grub.conf: KEY=value lines, '#' comments. Unknown keys and bad values are ignored (never fatal in a boot-config path)."""
     import os
@@ -51,14 +52,15 @@ def load_conf(path=None):
             if not m or m[1] not in c: continue
             k, v = m[1], m[2].strip()
             if k == "TIMEOUT": c[k] = v if v.isdigit() else ""
+            elif k in CONF_CHOICES: c[k] = v.lower() if v.lower() in CONF_CHOICES[k] else c[k]
             elif v.lower() in ("on", "off", "yes", "no", "true", "false", "1", "0"): c[k] = "on" if v.lower() in ("on", "yes", "true", "1") else "off"
     except OSError: pass
     return c
 
 def apply_conf_to_theme(text, conf):
-    """Drop the '# mg:begin NAME' .. '# mg:end NAME' blocks of theme.txt that the config switches off."""
+    """Drop the '# mg:begin NAME' .. '# mg:end NAME' blocks of theme.txt that the config switches off (no cookie also means no logo in it)."""
     for key, name in (("RAW_NAME", "raw"), ("COUNTDOWN", "countdown"), ("LOGO", "logo")):
-        if conf[key] == "off": text = re.sub(rf"(?ms)^# mg:begin {name}\n.*?^# mg:end {name}\n", "", text)
+        if conf[key] == "off" or (name == "logo" and conf["COOKIE"] == "off"): text = re.sub(rf"(?ms)^# mg:begin {name}\n.*?^# mg:end {name}\n", "", text)
     return text
 
 

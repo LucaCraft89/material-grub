@@ -65,6 +65,15 @@ class Conf(unittest.TestCase):
         t = "a\n# mg:begin raw\nX\n# mg:end raw\n# mg:begin logo\nY\n# mg:end logo\nb\n"
         self.assertEqual(mgrub.apply_conf_to_theme(t, c), "a\n# mg:begin logo\nY\n# mg:end logo\nb\n")
 
+    def test_new_keys(self):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile("w", suffix=".conf", delete=False) as f: f.write("STYLE=List\nHINTS=off\nCOOKIE=no\nSCHEME=sepia\n"); n = f.name
+        c = mgrub.load_conf(n); os.unlink(n)
+        self.assertEqual((c["STYLE"], c["HINTS"], c["COOKIE"], c["SCHEME"]), ("list", "off", "off", "dark"))   # bad SCHEME ignored
+        d = mgrub.load_conf("/nonexistent"); self.assertEqual((d["STYLE"], d["HINTS"], d["COOKIE"]), ("rail", "on", "on"))
+        t = "# mg:begin logo\nY\n# mg:end logo\nb\n"
+        self.assertEqual(mgrub.apply_conf_to_theme(t, c), "b\n", "COOKIE=off removes the logo block too")
+
 class Catalog(unittest.TestCase):
     def test_catalog(self):
         sys.path.insert(0, str(ROOT / "scripts")); import catalog as C

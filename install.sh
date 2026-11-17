@@ -4,7 +4,7 @@
 #   sudo ./install.sh                 # auto-detects resolution, installs missing dependencies, builds and installs
 #   sudo ./install.sh --res 1920x1200 # force a resolution
 #   sudo ./install.sh --scheme light  # light Material 3 scheme instead of the default dark one
-#   sudo ./install.sh --no-hints      # leave the key-hint pills out of the screens
+#   sudo ./install.sh --no-hints      # leave the key-hint pills out of the screens (sets HINTS=off in /etc/material-grub.conf)
 #   sudo ./install.sh --prebuilt      # download the release's prebuilt theme (no build tools, no pip; checksum verified)
 #   sudo ./install.sh --uninstall
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
@@ -180,7 +180,6 @@ trap cleanup EXIT
 info "build directory: $BUILD (your clone stays untouched)"
 DIST=$BUILD/dist/material-grub
 if [ "$DL" = 1 ] && [ -z "$PREBUILT" ]; then
-  [ "$HINTS" = 1 ] || die "--prebuilt has no --no-hints variant: build from source instead."
   VER=$(cat "$HERE/VERSION" 2>/dev/null) || die "VERSION file missing"
   BASE=${MG_RELEASE_URL:-https://github.com/LucaCraft89/material-grub/releases/download/v$VER}
   ASSET=material-grub-$VER-$BUILD_RES-$SCHEME.tar.gz
@@ -205,7 +204,7 @@ elif [ "$VIA_CONTAINER" = 1 ]; then
   mkdir -p "$BUILD/out"; CIMG=${MG_BUILD_IMAGE:-registry.fedoraproject.org/fedora:latest}
   info "image: $CIMG (pulled once; its own output follows). The container installs the build tools and renders the theme."
   podman run --rm --security-opt label=disable -v "$HERE":/src:ro -v "$BUILD/out":/out "$CIMG" \
-    sh -c "cd /src && ./install.sh --stage-only --res '$BUILD_RES' --scheme '$SCHEME' $( [ "$HINTS" = 0 ] && echo --no-hints ) --dist-out /out" || die "container build failed (log above)."
+    sh -c "cd /src && ./install.sh --stage-only --res '$BUILD_RES' --scheme '$SCHEME' --dist-out /out" || die "container build failed (log above)."
   DIST=$BUILD/out/material-grub; [ -d "$DIST/res" ] || die "container build produced no package."
   ok "package built in the container: $DIST"
 else
@@ -223,7 +222,7 @@ else
   info "colour scheme: $SCHEME"
   info "drawing the scene set for $BUILD_RES (native 2160-high design for 4K-class screens), then its theme bundle"
   GSF_FONT=$(ls "$BUILD"/fonts/GoogleSansFlex*.ttf | head -n1); export GSF_FONT PYTHONUNBUFFERED=1
-  .venv/bin/python scripts/package.py --res "$BUILD_RES" --scheme "$SCHEME" $( [ "$HINTS" = 0 ] && echo --no-hints ) >build.log 2>&1 &
+  .venv/bin/python scripts/package.py --res "$BUILD_RES" --scheme "$SCHEME" >build.log 2>&1 &
   PKGPID=$!
   sleep 3; ITEMS=$(sed -n 's/^total \([0-9][0-9]*\)$/\1/p' build.log | head -n1); ITEMS=${ITEMS:-109}
   wait_job "$PKGPID" build.log "rendering scenes" "$ITEMS" || { tail -n 25 build.log >&2; die "Build failed (log above)."; }
@@ -239,7 +238,7 @@ fi
 
 # ---------- [5/6] install ----------
 step "Installing into GRUB"
-sh "$HERE/install/install.sh" --res "$RES" --pkg "$DIST" $( [ "$IMM" = 1 ] && echo --immutable )
+sh "$HERE/install/install.sh" --res "$RES" --pkg "$DIST" $( [ "$IMM" = 1 ] && echo --immutable ) $( [ "$HINTS" = 0 ] && echo --set HINTS=off )
 
 # ---------- [6/6] done ----------
 step "Finished"

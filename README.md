@@ -143,7 +143,7 @@ sudo ./install.sh --keep-build      # keep the temporary build directory
 sudo ./install.sh --uninstall       # remove the theme and hooks
 ```
 
-**Prebuilt themes:** each release attaches the theme for every supported resolution and both schemes plus `SHA256SUMS` (built by `.github/workflows/release.yml` when a `vX.Y.Z` tag is pushed; the tag must equal `VERSION`). `--prebuilt` downloads the matching one, verifies the checksum and installs it. It is opt-in because the package contains scripts that run as root and the checksum comes from the same release (it guards against corruption, not a compromised release). There is no `--no-hints` variant. This is the easiest route on immutable systems. Until the first release that contains the assets is published, `--prebuilt` reports a download error; the release workflow itself has not run yet.
+**Prebuilt themes:** each release attaches the theme for every supported resolution and both schemes plus `SHA256SUMS` (built by `.github/workflows/release.yml` when a `vX.Y.Z` tag is pushed; the tag must equal `VERSION`). `--prebuilt` downloads the matching one, verifies the checksum and installs it. It is opt-in because the package contains scripts that run as root and the checksum comes from the same release (it guards against corruption, not a compromised release). `--no-hints` works with it too, because the hints are drawn at install time. This is the easiest route on immutable systems. Until the first release that contains the assets is published, `--prebuilt` reports a download error; the release workflow itself has not run yet.
 
 **Supported resolutions:** `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `2880x1800`, `3440x1440`, `3840x1080`, `3840x1600`, `3840x2160`, `5120x1440`, `5120x2160`.
 Anything else snaps to the closest aspect ratio. The scene sets are 16:9, 16:10, 21:9 and 32:9; screens at least 1800 px high use a 2160-high set
@@ -190,7 +190,7 @@ What was tested: the whole flow in a container with a read-only `/usr` and a sim
 
 ## Customising
 
-- **Runtime options:** `/etc/material-grub.conf` (`RAW_NAME`, `COUNTDOWN`, `LOGO`, `TIMEOUT`); apply with `sudo material-grub-apply`. Key-hint pills are baked into the scenes: `sudo ./install.sh --no-hints`.
+- **Runtime options:** `/etc/material-grub.conf` (`RAW_NAME`, `COUNTDOWN`, `LOGO`, `COOKIE`, `HINTS`, `TIMEOUT`, `STYLE`); apply with `sudo material-grub-apply`. The top-right cookie and the key-hint pills are drawn at install/apply time, not baked into the downloaded images, so they are switchable without a rebuild (`sudo ./install.sh --no-hints` writes `HINTS=off`). Only the colour scheme is still a build choice.
 
 - **Seed colours, names, aliases:** `scripts/catalog.py` is the single source of truth. Colours marked `proposed` are hand-picked, not official, and are happy to be changed (open a PR). Rebuild with `make package`.
 - **Add a distro:** add a row to `catalog.py` (key, title, subtitle, glyph, seed colour, aliases); the full guide is [docs/adding-a-distro.md](docs/adding-a-distro.md). Unknown distros already fall back to Tux.

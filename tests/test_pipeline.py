@@ -47,6 +47,28 @@ class Pipeline(unittest.TestCase):
         for gone in ('id = "__timeout__"', "machine-logo.png", 'item_height = 34'): self.assertNotIn(gone, th)
         self.assertIn("boot_menu", th); self.assertIn("set timeout=9", self.cfg.read_text())
         self.assertFalse((self.boot / "grub2/themes/material/machine-logo.png").exists())
+    def test_menu_order_and_unique_plain_classes(self):
+        self.cfg.write_text(STATIC + "menuentry 'Windows Boot Manager (on /dev/sda1)' { true }\nmenuentry 'Windows Boot Manager (on /dev/sdb1)' { true }\n")
+        self.run_all(); menu = json.loads((self.state.parent / "menu.json").read_text()); ents = {e["class"]: e for e in json.loads(self.state.read_text())}
+        top = [ents[c] for c in menu[0]["items"]]
+        self.assertEqual([e["kind"] for e in top], ["kernel", "advanced", "plain", "plain", "plain", "plain"], "default kernel, Advanced, then the grub.cfg entries in file order")
+        self.assertEqual(len({e["class"] for e in top}), 6, "plain entries (two Windows installs) need unique classes")
+        self.assertEqual(menu[1]["level"], "adv"); self.assertEqual(menu[1]["parent"], top[1]["class"]); self.assertEqual(len(menu[1]["items"]), 1)
+        t = self.cfg.read_text(); self.assertIn("--class windows11", t); self.assertIn(f"--class {top[2]['class']} --class windows11", t)
+    def test_runtime_cookie_and_hints(self):      # cookie and hint pills are drawn at config time: conf switches change the scenes, the build-time bg has neither
+        from PIL import Image, ImageChops
+        def scene(conf_text):
+            conf = self.d / "m.conf"; conf.write_text(conf_text); os.environ["MATERIAL_CONF"] = str(conf)
+            try: self.run_all()
+            finally: del os.environ["MATERIAL_CONF"]
+            return Image.open(next((self.boot / "grub2/themes/material/icons").glob("mg_*.png"))).convert("RGB")
+        full = scene(""); nohint = scene("HINTS=off\n"); nocookie = scene("COOKIE=off\n"); neither = scene("HINTS=off\nCOOKIE=off\n")
+        W, H = full.size
+        self.assertIsNotNone(ImageChops.difference(full, nohint).getbbox()); self.assertIsNotNone(ImageChops.difference(full, nocookie).getbbox())
+        self.assertGreater(ImageChops.difference(full, nohint).getbbox()[1], H * 0.8, "hints are at the bottom")
+        self.assertGreater(ImageChops.difference(full, nocookie).getbbox()[0], W * 0.8, "cookie is top right")
+        bg = Image.open(sorted((PKG / "scenes/16x9/bg").glob("fedora.png"))[0]).convert("RGB")
+        self.assertEqual(bg.getpixel((W - 150, 140)), bg.getpixel((W // 2, 40)), "the build-time bg must not carry the cookie")
     def test_non_latin_titles(self):      # pills fall back to another installed font; the theme ships GRUB's unicode.pf2 when the system has it
         (self.entries / "ostree-4-fedora.conf").write_text(ENTRY.format(v="44.1", n=4).replace("(Silverblue)", "(Рабочая станция 日本語)"))
         self.run_all(); self.assertTrue(any((self.boot / "grub2/themes/material/icons").glob("mg_*.png")))

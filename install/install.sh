@@ -1,11 +1,12 @@
 #!/bin/sh
-# usage: sudo ./install.sh [--res WxH] [--dest DIR] [--no-run] [--immutable]   (DESTDIR-style staging with --dest)
+# usage: sudo ./install.sh [--res WxH] [--dest DIR] [--no-run] [--immutable] [--set KEY=value]...   (DESTDIR-style staging with --dest)
+#   --set: write KEY=value into /etc/material-grub.conf (STYLE, HINTS, COOKIE, LOGO, ...); the file itself is otherwise never overwritten
 #   --immutable: ostree/bootc layout. Nothing goes under /usr: package, venv and the postprocess script live in /var/lib/material-grub,
 #                hooks are applied directly to the static grub.cfg instead of through grub-mkconfig.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd); PKG=$HERE/../dist/material-grub
-D=""; RES=""; RUN=1; PKGARG=""; IMM=0
-while [ $# -gt 0 ]; do case $1 in --dest) D=$2; shift;; --res) RES=$2; shift;; --pkg) PKGARG=$2; shift;; --no-run) RUN=0;; --immutable) IMM=1;; esac; shift; done
+D=""; RES=""; RUN=1; PKGARG=""; IMM=0; SETS=""
+while [ $# -gt 0 ]; do case $1 in --dest) D=$2; shift;; --res) RES=$2; shift;; --pkg) PKGARG=$2; shift;; --no-run) RUN=0;; --immutable) IMM=1;; --set) SETS="$SETS $2"; shift;; esac; shift; done
 [ -n "$PKGARG" ] && PKG=$PKGARG
 [ -d "$PKG" ] || { echo "run scripts/package.py first"; exit 1; }
 
@@ -40,6 +41,10 @@ else
   install -m644 "$HERE"/systemd/material-grub.* "$D/etc/systemd/system/"
 fi
 [ -e "$D/etc/material-grub.conf" ] || install -m644 "$HERE/material-grub.conf" "$D/etc/material-grub.conf"     # never overwrite the user's settings
+for kv in $SETS; do      # explicit --set choices (installer flags / TUI): replace the sample line or the existing value, else append
+  k=${kv%%=*}; v=${kv#*=}; f="$D/etc/material-grub.conf"
+  if grep -q "^#\{0,1\}$k=" "$f"; then sed -i "s|^#\{0,1\}$k=.*|$k=$v|" "$f"; else echo "$k=$v" >> "$f"; fi
+done
 if [ -z "$D" ]; then
   B=/var/backups/material-grub; mkdir -p "$B"
   [ -f "$B/default-grub.orig" ] || { [ -f /etc/default/grub ] && cp -a /etc/default/grub "$B/default-grub.orig" || true; }
