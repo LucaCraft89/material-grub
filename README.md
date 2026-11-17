@@ -29,76 +29,13 @@ sectioned icon rail keeps you oriented. All text is set in [Google Sans Flex](ht
 - **Raw entry title, always visible** (small, muted) at the bottom of the screen, so it is obvious what GRUB actually sees if parsing ever goes wrong.
 - **Case-insensitive name matching.** Entry titles are matched to a distro by name, not only by GRUB's `--class`. Unknown Linux falls back to Tux; an unknown Windows version falls back to Windows 11.
 - **Many screens, one package.** Scenes are rendered per aspect ratio (16:9, 16:10, 21:9, 32:9) and a tiny `theme.txt` is generated per resolution: 1280×720, 1920×1080, 1920×1200, 2560×1080, 2560×1440, 2880×1800, 3440×1440, 3840×1080, 3840×1600, 3840×2160, 5120×1440, 5120×2160. Screens 1800 or more pixels high (4K, 2880×1800, 5120×2160) get **native 2160-high scenes** instead of an upscaled 1080 design, so text, glyphs and the rail stay sharp.
-- **Dark (default) or light.** `sudo ./install.sh --scheme light` builds the light Material 3 Expressive scheme: neutral countdown, raw-name and progress colours, the desktop colour and the rail glyphs switch with it (contrast checked: all text at least 5:1; see the [gallery](#gallery)).
+- **Dark (default) or light.** `sudo ./install.sh --scheme light` builds the light Material 3 Expressive scheme: neutral countdown, raw-name and progress colours, the desktop colour and the rail glyphs switch with it (contrast checked: all text at least 5:1; see the [gallery](docs/gallery.md)).
 - **Non-Latin names.** The bundled font is Latin (incl. Latin Extended and Vietnamese). Cyrillic, Greek, CJK and other titles use GRUB's own `unicode.pf2` as glyph fallback in the menu line, and any installed system font (via fontconfig) in the info pills.
 - **Menu always visible.** Fedora hides the GRUB menu after a successful boot; the installer keeps it on screen.
 
 ## Gallery
 
-<table>
-<tr>
-<td><img src="docs/screenshots/advanced.png" alt="Advanced options entry with gear icon"></td>
-<td><img src="docs/screenshots/rescue.png" alt="Rescue entry with wrench icon"></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/windows.png" alt="Windows 11 entry"></td>
-<td><img src="docs/screenshots/arch.png" alt="Arch Linux entry"></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/ubuntu.png" alt="Ubuntu entry"></td>
-<td><img src="docs/screenshots/firmware.png" alt="UEFI Firmware Settings entry"></td>
-</tr>
-</table>
-
-Light scheme (`sudo ./install.sh --scheme light`):
-
-<table>
-<tr>
-<td><img src="docs/screenshots/light-fedora.png" alt="Fedora entry, light scheme"></td>
-<td><img src="docs/screenshots/light-windows.png" alt="Windows 11 entry, light scheme"></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/light-arch.png" alt="Arch Linux entry, light scheme"></td>
-<td><img src="docs/screenshots/light-ubuntu.png" alt="Ubuntu entry, light scheme"></td>
-</tr>
-</table>
-
-<img src="docs/screenshots/light-ultrawide-fedora.png" alt="Ultrawide 21:9 layout, light scheme" width="100%">
-
-Ultrawide (2560×1080):
-
-<img src="docs/screenshots/ultrawide-fedora.png" alt="Ultrawide 21:9 layout" width="100%">
-
-<sub>All screenshots are real GRUB output, captured in QEMU + OVMF with `make screenshots`. The Dell logo is this author's firmware logo.</sub>
-
-## Supported distros
-
-Entries are matched by name and GRUB class; each distro gets its own colour, logo and name. The samples below are rendered from the theme code and kept in sync by CI.
-
-<!-- distros:begin -->
-<details><summary>All 54 supported distros and system entries (rendered from the theme code)</summary>
-
-<table>
-<tr><td align="center"><img src="docs/distros/fedora.png" width="200" alt="Fedora"><br><sub>Fedora</sub></td><td align="center"><img src="docs/distros/nobara.png" width="200" alt="Nobara"><br><sub>Nobara</sub></td><td align="center"><img src="docs/distros/bazzite.png" width="200" alt="Bazzite"><br><sub>Bazzite</sub></td><td align="center"><img src="docs/distros/ubuntu.png" width="200" alt="Ubuntu"><br><sub>Ubuntu</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/kubuntu.png" width="200" alt="Kubuntu"><br><sub>Kubuntu</sub></td><td align="center"><img src="docs/distros/debian.png" width="200" alt="Debian"><br><sub>Debian</sub></td><td align="center"><img src="docs/distros/devuan.png" width="200" alt="Devuan"><br><sub>Devuan</sub></td><td align="center"><img src="docs/distros/kali.png" width="200" alt="Kali Linux"><br><sub>Kali Linux</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/parrot.png" width="200" alt="Parrot OS"><br><sub>Parrot OS</sub></td><td align="center"><img src="docs/distros/tails.png" width="200" alt="Tails"><br><sub>Tails</sub></td><td align="center"><img src="docs/distros/mxlinux.png" width="200" alt="MX Linux"><br><sub>MX Linux</sub></td><td align="center"><img src="docs/distros/deepin.png" width="200" alt="Deepin"><br><sub>Deepin</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/zorin.png" width="200" alt="Zorin OS"><br><sub>Zorin OS</sub></td><td align="center"><img src="docs/distros/linuxmint.png" width="200" alt="Linux Mint"><br><sub>Linux Mint</sub></td><td align="center"><img src="docs/distros/elementary.png" width="200" alt="elementary OS"><br><sub>elementary OS</sub></td><td align="center"><img src="docs/distros/pop.png" width="200" alt="Pop!_OS"><br><sub>Pop!_OS</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/arch.png" width="200" alt="Arch Linux"><br><sub>Arch Linux</sub></td><td align="center"><img src="docs/distros/endeavouros.png" width="200" alt="EndeavourOS"><br><sub>EndeavourOS</sub></td><td align="center"><img src="docs/distros/manjaro.png" width="200" alt="Manjaro"><br><sub>Manjaro</sub></td><td align="center"><img src="docs/distros/garuda.png" width="200" alt="Garuda Linux"><br><sub>Garuda Linux</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/artix.png" width="200" alt="Artix Linux"><br><sub>Artix Linux</sub></td><td align="center"><img src="docs/distros/arcolinux.png" width="200" alt="ArcoLinux"><br><sub>ArcoLinux</sub></td><td align="center"><img src="docs/distros/archcraft.png" width="200" alt="Archcraft"><br><sub>Archcraft</sub></td><td align="center"><img src="docs/distros/cachyos.png" width="200" alt="CachyOS"><br><sub>CachyOS</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/biglinux.png" width="200" alt="BigLinux"><br><sub>BigLinux</sub></td><td align="center"><img src="docs/distros/opensuse.png" width="200" alt="openSUSE"><br><sub>openSUSE</sub></td><td align="center"><img src="docs/distros/nixos.png" width="200" alt="NixOS"><br><sub>NixOS</sub></td><td align="center"><img src="docs/distros/gentoo.png" width="200" alt="Gentoo"><br><sub>Gentoo</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/void.png" width="200" alt="Void Linux"><br><sub>Void Linux</sub></td><td align="center"><img src="docs/distros/alpine.png" width="200" alt="Alpine"><br><sub>Alpine</sub></td><td align="center"><img src="docs/distros/slackware.png" width="200" alt="Slackware"><br><sub>Slackware</sub></td><td align="center"><img src="docs/distros/solus.png" width="200" alt="Solus"><br><sub>Solus</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/mageia.png" width="200" alt="Mageia"><br><sub>Mageia</sub></td><td align="center"><img src="docs/distros/puppy.png" width="200" alt="Puppy Linux"><br><sub>Puppy Linux</sub></td><td align="center"><img src="docs/distros/vanilla.png" width="200" alt="Vanilla OS"><br><sub>Vanilla OS</sub></td><td align="center"><img src="docs/distros/sabayon.png" width="200" alt="Sabayon"><br><sub>Sabayon</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/openwrt.png" width="200" alt="OpenWrt"><br><sub>OpenWrt</sub></td><td align="center"><img src="docs/distros/postmarketos.png" width="200" alt="postmarketOS"><br><sub>postmarketOS</sub></td><td align="center"><img src="docs/distros/qubes.png" width="200" alt="Qubes OS"><br><sub>Qubes OS</sub></td><td align="center"><img src="docs/distros/neon.png" width="200" alt="KDE neon"><br><sub>KDE neon</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/rocky.png" width="200" alt="Rocky Linux"><br><sub>Rocky Linux</sub></td><td align="center"><img src="docs/distros/almalinux.png" width="200" alt="AlmaLinux"><br><sub>AlmaLinux</sub></td><td align="center"><img src="docs/distros/centos.png" width="200" alt="CentOS"><br><sub>CentOS</sub></td><td align="center"><img src="docs/distros/rhel.png" width="200" alt="Red Hat"><br><sub>Red Hat</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/freebsd.png" width="200" alt="FreeBSD"><br><sub>FreeBSD</sub></td><td align="center"><img src="docs/distros/openbsd.png" width="200" alt="OpenBSD"><br><sub>OpenBSD</sub></td><td align="center"><img src="docs/distros/guix.png" width="200" alt="GNU Guix"><br><sub>GNU Guix</sub></td><td align="center"><img src="docs/distros/raspberrypi.png" width="200" alt="Raspberry Pi OS"><br><sub>Raspberry Pi OS</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/tux.png" width="200" alt="Linux"><br><sub>Linux</sub></td><td align="center"><img src="docs/distros/windows11.png" width="200" alt="Windows 11"><br><sub>Windows 11</sub></td><td align="center"><img src="docs/distros/windows10.png" width="200" alt="Windows 10"><br><sub>Windows 10</sub></td><td align="center"><img src="docs/distros/firmware.png" width="200" alt="Firmware"><br><sub>Firmware</sub></td></tr>
-<tr><td align="center"><img src="docs/distros/reboot.png" width="200" alt="Restart"><br><sub>Restart</sub></td><td align="center"><img src="docs/distros/shutdown.png" width="200" alt="Shut down"><br><sub>Shut down</sub></td></tr>
-</table>
-
-Full table with the matched names: [docs/distros.md](docs/distros.md). Not listed? [Request your distro](https://github.com/LucaCraft89/material-grub/issues/new?template=distro_request.yml).
-
-</details>
-<!-- distros:end -->
+Screenshots of every style, the light scheme and the ultrawide layout, plus a rendered sample of all 54 supported distros: **[docs/gallery.md](docs/gallery.md)**. Using a Ventoy stick? See **[docs/ventoy.md](docs/ventoy.md)**.
 
 ## How it works (and what GRUB cannot do)
 
@@ -203,19 +140,13 @@ The Google Sans Flex font is bundled in `fonts/` (SIL OFL 1.1, unmodified upstre
 
 ### Ventoy
 
-The theme also works on a [Ventoy](https://www.ventoy.net) USB stick: same styles (`rail`, `clean`, `list`), dark and light, cookie, hints. Ventoy builds its menu at boot from the files on the stick, so the theme is **dynamic**: it recognises distros by ISO file name (colour, logo and name on the scene; the name shown for each ISO is its raw file name), and you can add, remove or rename ISOs on any computer without installing again. The cookie shows a static "V" instead of the firmware logo.
+The same theme works on a [Ventoy](https://www.ventoy.net) USB stick (all three styles, dark and light), and it follows the ISOs on the stick without installing again: add, rename or remove files on any computer. No root needed:
 
 ```sh
-./install.sh --ventoy                                   # a TUI asks for the stick (detected, mounted or not), resolutions, style, scheme ...
-./install.sh --ventoy /run/media/$USER/Ventoy --res 1920x1080,2560x1440 --style list --yes
-./install.sh --uninstall --ventoy /run/media/$USER/Ventoy
+./install.sh --ventoy        # a TUI picks the stick, resolutions, style and scheme
 ```
 
-It needs no root (only write access to the stick; use `sudo` if you want it to install missing build dependencies), merges into `/ventoy/ventoy.json` (your own `menu_class` rules stay first, a backup is written) and keeps its options in `/ventoy/material-grub.conf`. Several `--res` values add one theme per size; Ventoy starts in the first and switches theme when you change the resolution (F5 Tools -> Resolution Configuration). To change style, scheme or resolutions, run the installer again.
-
-`--mode snapshot` instead renders the exact list (icons, per-distro highlight colours, neighbours) for the ISOs that are on the stick right now; run the installer again after changing the files. In dynamic mode the list rows are drawn by GRUB itself, so the highlighted row is a neutral colour and rows have no icons; the `clean` style has no neighbour peeks.
-
-Status: verified in QEMU/OVMF with Ventoy 1.1.18, including adding, renaming and removing ISOs without re-running anything (`tests/ventoy_smoke.py`, also in CI). Not tried on real hardware, BIOS/legacy boot or other Ventoy versions; mounting a not-yet-mounted stick and the countdown/`TIMEOUT` are untested. Details and findings: [docs/plans/ventoy.md](docs/plans/ventoy.md).
+Everything about it (screenshots, options, how matching works, limits, what was tested): **[docs/ventoy.md](docs/ventoy.md)**.
 
 ### Other distros
 

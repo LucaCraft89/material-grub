@@ -9,6 +9,7 @@ Ventoy support.
 - Dynamic mode (default): nothing depends on the files on the stick. ~610 generic `menu_class` rules (every alias and title in four letter-cases) pick one pre-rendered scene per distro, Ventoy's F2-F5/tree menus have scenes too, and in the list style GRUB draws the rows itself (two synchronised native boot_menus), so ISOs can be added, renamed and removed on any computer. Snapshot mode renders the exact list for the files present at install time.
 - Verified in QEMU/OVMF with real Ventoy 1.1.18: all styles and both schemes, 28 ISOs with long/Cyrillic/Japanese names, F3 tree, F4, F5, 1920x1080 / 2560x1080 / 3840x2160 with `resolution_fit`, and `tests/ventoy_smoke.py` (install, then add/rename/remove ISOs without re-running: the right scenes appear and no file under /ventoy changes). Not verified: real hardware, BIOS boot, other Ventoy versions, mounting an unmounted stick, F2 browse, F6, countdown/`TIMEOUT` on Ventoy.
 - Fixed: the missing-glyph check used a cache keyed by `id(font)`, which Python reuses; non-Latin names could render as boxes. Fallback fonts that are variable (Noto) now use the pills' medium weight instead of their thinnest.
+- Docs: the README gallery and distro grid moved to `docs/gallery.md` (the generator and its CI check follow), and Ventoy has its own page, `docs/ventoy.md`, with screenshots; the README links to both.
 - New: folder and arrow_back glyphs (Material Icons, Apache-2.0), `MODE` config key, `docs/plans/ventoy.md`.
 
 ## 0.4.0 (2026-11-17)
