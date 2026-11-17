@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.0 (2026-11-17)
+
+Ventoy support, a fourth style for the PC, and the Pordenone Linux User Group scene.
+
+**Ventoy**
+- `install.sh --ventoy [MOUNTPOINT]` themes a Ventoy USB stick (no root needed; `--res A,B,C` for several screen sizes, `--mode dynamic|snapshot`, `--uninstall --ventoy MOUNTPOINT`). The TUI asks "this computer's GRUB or a Ventoy stick" first, then offers the detected sticks (`install/ventoy_sticks.py`: data partition found through its VTOYEFI sibling, mounted or not; an unmounted one is mounted for the copy and unmounted afterwards), resolutions, style, scheme, logo, hints and mode. A fresh Ventoy stick has no `/ventoy` folder, so the installer creates it.
+- Two styles. `full`: the ISO picker is one full-screen scene (distro logo, name, a pill with a disc icon and the real file name, the cookie with the real Ventoy logo, two small rounded arrows on the left that hint at scrolling; no rail, no neighbours, no key hints). `list`: the distro's logo and name on the left, the list on the right. In `full` every other Ventoy menu (F2 browse, F3 tree, F4 local boot, F5 tools, the boot-mode menu) is the list. `rail`, `clean` and `split` from older settings map to `full` / `list`.
+- `install/bin/material-grub-ventoy` does the work and merges into `/ventoy/ventoy.json` (user `menu_class` rules stay first, backup kept, uninstall removes only its own entries). Dark and light schemes, optional cookie, logo, key hints and raw file name.
+- Dynamic mode (default): nothing depends on the files on the stick. About 640 generic `menu_class` rules (every alias and title in four letter-cases) pick one pre-rendered scene per distro, and in the list style GRUB draws the rows itself, so ISOs can be added, renamed and removed on any computer. Snapshot mode renders the exact list for the files present at install time.
+- Ventoy's boot-mode menu (Enter on an image) is themed: Normal, GRUB2, WIMBOOT, Memdisk, File checksum and Back each get their own colour, background and icon.
+- PNLug: an image with `pnlug` in its name in any letter case (all 32 case combinations are written as rules, in front of everything else) gets the Pordenone Linux User Group's red and its horizontal logo on a white card.
+- A file nothing recognises gets a neutral gray "Disk image" scene with a disc icon. More file-name hints (MX, LMDE, Leap, Gentoo, Puppy, OpenBSD, Windows media names); `tests/iso_names.txt` checks about 150 realistic names.
+- How the full-screen picker coexists with the list: GRUB's list lies below the scene; the scenes of the other menus have holes where the rows are, the opaque ISO scenes hide it, and the file name (a GRUB label) shows through a hole in the ISO scenes' pill.
+- Verified in QEMU/OVMF with real Ventoy 1.1.18: both styles, dark and light, 28 ISOs with long/Cyrillic/Japanese names, F3 tree, F4, F5, the boot-mode menu, 1920x1080 / 2560x1080 / 3840x2160 with `resolution_fit`, and `tests/ventoy_smoke.py` (install, then add/rename/remove ISOs without re-running: the right scenes appear and no file under /ventoy changes). Not verified: real hardware, BIOS boot, other Ventoy versions, mounting an unmounted stick, F2 browse, F6, countdown/`TIMEOUT` on Ventoy.
+
+**PC**
+- New fourth style `STYLE=split` (`install.sh --style split`): the centred list moved to the right, the selected entry's logo in a big cookie and its name on the left (Advanced / Rescue show their gear / wrench). Every row keeps its themed icon-in-a-shape, highlight colour and the separators between Linux, Windows and System.
+
+**Other**
+- Fixed: the missing-glyph check used a cache keyed by `id(font)`, which Python reuses; non-Latin names could render as boxes. Fallback fonts that are variable (Noto) now use the pills' medium weight instead of their thinnest.
+- New scene-only catalog entries `iso` and `pnlug` (not matched by name on a PC, not in the gallery); `palettes.py` uses the Monochrome scheme for near-grey seeds. New glyphs: folder, arrow_back, play_arrow (Material Symbols, Apache-2.0). The Ventoy and PNLug logos are in `vendor/` (see `THIRD_PARTY.md`).
+- Docs: the README gallery moved to `docs/gallery.md` (two screenshots of every style in dark and light for the PC and for Ventoy), Ventoy has its own page `docs/ventoy.md`, the README links to both. New `scripts/make_ventoy_screenshots.py`, `make_screenshots.py --styles`, `docs/plans/ventoy.md`.
+
 ## 0.4.0 (2026-11-17)
 
 Runtime styles (rail, clean, list), TUI installer, distro gallery. Prebuilt downloads removed.

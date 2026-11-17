@@ -59,6 +59,11 @@ D = [
  ("reboot", "Restart", "Reboot the machine", MS % "restart_alt", "#2E9E5B", "chosen", ["restart"]),
  ("shutdown", "Shut down", "Power off", MS % "power_settings_new", "#C62828", "chosen", ["poweroff", "halt"]),
 ]
-ENTRIES = [(k, t, s, g or FL % "tux") for k, t, s, g, *_ in D]
-SEEDS = {"base": "#0B3D2E", **{k: seed for k, _, _, _, seed, *_ in D}}
-CLASSES = {k: [k] + [a for a in al if a != k] for k, *_, al in D}
+# Scene-only entries: built like the others (scene, palette, glyph) but NOT part of D, so they never match an entry title on a PC and are not in the gallery.
+# "iso": the grey disc scene Ventoy shows for a file it cannot place (the PC fallback stays Tux).
+# "pnlug": Pordenone Linux User Group (Ventoy only, matched on the ISO name in any letter case); its scene shows the association's own logo (vendor/pnlug), the glyph is only the Tux used in small places. Seed: the logo's red.
+X = [("iso", "Disk image", "Unrecognised image", MS % "album", "#8B8E94", "chosen", []),
+     ("pnlug", "PNLug", "Pordenone Linux User Group", None, "#C22020", "chosen", [])]
+ENTRIES = [(k, t, s, g or FL % "tux") for k, t, s, g, *_ in D + X]
+SEEDS = {"base": "#0B3D2E", **{k: seed for k, _, _, _, seed, *_ in D + X}}
+CLASSES = {k: [k] + [a for a in al if a != k] for k, *_, al in D + X}

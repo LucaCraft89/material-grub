@@ -10,6 +10,7 @@ echo "== unit tests"
 python3 tests/test_mgrub.py
 python3 tests/test_monitors.py
 python3 tests/test_tui.py
+python3 tests/test_ventoy.py
 python3 scripts/gen_distro_table.py --check
 echo "== pipeline test (needs a built package)"
 python3 tests/test_pipeline.py

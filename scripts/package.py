@@ -38,17 +38,19 @@ if __name__ == "__main__":
             if toks: rules.append({"key": k, "tokens": toks})
     rules.sort(key=lambda r: -len("".join(r["tokens"])))
     (PKG / "rules.json").write_text(json.dumps(rules))
-    (PKG / "titles.json").write_text(json.dumps({k: t for k, t, *_ in C.D}))
+    (PKG / "titles.json").write_text(json.dumps({k: t for k, t, *_ in C.D + C.X}))
     (PKG / "fonts").mkdir(); shutil.copy(B.R.FONT, PKG / "fonts" / "GoogleSansFlex-VF.ttf")
     for n in ("OFL.txt", "TRADEMARKS.md"): shutil.copy(ROOT / "fonts" / n, PKG / "fonts" / n)
     (PKG / "fonts" / "NOTICE.txt").write_text("Google Sans Flex: SIL Open Font License 1.1 (OFL.txt). Not affiliated with or endorsed by Google; see TRADEMARKS.md. The GRUB .pf2 fonts MG-* are Modified Versions derived from it and remain under the OFL.\n")
     (PKG / "glyphs").mkdir()
-    extra = {"gear": "vendor/material-symbols/settings.svg", "wrench": "vendor/material-symbols/build.svg", "kernel": "vendor/material-symbols/terminal.svg", "tag": "vendor/material-symbols/tag.svg"}
+    extra = {"gear": "vendor/material-symbols/settings.svg", "wrench": "vendor/material-symbols/build.svg", "kernel": "vendor/material-symbols/terminal.svg", "tag": "vendor/material-symbols/tag.svg",
+             "folder": "vendor/material-symbols/folder.svg", "back": "vendor/material-symbols/arrow_back.svg", "play": "vendor/material-symbols/play_arrow.svg"}      # folder / back / play: Ventoy menu scenes
     from PIL import Image
     for k, _, _, g in C.ENTRIES:
         m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
     for k, g in extra.items():
         m = B.R.icon_mask(g, 512); im = Image.new("RGBA", (512, 512), (255, 255, 255, 255)); im.putalpha(m); im.save(PKG / "glyphs" / f"{k}.png")
+    (PKG / "ventoy").mkdir(); shutil.copy(ROOT / "vendor/ventoy/VentoyLogo.png", PKG / "ventoy" / "VentoyLogo.png"); shutil.copy(ROOT / "vendor/pnlug/logo.png", PKG / "ventoy" / "pnlug.png")      # the Ventoy logo drawn in the cookie on a stick
     (PKG / "scheme.txt").write_text(B.R.SCHEME + "\n")
     (PKG / "palettes.json").write_text(json.dumps({k: v for k, v in B.R.PAL.items()}))
     shutil.copytree(ROOT / "install/bin", PKG / "bin"); shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
