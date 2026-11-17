@@ -85,15 +85,8 @@ def pill_slices(out, prefix, h, rgba, w=None):
     for j, (y0, y1) in enumerate(ys):
         for i, (x0, x1) in enumerate(xs): im.crop((x0, y0, x1, y1)).save(out / f"{prefix}_{names[j][i]}.png")
 
-def native_list(text, W, H, light):
-    """theme.txt block for the dynamic `list` style: a boot_menu with one translucent pill per entry (works for any number of ISOs, GRUB scrolls it), placed before the scene menu so it is drawn on top."""
-    f = H / 1080; font = re.findall(r'item_font = "([^"]+)"', text)[-1]; q = lambda v: round(v * f)
-    h, pitch, N = q(76), q(88), 7; cs = h // 2 - 1; ih = h - 2 * cs      # N rows of h px, one every `pitch` px
-    x0, y0, w = round(W * 0.47), q(110), q(640)
-    # GRUB grows every item box DOWNWARDS by the pixmap's edge slices (2*cs px; verified, no growth sideways or upwards) and clips text to the item rectangle, so two synchronised lists are used:
-    # the pills (a 2 px item rectangle that the pixmap grows into a pill) and, on top, the text (full-height items, no pixmap)
-    def menu(left, top, width, height, item_h, spacing, color, sel_color, pix):
-        return f'''+ boot_menu {{
+def _bm(font, left, top, width, height, item_h, spacing, color, sel_color, pix=""):
+    return f'''+ boot_menu {{
   left = {left}
   top = {top}
   width = {width}
@@ -111,11 +104,50 @@ def native_list(text, W, H, light):
 {pix}  scrollbar = false
 }}
 '''
-    ink, sel = ("#1B1B1F", "#000000") if light else ("#E6E1E5", "#FFFFFF")
-    block = "# mg:list rows drawn by GRUB (dynamic list): text on top, pills below\n" + menu(x0 + q(30), y0, w - q(60), N * pitch - (pitch - h), h, pitch - h, ink, sel, "") + "\n" \
-          + menu(x0, y0, w, N * pitch - (pitch - h), ih, pitch - ih, "#00000000", "#00000000", '  item_pixmap_style = "mgrow_*.png"\n  selected_item_pixmap_style = "mgsel_*.png"\n') + "\n"
-    mark = "# GRUB draws the first-declared component on top"
+
+def row_geom(W, H):
+    """The rows of the native list: pixel values of the 1080-high design scaled to this resolution. (x, y of the first row, width, row height, pitch, number of rows)"""
+    q = lambda v: round(v * H / 1080); return round(W * 0.47), q(110), q(640), q(76), q(88), 7
+
+def rows_block(text, W, H, light, opaque=None):
+    """theme.txt block of the native list: one pill per entry (works for any number of ISOs, GRUB scrolls it). GRUB grows every item box DOWNWARDS by the pixmap's edge slices (2*cs px; verified, no growth sideways or upwards)
+    and clips text to the item rectangle, so two synchronised lists are used: the pills (a 2 px item rectangle that the pixmap grows into a pill) and, on top, the text (full-height items, no pixmap)."""
+    font = re.findall(r'item_font = "([^"]+)"', text)[-1]; x0, y0, w, h, pitch, N = row_geom(W, H); q = lambda v: round(v * H / 1080); cs = h // 2 - 1; ih = h - 2 * cs
+    ink, sel = ("#1B1B1F", "#000000") if light else ("#E6E1E5", "#FFFFFF"); H_ = N * pitch - (pitch - h)
+    return "# mg:list rows drawn by GRUB (dynamic list): text on top, pills below\n" + _bm(font, x0 + q(30), y0, w - q(60), H_, h, pitch - h, ink, sel) + "\n" \
+         + _bm(font, x0, y0, w, H_, ih, pitch - ih, "#00000000", "#00000000", '  item_pixmap_style = "mgrow_*.png"\n  selected_item_pixmap_style = "mgsel_*.png"\n') + "\n"
+
+def native_list(text, W, H, light):
+    """`list` style: the rows go before the scene menu, so they are drawn on top of the scene."""
+    block = rows_block(text, W, H, light); mark = "# GRUB draws the first-declared component on top"
     return text.replace(mark, block + mark, 1) if mark in text else text + block
+
+def pill_geom(W, H):
+    """The wide pill under the title in the full-screen ISO scenes: (left, top, width, height) and the x where the file name starts (after the distro logo and the disc icon)."""
+    q = lambda v: round(v * H / 1080); w, h = q(900), q(72); left, top = (W - w) // 2, q(736); return left, top, w, h, left + q(26) + 2 * q(36) + q(14) + q(18)
+
+def fullscreen_layers(text, W, H, light, raw):
+    """`rail` / `clean`: the scene menu stays on top of GRUB's own lists. The scenes of Ventoy's other menus (F2-F5, folders, boot modes) are list scenes with holes where the rows are, so the rows show through only there;
+    in the ISO scenes (opaque) they are hidden. The same goes for the file name: the raw-name label and a pill under it sit below the scene and show through the hole in the ISO scenes' pill."""
+    q = lambda v: round(v * H / 1080); lay = ""
+    if raw:
+        text = re.sub(r"(?ms)^# mg:begin raw\n.*?^# mg:end raw\n", "", text); left, top, w, h, tx = pill_geom(W, H); cs = h // 2 - 1; ih = h - 2 * cs
+        ty = 2 * (top + h // 2) - H      # GRUB ignores a list's height and shows every row down to the screen edge; one item that reaches the edge keeps it a 1-item list (text is centred in the item, so the item is centred on the pill)
+        ink = "#1B1B1F" if light else "#E6E1E5"; pix = '  item_pixmap_style = "mgrow_*.png"\n  selected_item_pixmap_style = "mgrow_*.png"\n'
+        lay += "# mg:filename the raw file name in a pill under the title (seen through the hole of the ISO scenes)\n" + _bm("MG-Label Regular 26", tx, ty, left + w - tx - q(28), H - ty, H - ty, 0, ink, ink) + "\n" \
+             + _bm("MG-Label Regular 26", left, top, w, h, ih, h - ih, "#00000000", "#00000000", pix) + "\n"
+    lay += rows_block(text, W, H, light)
+    def cd(m):    # the countdown bar would sit on the pill: move it below
+        s = re.sub(r"(?m)^(\s*top = )755$", rf"\g<1>{q(830)}", m[0]); return re.sub(r"(?m)^(\s*top = )790$", rf"\g<1>{q(848)}", s)
+    text = re.sub(r"(?ms)^# mg:begin countdown\n.*?^# mg:end countdown\n", cd, text)
+    return text.rstrip("\n") + "\n\n" + lay
+
+def punch(im, boxes):
+    """Make rounded rectangles (x, y, w, h) of a scene fully transparent (inset by 1 px so the translucent edge of what lies below never shows)."""
+    from PIL import Image, ImageDraw, ImageChops
+    im = im.convert("RGBA"); S = 4; m = Image.new("L", (im.width * S, im.height * S), 255); d = ImageDraw.Draw(m)
+    for x, y, w, h in boxes: d.rounded_rectangle([(x + 1) * S, (y + 1) * S, (x + w - 1) * S - 1, (y + h - 1) * S - 1], radius=(h // 2 - 1) * S, fill=0)
+    im.putalpha(ImageChops.darker(im.getchannel("A"), m.resize(im.size, Image.LANCZOS))); return im
 
 def logo_png(path, size, src=None):
     """The logo drawn in the cookie: the real Ventoy logo (blue disc with a USB stick, shipped in the package, full colour) or `src`, any image of your own. Both keep their colours."""
@@ -187,10 +219,16 @@ for res in resl:
     for f in rdir.iterdir():
         if f.name not in ("logo_size", "aspect"): shutil.copy(f, tmp / f.name)
     th = tmp / "theme.txt"; th.write_text(mgrub.apply_conf_to_theme(th.read_text(), conf))
+    rw, rh = map(int, res.split("x")); light = (PKG / "scheme.txt").read_text().strip() == "light" if (PKG / "scheme.txt").exists() else False; q = round(76 * rh / 1080)
+    fs = style in ("rail", "clean")      # full screen: only the ISO picker keeps it; Ventoy's other menus are list scenes whose rows come from GRUB's own list below the scene
     if dynamic and style == "list":
-        rw, rh = map(int, res.split("x")); light = (PKG / "scheme.txt").read_text().strip() == "light" if (PKG / "scheme.txt").exists() else False
-        th.write_text(native_list(th.read_text(), rw, rh, light)); q = round(76 * rh / 1080)
+        th.write_text(native_list(th.read_text(), rw, rh, light))
         pill_slices(tmp, "mgrow", q, (0, 0, 0, 20) if light else (255, 255, 255, 24)); pill_slices(tmp, "mgsel", q, (0, 0, 0, 52) if light else (255, 255, 255, 70))
+    elif fs:
+        base = mgscenes.hexc(re.search(r'desktop-color: "(#[0-9A-Fa-f]{6})"', th.read_text())[1]); desk = base      # the rows lie below the scene, over the desktop colour: the pills are opaque, and the list scenes carry a card of that colour behind the rows
+        over = lambda c, a: tuple(round(b * (1 - a / 255) + c * a / 255) for b in base) + (255,)
+        th.write_text(fullscreen_layers(th.read_text(), rw, rh, light, conf["RAW_NAME"] == "on"))
+        pill_slices(tmp, "mgrow", q, over(0, 20) if light else over(255, 24)); pill_slices(tmp, "mgsel", q, over(0, 52) if light else over(255, 70))
     for n in ("OFL.txt", "TRADEMARKS.md"):
         if (PKG / "fonts" / n).exists(): shutil.copy(PKG / "fonts" / n, tmp / n)
     for cand in ("/usr/share/grub/unicode.pf2", "/usr/share/grub2/unicode.pf2", "/usr/share/fonts/grub/unicode.pf2", "/usr/share/fonts/truetype/unifont/unicode.pf2", "/boot/grub/fonts/unicode.pf2", "/boot/grub2/fonts/unicode.pf2"):
@@ -198,7 +236,33 @@ for res in resl:
     if conf["LOGO"] == "on" and conf["COOKIE"] == "on": logo_png(tmp / "machine-logo.png", int((rdir / "logo_size").read_text().strip()), arg("--logo"))
     bgs = sorted((PKG / "scenes" / aspect / "bg").glob("*.png")); R = mgscenes.Renderer(PKG, Image.open(bgs[0]).height); R.bg_dir = PKG / "scenes" / aspect / "bg"; R.hint_labels = HINTS
     cls_scene = lambda k: PKG / "scenes" / aspect / "icons" / f"{classes[k][0]}.png"
+    bgdir = PKG / "scenes" / aspect / "bg"; R.chip_disc = fs; R.cookie_off = (-24, 96) if style == "clean" else (0, 0); raw_on = conf["RAW_NAME"] == "on"
+    def rows_of(im): x0, y0, w, h, pitch, n = row_geom(*im.size); return [(x0, y0 + i * pitch, w, h) for i in range(n)]
+    def carded(im):
+        """A rounded card in the desktop colour behind the 7 row slots: slots without an entry show the desktop colour through their hole, so they melt into the card instead of showing as dark ghosts."""
+        from PIL import ImageDraw
+        x0, y0, w, h, pitch, n = row_geom(*im.size); S = 3; pad = round(24 * im.height / 1080); m = Image.new("L", (im.width * S, im.height * S), 0)
+        ImageDraw.Draw(m).rounded_rectangle([(x0 - pad) * S, (y0 - pad) * S, (x0 + w + pad) * S, (y0 + (n - 1) * pitch + h + pad) * S], radius=round(44 * im.height / 1080) * S, fill=255)
+        im = im.convert("RGBA"); im.paste(Image.new("RGBA", im.size, desk + (255,)), mask=m.resize(im.size, Image.LANCZOS)); return im
+    def list_scene(k, pal_key=None):      # a list scene whose rows are holes: GRUB's own list shows through
+        return punch(carded(R.render_list_hero(k, bgdir / f"{pal_key or k}.png", opts)), rows_of(Image.open(bgdir / f"{pal_key or k}.png")))
+    if fs:
+        (tmp / "_hero").mkdir()
+        for k in keys + (["iso"] if "iso" not in keys else []):      # background + hero with a slightly smaller title (the file name is the main text here)
+            sc = Image.open(bgdir / f"{k}.png").convert("RGBA"); R.hero(sc, {"key": k, "kind": "plain", "title": ""}, R.pal[k], 124); sc.save(tmp / "_hero" / f"{k}.png")
+    def finish_iso(im, k):
+        """ISO picker scene: a hole where the file-name pill is (the raw-name label shows through it) and the distro logo and a disc icon at the start of the pill."""
+        im = im.convert("RGBA")
+        if not raw_on: return im
+        W, H = im.size; L, T, Wp, Hp, tx = pill_geom(W, H); s = round(36 * H / 1080); im = punch(im, [(L, T, Wp, Hp)]); ink = mgscenes.hexc(R.pal[k]["primary"]) + (255,)
+        x1 = L + round(26 * H / 1080); x2 = x1 + s + round(14 * H / 1080)
+        for g, x in ((k, x1), ("iso", x2)): im.alpha_composite(R.glyph(g, s, ink), (x, T + (Hp - s) // 2))
+        return im
     def class_scene(k):
+        if fs:
+            hero = tmp / "_hero" / f"{k}.png"
+            return finish_iso(R.render_class(k, hero, SECTIONS, style, opts, [], rail_sel=section(k)) if dynamic else R.render_class(k, hero, groups, style, opts, menu), k)
+
         if dynamic and style == "list": return R.render_list_hero(k, PKG / "scenes" / aspect / "bg" / f"{k}.png", opts)
         if dynamic: return R.render_class(k, cls_scene(k), SECTIONS, style, opts, [], rail_sel=section(k))      # rail with sections; clean without neighbours
         # snapshot -- rail: the whole story. clean: a panel without neighbours. list: the whole list, nothing highlighted (also what an ISO added after install gets)
@@ -207,12 +271,15 @@ for res in resl:
     for k in keys: class_scene(k).save(tmp / "icons" / f"mg_{k}.png")
     generic = Image.open(tmp / "icons" / "mg_iso.png") if "iso" in keys else class_scene("iso")      # Ventoy's own classes (vtoyiso, vtoywim, ...) and every file the rules do not recognise
     for c in VTOY_FALLBACK: generic.save(tmp / "icons" / f"{c}.png")
-    if dynamic:       # the existing scenes for Ventoy's power / firmware / Windows items
+    if fs:            # power / firmware / Windows items of F4 / F5: list scenes
+        for c, k in MENU_ALIAS.items(): list_scene(k).save(tmp / "icons" / f"{c}.png")
+    elif dynamic:       # the existing scenes for Ventoy's power / firmware / Windows items
         for c, k in MENU_ALIAS.items(): shutil.copy(tmp / "icons" / f"mg_{k}.png", tmp / "icons" / f"{c}.png")
     if dynamic or style != "list":       # Ventoy's own menus: a scene each (folder, back, tools, local boot, the boot modes); the snapshot list bakes its rows into the scenes, so it has none
         for c, (glyph, title, sub, pal) in MENU.items():
             pk = f"mgm_{c}"; R.pal[pk] = R.pal[pal]; R.titles[pk] = title; R.galias[pk] = glyph; bg = PKG / "scenes" / aspect / "bg" / f"{pal}.png"
-            if style == "list": img = R.render_list_hero(pk, bg, opts)
+            if fs: img = punch(carded(R.render_list_hero(pk, bg, opts)), rows_of(Image.open(bg)))
+            elif style == "list": img = R.render_list_hero(pk, bg, opts)
             else:
                 sc = Image.open(bg).convert("RGBA"); R.hero(sc, {"key": pk, "kind": "kernel", "title": sub}, R.pal[pk])
                 img = R.render_clean({"key": pk, "kind": "plain", "title": title}, sc, None, None, opts).convert("RGB") if style == "clean" else None
@@ -220,9 +287,9 @@ for res in resl:
             img.save(tmp / "icons" / f"{c}.png")
     if per_entry and not dynamic:
         for e in entries:
-            src = PKG / "scenes" / aspect / ("icons" if style != "list" else "bg") / (f"{classes[e['key']][0]}.png" if style != "list" else f"{e['key']}.png")
-            R.render_entry(e, src, groups, style, opts, menu, by_class).save(tmp / "icons" / f"{e['class']}.png")
-    shutil.rmtree(out, ignore_errors=True); os.replace(tmp, out)
+            src = tmp / "_hero" / f"{e['key']}.png" if fs else PKG / "scenes" / aspect / ("icons" if style != "list" else "bg") / (f"{classes[e['key']][0]}.png" if style != "list" else f"{e['key']}.png")
+            im = R.render_entry(e, src, groups, style, opts, menu, by_class); (finish_iso(im, e["key"]) if fs else im).save(tmp / "icons" / f"{e['class']}.png")
+    shutil.rmtree(tmp / "_hero", ignore_errors=True); shutil.rmtree(out, ignore_errors=True); os.replace(tmp, out)
     theme_dirs.append(rel_dir); theme_files.append(f"/{rel_dir}/theme.txt")
     fonts += [f"/{rel_dir}/{p.name}" for p in sorted(out.glob("*.pf2"))]
 

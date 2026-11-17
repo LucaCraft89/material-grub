@@ -124,7 +124,7 @@ class Renderer:
     # ---- cookie (top-right) and key hints: drawn at config time, so they are runtime options ----
     def draw_cookie(self, canvas, p):
         u = self.u; W = canvas.width; c = self.shape("cookie", u(230), p["primaryContainer"])
-        canvas.alpha_composite(c, (int(W - u(150) - c.width / 2), int(u(140) - c.height / 2)))
+        canvas.alpha_composite(c, (int(W - u(150 - self.cookie_off[0]) - c.width / 2), int(u(140 + self.cookie_off[1]) - c.height / 2)))
     def key_hints(self, p):
         u = self.u; f = self.font(u(24), 520, 105); hh = u(46); parts = []
         for s in self.hint_labels:
@@ -163,14 +163,14 @@ class Renderer:
         """Runtime overlays that every style shares: top-right cookie (COOKIE) and key-hint pills (HINTS)."""
         if opts.get("cookie", True): self.draw_cookie(canvas, p)
         if opts.get("hints", True): self.draw_hints(canvas, p)
-    def hero(self, canvas, e, p):
+    def hero(self, canvas, e, p, tsz0=150):
         u = self.u; W = canvas.width; cx = W // 2; paste_c = self.paste_c
         paste_c(canvas, self.rrect(u(600), u(320), u(160), hexc(p["surfaceContainerHigh"]) + (255,)), cx, u(360))
         paste_c(canvas, self.rrect(u(560), u(280), u(140), hexc(p["primaryContainer"]) + (255,)), cx, u(360))
         ink = hexc(p["onPrimaryContainer"]) + (255,); acc = {"advanced": "gear", "rescue": "wrench"}.get(e["kind"])
         if acc: paste_c(canvas, self.glyph(e["key"], u(190), ink), cx - u(92), u(360)); paste_c(canvas, self.glyph(acc, u(120), ink), cx + u(140), u(360))
         else: paste_c(canvas, self.glyph(e["key"], u(230), ink), cx, u(360))
-        d = ImageDraw.Draw(canvas); title = self.title_for(e); tsz = u(150)
+        d = ImageDraw.Draw(canvas); title = self.title_for(e); tsz = u(tsz0)
         while tsz > u(60) and self.font(tsz, 800, 135, 60).getlength(title) > W * .62: tsz -= u(6)
         d.text((cx, u(590)), title, font=self.font(tsz, 800, 135, 60), fill=hexc(p["primary"]) + (255,), anchor="mm")
         self.pill_row(self.info_pills(e), p, W, u(672), canvas)
@@ -190,7 +190,7 @@ class Renderer:
         return label.rstrip() + "\u2026"
     def chip(self, e, p, h=None):
         u = self.u; h = h or u(self.CLEAN["chip_h"]); f = self.text_font(self.label_for(e), u(26), 560, 105); label = self.fit_label(self.label_for(e), f, u(900))
-        icons = [e["key"]] + ([{"advanced": "gear", "rescue": "wrench"}[e["kind"]]] if e["kind"] in ("advanced", "rescue") else [])
+        icons = [e["key"]] + (["iso"] if getattr(self, "chip_disc", False) else []) + ([{"advanced": "gear", "rescue": "wrench"}[e["kind"]]] if e["kind"] in ("advanced", "rescue") else [])
         ic = h - u(24); pad = u(22); w = pad * 2 + int(f.getlength(label)) + len(icons) * (ic + u(10))
         im = self.rrect(w, h, h // 2, hexc(p["surfaceContainerHigh"]) + (255,)); x = pad
         for g in icons: im.alpha_composite(self.glyph(g, ic, hexc(p["primary"]) + (255,)), (x, (h - ic) // 2)); x += ic + u(10)
@@ -288,6 +288,8 @@ class Renderer:
                 return items, next(k for k, x in enumerate(items) if x["class"] == e["class"])
         return [e], 0
 
+    cookie_off = (0, 0)   # design-px shift of the top-right cookie (Ventoy `clean`: its theme moves the logo with the cookie of the panel, so list scenes in that theme follow)
+    chip_disc = False   # Ventoy full-screen scenes: a disc icon after the distro logo in the chips (the entry is a disk image)
     bg_dir = None   # set by the caller: <pkg>/scenes/<aspect>/bg (the neighbours' panels in `clean` come from there)
     def render_entry(self, e, bg_path, groups, style="rail", opts=None, menu=None, by_class=None):
         """Per-entry scene. Kernel / rescue / advanced: bg + hero + info pills. Plain entries in clean/list styles pass their class hero scene as bg_path."""

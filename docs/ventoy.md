@@ -58,6 +58,7 @@ Options are saved on the stick in `/ventoy/material-grub.conf` (`STYLE`, `SCHEME
 ## What you see
 
 - **The scene** for the highlighted ISO: its distro's colour, logo and name, in the style you chose. The small muted line at the bottom is the raw file name exactly as Ventoy lists it (`RAW_NAME=off` hides it).
+- **`rail` / `clean` (full screen)** only change the ISO picker. Under the smaller distro name sits a wide pill with the distro logo, a disc icon (it is a disk image) and the real file name in a larger font (`RAW_NAME=off` removes the pill). Every other Ventoy menu (F2 browse, F3 folders, F4 local boot, F5 tools, the boot-mode menu) falls back to the list layout: the logo and name on the left, GRUB's own list on the right.
 - **`rail`**: a rail on the left with three sections (Linux, Windows, Tools); the section of the highlighted entry is lit.
 - **`clean`**: a big rounded panel with label chips on its edges.
 - **`list`**: the distro's logo and name on the left and the ISO list on the right.

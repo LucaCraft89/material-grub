@@ -101,8 +101,12 @@ class DynamicStick(unittest.TestCase):
         for style in ("rail", "clean", "list"):
             j, th = self.run_tool(style); need = {r["class"] for r in j["menu_class"]} | {"vtoyiso", "vtoydir", "vtoyret", "F5tool", "F4boot", "debug_reboot", "debug_halt", "debug_efisetup", "boot_windows", "second_normal", "second_grub2", "second_wimboot", "second_memdisk", "second_checksum", "second_return"}      # the last six: Ventoy's boot-mode menu
             for c in need: self.assertTrue((th / "icons" / f"{c}.png").exists(), (style, c))
-            txt = (th / "theme.txt").read_text(); self.assertEqual("mgrow_*.png" in txt, style == "list", style)
-            if style == "list": self.assertTrue((th / "mgsel_c.png").exists())
+            th_w, th_h = 1920, 1080; txt = (th / "theme.txt").read_text(); self.assertIn("mgrow_*.png", txt)      # every style has GRUB's own list; in rail / clean it lies below the scene
+            self.assertTrue((th / "mgsel_c.png").exists()); self.assertEqual("mg:filename" in txt, style != "list", style)      # full screen: the file name pill under the title
+            if style != "list":
+                from PIL import Image as I
+                self.assertEqual(I.open(th / "icons/mg_fedora.png").convert("RGBA").getpixel((th_w // 2, round(th_h * .68) + 36))[3], 0, "hole for the file-name pill in the ISO scene")
+                self.assertEqual(I.open(th / "icons/second_normal.png").convert("RGBA").getpixel((int(th_w * .47) + 300, 148))[3], 0, "hole at the first row of a menu scene")
             logo = Image.open(th / "machine-logo.png").convert("RGBA"); px = [logo.getpixel((x, y)) for x in range(logo.width) for y in range(logo.height)]
             self.assertTrue(any(a > 200 and b > r + 40 for r, g, b, a in px), "the real Ventoy logo is blue, not a dark V")
 
