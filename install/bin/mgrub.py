@@ -62,7 +62,19 @@ def apply_conf_to_theme(text, conf):
     for key, name in (("RAW_NAME", "raw"), ("COUNTDOWN", "countdown"), ("LOGO", "logo")):
         if conf[key] == "off" or (name == "logo" and conf["COOKIE"] == "off"): text = re.sub(rf"(?ms)^# mg:begin {name}\n.*?^# mg:end {name}\n", "", text)
     if conf.get("STYLE") == "clean": text = _clean_layout(text)
+    if conf.get("STYLE") == "list": text = _list_layout(text)
     return text
+
+def _list_layout(text):
+    """`list` centres the menu on the screen, so the countdown moves down between the list and the key hints (1080-high design: bar 868, label 884)."""
+    m = re.search(r"(?ms)^# mg:begin countdown\n(.*?)^# mg:end countdown\n", text)
+    if not m: return text
+    body = m[1]; lab = re.search(r"label \{.*?\n\}", body, re.S); hh = re.search(r"^\s*height = (\d+)$", lab[0], re.M) if lab else None
+    if not (lab and hh): return text
+    f = int(hh[1]) / 34
+    def settop(chunk, v): return re.sub(r"^(\s*top = )-?\d+$", rf"\g<1>{v}", chunk, count=1, flags=re.M)
+    parts = body.split("+ label {"); parts[0] = settop(parts[0], round(868 * f)); parts[1] = settop(parts[1], round(884 * f))
+    return text[:m.start(1)] + "+ label {".join(parts) + text[m.end(1):]
 
 def _clean_layout(text):
     """`clean` draws its panel inside a 24 px margin and 96 px top bar, so the BGRT logo moves with the cookie (design values scaled by the bundle's own factor, recovered from the logo width).

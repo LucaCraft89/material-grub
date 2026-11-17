@@ -16,12 +16,13 @@ entries = json.loads(state.read_text()) if state.exists() else []
 menu = json.loads(state.with_name("menu.json").read_text()) if state.with_name("menu.json").exists() else []
 classes = json.loads((pkg / "classes.json").read_text())
 conf = mgrub.load_conf(); style = conf["STYLE"]
-opts = {"cookie": conf["COOKIE"] == "on", "hints": conf["HINTS"] == "on"}
+import os
+opts = {"cookie": conf["COOKIE"] == "on", "hints": conf["HINTS"] == "on", "shape": os.environ.get("MG_LIST_SHAPE", "cookie")}   # shape: prototype knob
 aspect = (theme / ".aspect").read_text().strip()
 bgs = sorted((pkg / "scenes" / aspect / "bg").glob("*.png"))
 R = mgscenes.Renderer(pkg, Image.open(bgs[0]).height if bgs else 1080); R.bg_dir = pkg / "scenes" / aspect / "bg"
 by_class = {e["class"]: e for e in entries if "class" in e}
-if style not in ("rail", "clean"): print(f"material-grub: style '{style}' is not available yet, drawing 'rail'"); style = "rail"
+if style not in ("rail", "clean", "list"): print(f"material-grub: style '{style}' is not available yet, drawing 'rail'"); style = "rail"
 
 tops = [e for e in entries if e.get("level", "top") == "top"] or entries
 keys = []
@@ -32,11 +33,11 @@ if not groups: sys.exit(0)
 done = 0
 for k in keys:       # class scenes: used by plain entries (Windows, Firmware...) and as fallbacks
     first = theme / "icons" / f"{classes[k][0]}.png"
-    R.render_class(k, pkg / "scenes" / aspect / "icons" / f"{classes[k][0]}.png", groups, style, opts, menu).save(first)
+    R.render_class(k, pkg / "scenes" / aspect / ("bg" if style == "list" else "icons") / (f"{k}.png" if style == "list" else f"{classes[k][0]}.png"), groups, style, opts, menu).save(first)
     for a in classes[k][1:]: shutil.copyfile(first, theme / "icons" / f"{a}.png")
 per_entry = ("kernel", "rescue", "advanced") + (("plain",) if style != "rail" else ())    # clean/list: neighbours differ per entry, so plain entries need their own scene too
 for e in entries:
     if e.get("class", "").startswith("mg_") and e["kind"] in per_entry:
-        src = pkg / "scenes" / aspect / ("icons" if e["kind"] == "plain" else "bg") / (f"{classes[e['key']][0]}.png" if e["kind"] == "plain" else f"{e['key']}.png")
+        src = pkg / "scenes" / aspect / ("icons" if e["kind"] == "plain" and style != "list" else "bg") / (f"{classes[e['key']][0]}.png" if e["kind"] == "plain" and style != "list" else f"{e['key']}.png")
         R.render_entry(e, src, groups, style, opts, menu, by_class).save(theme / "icons" / f"{e['class']}.png"); done += 1
 print(f"material-grub: {done} entry scenes + {len(keys)} class scenes baked; style {style}; rail: {' | '.join(' '.join(g) for g in groups)}")

@@ -219,10 +219,65 @@ class Renderer:
                 return prev, nxt
         return None, None
 
+    # ---- list style: the whole menu level is drawn into the scene, centred, with the selected entry highlighted ----
+    LIST = dict(col=640, row=76, gap=12, div=30, top=110, bottom=840, more_h=40, shape_glyph=40)
+    def _group(self, key): return 2 if key in SYS else 1 if key in WIN else 0
+    def list_label(self, e):
+        return {"advanced": "Advanced options", "rescue": "Rescue"}.get(e["kind"]) or self.label_for(e)
+    def list_window(self, items, sel):
+        """Choose the largest window of rows around `sel` that fits the available height. Returns (start, end, height)."""
+        u = self.u; L = self.LIST; avail = u(L["bottom"] - L["top"]); row, gap, div = u(L["row"]), u(L["gap"]), u(L["div"]); more = u(L["more_h"]) + u(10)
+        def height(a, b):
+            h = sum(row for _ in range(a, b)) + sum(div if self._group(items[k]["key"]) != self._group(items[k - 1]["key"]) else gap for k in range(a + 1, b))
+            return h + (more if a > 0 else 0) + (more if b < len(items) else 0)
+        n = len(items)
+        for k in range(n, 0, -1):
+            a = min(max(sel - k // 2, 0), n - k); b = a + k
+            if height(a, b) <= avail: return a, b, height(a, b)
+        return sel, sel + 1, row
+    def draw_list(self, canvas, p, items, sel, opts):
+        u = self.u; L = self.LIST; W, H = canvas.size; row, gap, div = u(L["row"]), u(L["gap"]), u(L["div"]); col = u(L["col"])
+        a, b, h = self.list_window(items, sel); x0 = (W - col) // 2
+        top = max(u(L["top"]), min((H - h) // 2, u(L["bottom"]) - h)); y = top; shape = opts.get("shape", "cookie")
+        def more(n, y):
+            im = self.pill(f"+{n} more", p, "plain", None, h=u(L["more_h"])); canvas.alpha_composite(im, ((W - im.width) // 2, y)); return y + im.height + u(10)
+        if a > 0: y = more(a, y)
+        d = ImageDraw.Draw(canvas)
+        for k in range(a, b):
+            e = items[k]
+            if k > a:
+                if self._group(e["key"]) != self._group(items[k - 1]["key"]):
+                    ly = y + div // 2 - gap // 2 - u(1); d.rounded_rectangle([W // 2 - u(60), ly, W // 2 + u(60), ly + u(2)], radius=u(1), fill=hexc(p["outline"]) + (150,)); y += div
+                else: y += gap
+            on = k == sel
+            sh = self.shape(shape, row, p["primary"] if on else p["surfaceContainerHigh"]); canvas.alpha_composite(sh, (x0, y))
+            g = self.glyph(e["key"], u(L["shape_glyph"]), hexc(p["onPrimary"] if on else p["primary"]) + (255,)); self.paste_c(canvas, g, x0 + row / 2, y + row / 2)
+            ph = u(64); pw = col - row - u(14); pill = self._list_pill(self.list_label(e), e, p, on, pw, ph); canvas.alpha_composite(pill, (x0 + row + u(14), y + (row - ph) // 2))
+            y += row
+        if b < len(items): more(len(items) - b, y + u(10))
+    def _list_pill(self, label, e, p, on, w, h):
+        u = self.u; bg, fg = (p["primaryContainer"], p["onPrimaryContainer"]) if on else (p["surfaceContainerHigh"], p["onSurface"])
+        acc = {"advanced": "gear", "rescue": "wrench"}.get(e["kind"]); size = u(28); f = self.text_font(label, size, 560, 104)
+        ic = u(30) if acc else 0; room = w - u(28) * 2 - (ic + u(12) if acc else 0)
+        while f.getlength(label) > room and size > u(16): size -= u(2); f = self.text_font(label, size, 560, 104)
+        im = self.rrect(w, h, h // 2, hexc(bg) + (255,)); x = u(28)
+        if acc: im.alpha_composite(self.glyph(acc, ic, hexc(fg) + (255,)), (x, (h - ic) // 2)); x += ic + u(12)     # second icon right before the name, name shifted right
+        ImageDraw.Draw(im).text((x, h // 2 + u(1)), label, font=f, fill=hexc(fg) + (255,), anchor="lm"); return im
+    @staticmethod
+    def level_items(menu, by_class, e):
+        """(siblings in the entry's menu level, index of e); just [e] without menu info."""
+        for lv in menu or []:
+            if e.get("class") in lv["items"]:
+                items = [by_class[c] for c in lv["items"] if c in by_class]
+                return items, next(k for k, x in enumerate(items) if x["class"] == e["class"])
+        return [e], 0
+
     bg_dir = None   # set by the caller: <pkg>/scenes/<aspect>/bg (the neighbours' panels in `clean` come from there)
     def render_entry(self, e, bg_path, groups, style="rail", opts=None, menu=None, by_class=None):
         """Per-entry scene. Kernel / rescue / advanced: bg + hero + info pills. Plain entries in clean/list styles pass their class hero scene as bg_path."""
         opts = opts or {}; p = self.pal[e["key"]]; sc = Image.open(bg_path).convert("RGBA")
+        if style == "list":
+            items, sel = self.level_items(menu, by_class or {}, e); self.decorate(sc, p, opts); self.draw_list(sc, p, items, sel, opts); return sc.convert("RGB")
         if e["kind"] != "plain": self.hero(sc, e, p)
         if style == "clean":
             prev, nxt = self.neighbours(menu, by_class or {}, e, opts.get("wrap", True)); return self.render_clean(e, sc, prev, nxt, opts).convert("RGB")
@@ -230,5 +285,6 @@ class Renderer:
     def render_class(self, key, icon_path, groups, style="rail", opts=None, menu=None):
         """Class-level scene (fallbacks, and plain entries in the rail style): the build-time hero scene + cookie + hints + style furniture."""
         opts = opts or {}; p = self.pal[key]; sc = Image.open(icon_path).convert("RGBA")
+        if style == "list": self.decorate(sc, p, opts); return sc.convert("RGB")      # fallback only: the real list scenes are per entry
         if style == "clean": return self.render_clean({"key": key, "kind": "plain", "title": key}, sc, None, None, opts).convert("RGB")
         self.decorate(sc, p, opts); self.draw_rail(sc, p, groups, key); return sc.convert("RGB")
