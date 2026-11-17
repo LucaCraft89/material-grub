@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Material GRUB installer questions (curses TUI with a plain-prompt fallback). stdlib only.
 It only COLLECTS answers: install.sh does the work. Answers go to --out as shell-safe KEY=value lines (every value is validated first).
-usage: tui.py --out FILE [--preset KEY=value ...] [--immutable] [--plain] [--monitors JSON]
-  presets (answers given by installer flags) are not asked again: RES STYLE SCHEME COOKIE LOGO HINTS RAW_NAME COUNTDOWN TIMEOUT
+usage: tui.py --out FILE [--preset KEY=value ...] [--immutable] [--plain] [--monitors JSON] [--ask-target] [--sticks JSON]
+  presets (answers given by installer flags) are not asked again: TARGET STICK RES RESX STYLE SCHEME COOKIE LOGO HINTS RAW_NAME COUNTDOWN TIMEOUT MODE
+  --ask-target first asks "this computer's GRUB or a Ventoy USB stick"; TARGET=ventoy switches to the Ventoy questions (stick picker, resolutions, dynamic/snapshot)
 exit status: 0 = confirmed, 1 = cancelled."""
 import json, os, re, sys, textwrap
 from pathlib import Path
@@ -10,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 BUILTIN = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split()
 RES_RE = re.compile(r"^[0-9]{3,5}x[0-9]{3,5}$")
+def stick_ok(p): return bool(CHECK["STICK"].match(p)) and Path(p, "ventoy").is_dir()
 def snap(res):
     """Same rule as install.sh / material-grub-assemble: exact size, else the closest aspect ratio, then the closest height."""
     w, h = map(int, res.split("x")); size = lambda r: tuple(map(int, r.split("x")))
@@ -21,8 +23,47 @@ WIRE = {
  "list": ["+------------------+", "|            (o)  |", "|  (o) [ Fedora  ] |", "|  (o) [ Windows ] |", "|  (o) [ Restart ] |", "+------[hints]-----+"],
 }
 
-def build_steps(presets, monitors, immutable):
+def target_step():
+    return {"id": "TARGET", "title": "Where to install", "type": "choice", "cur": 0, "options": [
+        {"v": "grub", "label": "This computer's GRUB", "help": "Theme the GRUB boot menu of this machine (needs sudo; it changes /boot and /etc/grub.d, with backups)."},
+        {"v": "ventoy", "label": "A Ventoy USB stick", "help": "Theme the menu of a Ventoy stick. Nothing on this computer changes; the files go onto the stick. The theme recognises ISOs by their file name, so you can add or remove ISOs later without installing again."}]}
+
+def ventoy_steps(presets, monitors, sticks):
     def opt(v, label, help): return {"v": v, "label": label, "help": help}
+    steps = []
+    so = [opt(s["path"], describe_stick(s), "A Ventoy stick" + ("" if s["mounted"] else ": it is not mounted, the installer mounts it for the copy and unmounts it afterwards") + ". Everything is added under /ventoy; your ventoy.json is merged, not replaced (a backup is kept).") for s in sticks or []]
+    so.append(opt("custom", "Type a mount point..." if sticks else "Type the stick's mount point...", "The folder where the Ventoy data partition is mounted, for example /run/media/you/Ventoy. It must contain a /ventoy folder." + ("" if sticks else "\n\nNo Ventoy stick was detected: plug it in and mount it, or type the path.")))
+    steps.append({"id": "STICK", "title": "Ventoy stick", "type": "choice", "options": so, "cur": 0})
+    mons = monitors or [{"name": "default", "w": 1920, "h": 1080, "primary": False, "source": "default"}]
+    ro = [opt(f"{m['w']}x{m['h']}", f"{m['w']}x{m['h']} {m['name']}" + (" (primary)" if m.get("primary") else ""), "The screen mode Ventoy starts in, and the first theme size. Pick the resolution of the screen you boot on most; the next step adds others for other computers.") for m in mons]
+    ro.append(opt("custom", "Type another resolution...", "Enter WxH, for example 2560x1440. Sizes that are not built in use the closest theme."))
+    steps.append({"id": "RES", "title": "Main resolution", "type": "choice", "options": ro, "cur": 0})
+    steps.append({"id": "RESX", "title": "More resolutions", "type": "multi", "cur": 0, "rows": [
+        {"id": r, "kind": "toggle", "label": r, "val": False, "help": "Add a theme for this size (about 8 to 14 MB). Ventoy switches to the matching theme when you change the resolution with F5 Tools -> Resolution Configuration."} for r in ("1280x720", "1920x1080", "2560x1440", "3840x2160")]})
+    steps.append({"id": "STYLE", "title": "Style", "type": "choice", "cur": 0, "options": [
+        opt("rail", "Full screen with a left rail", "A big hero panel for the selected ISO's distro and a small rail with three sections (Linux, Windows, Tools) on the left."),
+        opt("clean", "Full screen, no rail", "A big panel per distro with label chips on the edges. The neighbour peeks only exist in snapshot mode."),
+        opt("list", "Centred list", "The distro's logo and name on the left and the ISO list on the right, drawn by GRUB itself so it follows the files on the stick.")]})
+    steps.append({"id": "SCHEME", "title": "Colour scheme", "type": "choice", "cur": 0, "options": [
+        opt("dark", "Dark", "Deep Material 3 surfaces."), opt("light", "Light", "Light Material 3 surfaces.")]})
+    steps.append({"id": "LOGO", "title": "Cookie and logo", "type": "choice", "cur": 0, "options": [
+        opt("both", "Cookie with the logo", "The cookie shape at the top right with a static logo inside (a Material V mark; pass --logo FILE to the Ventoy tool for another image)."),
+        opt("cookie", "Cookie only", "The cookie shape without the logo."), opt("none", "Neither", "No cookie and no logo.")]})
+    steps.append({"id": "HINTS", "title": "Key hints", "type": "choice", "cur": 0, "options": [
+        opt("on", "Show key hints", "Small pills at the bottom with Ventoy's keys: F1 Help, F2 Browse, F3 Tree, F4 Local boot, F5 Tools."), opt("off", "No key hints", "Cleaner screen; the keys keep working.")]})
+    steps.append({"id": "MODE", "title": "Mode", "type": "choice", "cur": 0, "options": [
+        opt("dynamic", "Dynamic (recommended)", "Works with whatever ISOs are on the stick, now and later: add, remove or rename files on any computer and the theme follows. Trade-offs: in the list style the highlighted row is a neutral colour and the rows have no icons; no neighbour peeks in the clean style."),
+        opt("snapshot", "Snapshot", "Draws the exact list (icons, colours, neighbours) for the ISOs that are on the stick right now. Run this installer again after changing the files; a file added later gets a plain list without highlight.")]})
+    steps.append({"id": "EXTRAS", "title": "Extras", "type": "multi", "cur": 0, "rows": [
+        {"id": "RAW_NAME", "kind": "toggle", "label": "Raw file name line", "val": True, "help": "The small muted line at the bottom with the ISO's file name exactly as Ventoy lists it."}]})
+    return steps
+
+def describe_stick(s):
+    return (s["path"] if s["mounted"] else f"{s['dev']} (not mounted)") + (f"  {s['label']}" if s.get("label") else "")
+
+def build_steps(presets, monitors, immutable, sticks=None):
+    def opt(v, label, help): return {"v": v, "label": label, "help": help}
+    if presets.get("TARGET") == "ventoy": return keep_open(ventoy_steps(presets, monitors, sticks), presets)
     steps = []
     mons = monitors or [{"name": "default", "w": 1920, "h": 1080, "primary": False, "source": "default"}]
     ro = []
@@ -54,11 +95,17 @@ def build_steps(presets, monitors, immutable):
         steps.append({"id": "IMMUTABLE", "title": "Immutable system", "type": "choice", "cur": 1, "options": [
             opt("no", "Cancel", "Do not change anything."),
             opt("yes", "I understand, continue", "ostree/bootc layout (experimental, not tested on a real ostree boot): nothing under /usr; the static grub.cfg is edited (an untouched copy is kept in /var/backups/material-grub) and re-applied after 'bootupctl update'. Undo with ./install.sh --uninstall.")]})
+    return keep_open(steps, presets)
+
+def keep_open(steps, presets):
+    """Drop the steps the installer flags already answered."""
     keep = []
     for st in steps:
         v = presets.get(st["id"])
         if st["id"] == "LOGO" and any(k in presets for k in ("COOKIE", "LOGO")): continue
         if st["id"] == "EXTRAS" and all(k in presets for k in ("RAW_NAME", "COUNTDOWN", "TIMEOUT")): continue
+        if st["id"] == "EXTRAS" and presets.get("TARGET") == "ventoy" and "RAW_NAME" in presets: continue
+        if st["id"] == "RESX" and "RESX" in presets: continue
         if v is not None and st["type"] == "choice": continue
         keep.append(st)
     return keep
@@ -83,7 +130,11 @@ def answers(steps, presets):
     for st in steps:
         v = value(st)
         if st["id"] == "LOGO": a["COOKIE"] = "off" if v == "none" else "on"; a["LOGO"] = "on" if v == "both" else "off"
-        elif st["id"] == "EXTRAS": a["RAW_NAME"] = "on" if v["RAW_NAME"] else "off"; a["COUNTDOWN"] = "on" if v["COUNTDOWN"] else "off"; a["TIMEOUT"] = v["TIMEOUT"]
+        elif st["id"] == "EXTRAS":
+            a["RAW_NAME"] = "on" if v["RAW_NAME"] else "off"
+            if "COUNTDOWN" in v: a["COUNTDOWN"] = "on" if v["COUNTDOWN"] else "off"; a["TIMEOUT"] = v["TIMEOUT"]
+        elif st["id"] == "RESX": a["RESX"] = ",".join(r for r, on in v.items() if on)
+        elif st["id"] == "STICK": a["STICK"] = v if v != "custom" else st.get("custom", "")
         elif st["id"] == "RES": a["RES"] = v if v != "custom" else st.get("custom", "1920x1080")
         else: a[st["id"]] = v
     if a.get("COOKIE") == "off": a["LOGO"] = "off"
@@ -91,7 +142,8 @@ def answers(steps, presets):
 
 CHECK = {"RES": RES_RE, "STYLE": re.compile(r"^(rail|clean|list)$"), "SCHEME": re.compile(r"^(dark|light)$"), "COOKIE": re.compile(r"^(on|off)$"), "LOGO": re.compile(r"^(on|off)$"),
          "HINTS": re.compile(r"^(on|off)$"), "RAW_NAME": re.compile(r"^(on|off)$"), "COUNTDOWN": re.compile(r"^(on|off)$"), "TIMEOUT": re.compile(r"^[0-9]{0,4}$"),
-         "IMMUTABLE": re.compile(r"^(yes|no)$")}
+         "IMMUTABLE": re.compile(r"^(yes|no)$"), "TARGET": re.compile(r"^(grub|ventoy)$"), "MODE": re.compile(r"^(dynamic|snapshot)$"),
+         "STICK": re.compile(r"^(dev:/dev/[A-Za-z0-9/_.-]+|/[^'\x00-\x1f]*)$"), "RESX": re.compile(r"^([0-9]{3,5}x[0-9]{3,5}(,[0-9]{3,5}x[0-9]{3,5})*)?$")}
 def write_out(path, a):
     lines = []
     for k, v in a.items():
@@ -100,6 +152,14 @@ def write_out(path, a):
     Path(path).write_text("\n".join(lines) + "\n")
 
 def command_line(a):
+    if a.get("TARGET") == "ventoy":
+        res = ",".join(x for x in [a.get("RES", "")] + [r for r in a.get("RESX", "").split(",") if r and r != a.get("RES")] if x); stick = a.get("STICK", "")
+        c = ["./install.sh", "--ventoy", "'" + stick + "'" if stick else "", f"--res {res}" if res else "", f"--style {a['STYLE']}" if "STYLE" in a else "", f"--scheme {a['SCHEME']}" if "SCHEME" in a else "",
+             "--mode snapshot" if a.get("MODE") == "snapshot" else ""]
+        if a.get("COOKIE") == "off": c.append("--no-cookie")
+        elif a.get("LOGO") == "off": c.append("--no-logo")
+        if a.get("HINTS") == "off": c.append("--no-hints")
+        return " ".join(x for x in c if x)
     c = ["sudo ./install.sh", f"--res {a['RES']}" if "RES" in a else "", f"--style {a['STYLE']}" if "STYLE" in a else "", f"--scheme {a['SCHEME']}" if "SCHEME" in a else ""]
     if a.get("COOKIE") == "off": c.append("--no-cookie")
     elif a.get("LOGO") == "off": c.append("--no-logo")
@@ -112,7 +172,7 @@ def summary_lines(steps, a):
     return out
 
 # ----------------------------------------------------------------- plain prompts
-def run_plain(steps, presets, inp=input, out=print):
+def run_plain(steps, presets, inp=input, out=print, final=True):
     out("Material GRUB installer: answer the questions (Enter keeps the default shown in [ ]).")
     i = 0
     while i < len(steps):
@@ -126,9 +186,9 @@ def run_plain(steps, presets, inp=input, out=print):
                 out("  please type one of the numbers")
             if st["options"][st["cur"]]["v"] == "custom":
                 while True:
-                    r = inp("  resolution WxH: ").strip()
-                    if RES_RE.match(r): st["custom"] = r; break
-                    out("  expected WxH, for example 2560x1440")
+                    r = inp("  mount point of the Ventoy stick: " if st["id"] == "STICK" else "  resolution WxH: ").strip()
+                    if st["id"] == "STICK" and stick_ok(r) or st["id"] != "STICK" and RES_RE.match(r): st["custom"] = r; break
+                    out("  expected a folder that contains /ventoy" if st["id"] == "STICK" else "  expected WxH, for example 2560x1440")
         else:
             for r in st["rows"]:
                 if r["kind"] == "toggle": x = inp(f"  {r['label']} [{'Y/n' if r['val'] else 'y/N'}]: ").strip().lower(); r["val"] = r["val"] if not x else x.startswith("y")
@@ -137,13 +197,14 @@ def run_plain(steps, presets, inp=input, out=print):
                         x = inp(f"  {r['label']} [{r['val'] or 'default'}]: ").strip()
                         if x == "" or x.isdigit(): r["val"] = x or r["val"]; break
         i += 1
+    if not final: return answers(steps, presets)
     a = answers(steps, presets); out("\nSummary:"); [out("  " + l) for l in summary_lines(steps, a)]
     out("Equivalent command: " + command_line(a))
     if any(s["id"] == "IMMUTABLE" and value(s) == "no" for s in steps): return None
     return a if inp("Install now? [Y/n] ").strip().lower() in ("", "y", "yes") else None
 
 # ----------------------------------------------------------------- curses
-def run_curses(steps, presets):
+def run_curses(steps, presets, summary_screen=True):
     import curses
     def main(scr):
         curses.curs_set(0); scr.keypad(True); i = 0; msg = ""
@@ -167,7 +228,7 @@ def run_curses(steps, presets):
             if h < 24 or w < 80: put(0, 0, "Please enlarge the terminal to at least 80x24 (q quits)."); scr.refresh(); k = scr.getch()
             else:
                 n = len(steps); summary = i >= n; box(0, 0, h - 1, w, "Material GRUB installer")
-                TAB = {"RES": "Res", "STYLE": "Style", "SCHEME": "Scheme", "LOGO": "Logo", "HINTS": "Hints", "EXTRAS": "Extras", "SOURCE": "Source", "IMMUTABLE": "Immut."}
+                TAB = {"TARGET": "Target", "STICK": "Stick", "RESX": "More res", "MODE": "Mode", "RES": "Res", "STYLE": "Style", "SCHEME": "Scheme", "LOGO": "Logo", "HINTS": "Hints", "EXTRAS": "Extras", "SOURCE": "Source", "IMMUTABLE": "Immut."}
                 tabs = [f"[{'x' if j < i else '>' if j == i else ' '}]{TAB.get(st['id'], st['title'])}" for j, st in enumerate(steps)] + [f"[{'>' if summary else ' '}]Summary"]
                 x = 2
                 for j, t in enumerate(tabs): put(1, x, t, curses.A_REVERSE if j == min(i, n) else (0 if j < i else curses.A_DIM), w - x - 1); x += len(t) + 1
@@ -202,8 +263,8 @@ def run_curses(steps, presets):
                 scr.refresh(); k = scr.getch()
             if k in (ord("q"), 27): return None
             if k == curses.KEY_RESIZE: continue
-            if i >= len(steps):
-                if k in (10, 13, curses.KEY_ENTER): return answers(steps, presets)
+            if i >= len(steps) or (not summary_screen and i == len(steps) - 1 and k in (10, 13, curses.KEY_ENTER, curses.KEY_RIGHT)):
+                if k in (10, 13, curses.KEY_ENTER, curses.KEY_RIGHT): return answers(steps, presets)
                 if k in (curses.KEY_LEFT, curses.KEY_BACKSPACE, 127): i = len(steps) - 1
                 continue
             st = steps[i]; key = k
@@ -212,7 +273,7 @@ def run_curses(steps, presets):
                 elif key in (curses.KEY_DOWN, ord("j")): st["cur"] = (st["cur"] + 1) % len(st["options"])
                 elif key in (10, 13, curses.KEY_ENTER, curses.KEY_RIGHT):
                     if st["options"][st["cur"]]["v"] == "custom":
-                        r = edit("Resolution WxH:", lambda b: bool(RES_RE.match(b)), st.get("custom", ""))
+                        r = edit("Mount point of the Ventoy stick:", stick_ok, st.get("custom", "")) if st["id"] == "STICK" else edit("Resolution WxH:", lambda b: bool(RES_RE.match(b)), st.get("custom", ""))
                         if r is None: continue
                         st["custom"] = r
                     if st["id"] == "IMMUTABLE" and value(st) == "no": return None
@@ -237,16 +298,26 @@ def main(argv):
     for i, a in enumerate(argv):
         if a == "--preset" and "=" in argv[i + 1]: k, v = argv[i + 1].split("=", 1); presets[k] = v
     out = arg("--out"); mons = None
-    if arg("--monitors"): mons = json.loads(Path(arg("--monitors")).read_text())
-    if mons is None and "RES" not in presets:
-        try: import monitors; mons = monitors.detect()
-        except Exception: mons = None
-    steps = build_steps(presets, mons, "--immutable" in argv); defaults(steps, presets)
-    if "COOKIE" in presets and "LOGO" not in presets: presets.setdefault("LOGO", "on")
     plain = "--plain" in argv or not sys.stdin.isatty() or not sys.stdout.isatty() or os.environ.get("TERM", "dumb") in ("dumb", "")
     if not plain:
         try: import curses
         except ImportError: plain = True
+    sticks = json.loads(Path(arg("--sticks")).read_text()) if arg("--sticks") else None
+    try:
+        if "--ask-target" in argv and "TARGET" not in presets:
+            a1 = run_plain([target_step()], presets, final=False) if plain else run_curses([target_step()], presets, summary_screen=False)
+            if a1 is None: return 1
+            presets["TARGET"] = a1["TARGET"]
+    except (KeyboardInterrupt, EOFError): return 1
+    if arg("--monitors"): mons = json.loads(Path(arg("--monitors")).read_text())
+    if mons is None and "RES" not in presets:
+        try: import monitors; mons = monitors.detect()
+        except Exception: mons = None
+    if presets.get("TARGET") == "ventoy" and sticks is None and "STICK" not in presets:
+        try: import ventoy_sticks; sticks = ventoy_sticks.detect()
+        except Exception: sticks = []
+    steps = build_steps(presets, mons, "--immutable" in argv, sticks); defaults(steps, presets)
+    if "COOKIE" in presets and "LOGO" not in presets: presets.setdefault("LOGO", "on")
     try: a = run_plain(steps, presets) if plain else run_curses(steps, presets)
     except (KeyboardInterrupt, EOFError): a = None
     except Exception as e:

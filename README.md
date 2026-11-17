@@ -203,16 +203,19 @@ The Google Sans Flex font is bundled in `fonts/` (SIL OFL 1.1, unmodified upstre
 
 ### Ventoy
 
-The theme also works on a [Ventoy](https://www.ventoy.net) stick: same styles (`rail`, `clean`, `list`), dark and light, cookie, hints. Ventoy builds its menu at boot from the files on the stick, so the theme is dynamic: it recognises distros by ISO file name (colour, logo, name on the scene) and the shown name is the raw file name. The cookie shows a static "V" instead of the firmware logo.
+The theme also works on a [Ventoy](https://www.ventoy.net) USB stick: same styles (`rail`, `clean`, `list`), dark and light, cookie, hints. Ventoy builds its menu at boot from the files on the stick, so the theme is **dynamic**: it recognises distros by ISO file name (colour, logo and name on the scene; the name shown for each ISO is its raw file name), and you can add, remove or rename ISOs on any computer without installing again. The cookie shows a static "V" instead of the firmware logo.
 
 ```sh
-# build once (any resolution you want on the stick), then, with the stick mounted:
-make venv && .venv/bin/python scripts/package.py --res 1920x1080,2560x1080     # add --scheme light for the light variant
-python3 install/bin/material-grub-ventoy /run/media/$USER/Ventoy --pkg dist/material-grub --res 1920x1080,2560x1080
-python3 install/bin/material-grub-ventoy /run/media/$USER/Ventoy --uninstall
+./install.sh --ventoy                                   # a TUI asks for the stick (detected, mounted or not), resolutions, style, scheme ...
+./install.sh --ventoy /run/media/$USER/Ventoy --res 1920x1080,2560x1440 --style list --yes
+./install.sh --uninstall --ventoy /run/media/$USER/Ventoy
 ```
 
-It needs no root, merges into `/ventoy/ventoy.json` (your own `menu_class` rules stay first, a backup is written) and reads options from `/ventoy/material-grub.conf` (`STYLE`, `COOKIE`, `LOGO`, `HINTS`, `RAW_NAME`, `MODE=dynamic|snapshot`). `snapshot` renders the exact list from the ISOs present now (re-run after changing them). Status: verified in QEMU/OVMF with Ventoy 1.1.18 (see [docs/plans/ventoy.md](docs/plans/ventoy.md)); not tried on real hardware, and not yet part of `install.sh`.
+It needs no root (only write access to the stick; use `sudo` if you want it to install missing build dependencies), merges into `/ventoy/ventoy.json` (your own `menu_class` rules stay first, a backup is written) and keeps its options in `/ventoy/material-grub.conf`. Several `--res` values add one theme per size; Ventoy starts in the first and switches theme when you change the resolution (F5 Tools -> Resolution Configuration). To change style, scheme or resolutions, run the installer again.
+
+`--mode snapshot` instead renders the exact list (icons, per-distro highlight colours, neighbours) for the ISOs that are on the stick right now; run the installer again after changing the files. In dynamic mode the list rows are drawn by GRUB itself, so the highlighted row is a neutral colour and rows have no icons; the `clean` style has no neighbour peeks.
+
+Status: verified in QEMU/OVMF with Ventoy 1.1.18, including adding, renaming and removing ISOs without re-running anything (`tests/ventoy_smoke.py`, also in CI). Not tried on real hardware, BIOS/legacy boot or other Ventoy versions; mounting a not-yet-mounted stick and the countdown/`TIMEOUT` are untested. Details and findings: [docs/plans/ventoy.md](docs/plans/ventoy.md).
 
 ### Other distros
 

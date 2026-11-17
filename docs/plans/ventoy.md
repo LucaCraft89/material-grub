@@ -1,6 +1,6 @@
 # Ventoy support plan
 
-Status: IMPLEMENTED as `install/bin/material-grub-ventoy` and verified in QEMU/OVMF with real Ventoy 1.1.18 (see "Verified" below). Not yet: installer/TUI integration (`install.sh --ventoy`), CI job, README gallery, real hardware. Items marked (?) are still unknown.
+Status: IMPLEMENTED as `install/bin/material-grub-ventoy` and verified in QEMU/OVMF with real Ventoy 1.1.18 (see "Verified" below). Installer (`install.sh --ventoy`), TUI stick picker, CI job and `tests/ventoy_smoke.py` (ISOs changed without re-running) are done. Not yet: README gallery, real hardware. Items marked (?) are still unknown.
 
 ## Decision: dynamic by default (maintainer, 2026-11-17)
 The theme cannot be re-rendered when someone copies an ISO onto the stick from any other PC, so the default mode (`MODE=dynamic`) needs no knowledge of the files:

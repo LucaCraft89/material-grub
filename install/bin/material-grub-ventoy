@@ -138,7 +138,10 @@ def uninstall():
         if state.get("prev_theme"): vj["theme"] = state["prev_theme"]
     vj_path.write_text(json.dumps(vj, indent=1) + "\n")
     for d in state.get("theme_dirs", []): shutil.rmtree(stick / d, ignore_errors=True)
-    state_path.unlink(missing_ok=True); print("material-grub-ventoy: removed")
+    state_path.unlink(missing_ok=True); (stick / "ventoy/material-grub.conf").unlink(missing_ok=True)
+    try: (stick / THEMES).rmdir()          # only if empty: other themes stay
+    except OSError: pass
+    print("material-grub-ventoy: removed")
 
 if "--uninstall" in sys.argv: uninstall(); sys.exit(0)
 

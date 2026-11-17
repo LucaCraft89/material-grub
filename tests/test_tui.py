@@ -22,6 +22,29 @@ class Logic(unittest.TestCase):
                 with self.assertRaises(ValueError): tui.write_out(f.name, bad)
             tui.write_out(f.name, {"RES": "1920x1080", "TIMEOUT": ""}); self.assertEqual(Path(f.name).read_text(), "RES='1920x1080'\nTIMEOUT=''\n")
 
+STICKS = [{"path": "/run/media/u/Ventoy", "dev": "/dev/sdb1", "label": "Ventoy", "fstype": "exfat", "size": 59000000000, "model": "DataTraveler", "mounted": True}]
+class VentoyFlow(unittest.TestCase):
+    def run_tui(self, args, text):
+        with tempfile.TemporaryDirectory() as d:
+            mon = Path(d) / "m.json"; mon.write_text(json.dumps(MONS)); st = Path(d) / "s.json"; st.write_text(json.dumps(STICKS)); out = Path(d) / "o"
+            r = subprocess.run([sys.executable, TUI, "--out", out, "--plain", "--monitors", mon, "--sticks", st, *args], input=text, capture_output=True, text=True)
+            return r, (out.read_text() if out.exists() else "")
+    def test_target_question_then_ventoy_steps(self):
+        # target 2 (Ventoy), stick 1, main res 2 (1920x1080), more res: only 2560x1440, style list, light, logo/hints/mode default, raw line default, confirm
+        r, t = self.run_tui(["--ask-target"], "2\n1\n2\nn\nn\ny\nn\n3\n2\n\n\n\n\ny\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        for want in ("TARGET='ventoy'", "STICK='/run/media/u/Ventoy'", "RES='1920x1080'", "RESX='2560x1440'", "STYLE='list'", "SCHEME='light'", "MODE='dynamic'"): self.assertIn(want, t)
+        self.assertIn("./install.sh --ventoy '/run/media/u/Ventoy' --res 1920x1080,2560x1440 --style list --scheme light", r.stdout)
+    def test_presets_skip_questions(self):
+        r, t = self.run_tui(["--preset", "TARGET=ventoy", "--preset", "STICK=/mnt/V", "--preset", "RES=1920x1080", "--preset", "STYLE=rail", "--preset", "SCHEME=dark", "--preset", "MODE=snapshot", "--preset", "RESX=1280x720"],
+                            "\n\n\n\ny\n")        # only logo, hints, raw-name remain
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr); self.assertIn("MODE='snapshot'", t); self.assertIn("STICK='/mnt/V'", t); self.assertIn("RESX='1280x720'", t)
+    def test_unsafe_stick_is_refused(self):
+        with tempfile.NamedTemporaryFile() as f:
+            for bad in ("/mnt/x'; rm -rf /", "relative/path", "dev:/dev/sdb1;x"):
+                with self.assertRaises(ValueError): tui.write_out(f.name, {"STICK": bad})
+            tui.write_out(f.name, {"STICK": "/run/media/u/My Ventoy", "RESX": "1280x720,1920x1080"})
+
 class Plain(unittest.TestCase):
     def test_plain_prompts(self):
         with tempfile.TemporaryDirectory() as d:
@@ -30,12 +53,13 @@ class Plain(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr); t = out.read_text(); self.assertIn("RES='1920x1080'", t); self.assertIn("STYLE='list'", t); self.assertIn("SCHEME='light'", t); self.assertIn("TIMEOUT='12'", t)
             r = subprocess.run([sys.executable, TUI, "--out", out, "--plain", "--monitors", mon], input="\n\n\n\n\n\n\n\nn\n", capture_output=True, text=True); self.assertEqual(r.returncode, 1)
 
-def drive(keys, env_extra=None, size=(24, 80), cmd=None):
+def drive(keys, env_extra=None, size=(24, 80), cmd=None, extra=(), sticks=None):
     """Run tui.py on a pty of the given size, send keys, return (exit status, screen text)."""
     d = tempfile.mkdtemp(); mon = Path(d) / "m.json"; mon.write_text(json.dumps(MONS)); out = Path(d) / "o"
+    if sticks is not None: sj = Path(d) / "s.json"; sj.write_text(json.dumps(sticks)); extra = [*extra, "--sticks", str(sj)]
     pid, fd = pty.fork()
     if pid == 0:
-        os.environ.update({"TERM": "xterm", "LINES": str(size[0]), "COLUMNS": str(size[1])}); os.execv(*(cmd or (sys.executable, [sys.executable, TUI, "--out", str(out), "--monitors", str(mon)])))
+        os.environ.update({"TERM": "xterm", "LINES": str(size[0]), "COLUMNS": str(size[1])}); os.execv(*(cmd or (sys.executable, [sys.executable, TUI, "--out", str(out), "--monitors", str(mon), *extra])))
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", size[0], size[1], 0, 0)); buf = b""
     def pump(t):
         nonlocal buf; end = time.time() + t
@@ -60,6 +84,15 @@ def drive(keys, env_extra=None, size=(24, 80), cmd=None):
     return os.waitstatus_to_exitcode(st), buf.decode(errors="replace"), out
 
 ENTER, DOWN, LEFT = b"\r", b"\x1bOB", b"\x1bOD"   # xterm application-keypad sequences (what curses enables)
+class VentoyCurses(unittest.TestCase):
+    def test_target_stick_picker_and_answers(self):
+        # target: Ventoy | stick: the detected one | main res | more res (none) | style list | scheme dark | logo | hints | mode | raw-name | summary: install
+        keys = [DOWN, ENTER, ENTER, ENTER, ENTER, DOWN, DOWN, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER]
+        code, screen, out = drive(keys, extra=["--ask-target"], sticks=STICKS); self.assertEqual(code, 0, screen[-900:]); t = out.read_text()
+        for want in ("TARGET='ventoy'", "STICK='/run/media/u/Ventoy'", "RES='2560x1440'", "RESX=''", "STYLE='list'", "SCHEME='dark'", "MODE='dynamic'"): self.assertIn(want, t)
+    def test_picker_shows_the_stick(self):
+        code, screen, out = drive([DOWN, ENTER, b"q"], extra=["--ask-target"], sticks=STICKS); self.assertIn("/run/media/u/Ventoy", screen); self.assertIn("Ventoy stick", screen)
+
 class Curses(unittest.TestCase):
     def test_full_flow(self):
         keys = [DOWN, ENTER,                      # resolution: second monitor (1920x1080)

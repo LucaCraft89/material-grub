@@ -7,6 +7,9 @@
 #   sudo ./install.sh --style list    # rail (default) | clean | list      --no-hints  no key-hint pills      --no-cookie / --no-logo  hide the cookie / only the firmware logo
 #   sudo ./install.sh                 # in a terminal, missing choices (resolution, style, scheme, ...) are asked in a TUI; --no-tui or --yes skips it, --tui forces it
 #   sudo ./install.sh --uninstall
+#   ./install.sh --ventoy [MOUNTPOINT]   # theme a Ventoy USB stick instead (no root needed; a TUI picks the stick when no path is given)
+#        --res A,B,C  themes for several screen sizes (the first is Ventoy's start mode)    --mode dynamic|snapshot  (default dynamic: follows the ISOs on the stick)
+#        ./install.sh --uninstall --ventoy MOUNTPOINT   removes it from the stick again
 #   Runtime options (STYLE, HINTS, COOKIE, LOGO) go to /etc/material-grub.conf and can be changed later without rebuilding: sudo material-grub-apply
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
 #            --keep-build  keep the temporary build dir     --force  ignore the NixOS check
@@ -14,17 +17,19 @@
 #            --pkg DIR  install a package built elsewhere   --dist-out DIR  with --stage-only: copy the built package to DIR
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-RES=""; SCHEME=dark; SCHEME_SET=0; STYLE=""; COOKIE=""; LOGO=""; HINTS=1; HINTS_SET=0; TUIMODE=auto; IMM=0; YES=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
+VENTOY=0; STICK=""; VMODE=""; RES=""; SCHEME=dark; SCHEME_SET=0; STYLE=""; COOKIE=""; LOGO=""; HINTS=1; HINTS_SET=0; TUIMODE=auto; IMM=0; YES=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
 while [ $# -gt 0 ]; do
   case $1 in
     --res) RES=${2:?--res needs WxH}; shift;;
+    --ventoy) VENTOY=1; case ${2:-} in ""|-*) ;; *) STICK=$2; shift;; esac;;
+    --mode) VMODE=${2:?--mode needs dynamic or snapshot}; shift; case $VMODE in dynamic|snapshot) ;; *) echo "--mode must be dynamic or snapshot" >&2; exit 2;; esac;;
     --style) STYLE=${2:?--style needs rail, clean or list}; shift; case $STYLE in rail|clean|list) ;; *) echo "--style must be rail, clean or list" >&2; exit 2;; esac;;
     --cookie) COOKIE=on;; --no-cookie) COOKIE=off;; --logo) LOGO=on;; --no-logo) LOGO=off;; --hints) HINTS=1; HINTS_SET=1;; --tui) TUIMODE=force;; --no-tui) TUIMODE=no;;
     --scheme) SCHEME=${2:?--scheme needs light or dark}; SCHEME_SET=1; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
     --immutable) IMM=1;; --yes|-y) YES=1;; --pkg) PREBUILT=${2:?--pkg needs a directory}; shift;; --dist-out) DISTOUT=${2:?--dist-out needs a directory}; shift;;
     --no-hints) HINTS=0; HINTS_SET=1;;
     --no-deps) DEPS=0;; --stage-only) STAGE=1;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
-    -h|--help) sed -n 2,15p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    -h|--help) sed -n 2,19p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2;;
   esac; shift
 done
@@ -65,7 +70,8 @@ printf "\n${B}Material GRUB installer${Z}\n"
 
 # ---------- [1/6] checks ----------
 step "Checking the system"
-if [ "$(id -u)" -ne 0 ]; then
+if [ "$VENTOY" = 1 ] && [ "$(id -u)" -ne 0 ]; then DEPS=0; info "not running as root: fine for a Ventoy stick (dependencies must already be installed; use sudo to let the installer install them)"
+elif [ "$(id -u)" -ne 0 ]; then
   if [ "$STAGE" = 1 ]; then DEPS=0; warn "not running as root: skipping dependency installation (--stage-only)"
   else
     echo "Material GRUB changes system files (/etc/grub.d, /boot) and may install packages."
@@ -75,14 +81,24 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
   fi
 fi
+if [ "$UNINSTALL" = 1 ] && [ "$VENTOY" = 1 ]; then
+  if [ -z "$STICK" ]; then
+    STICK=$(python3 "$HERE/install/ventoy_sticks.py" --json | python3 -c 'import json,sys; s=[x["path"] for x in json.load(sys.stdin) if x["mounted"]]; print(s[0] if len(s)==1 else "")')
+    [ -n "$STICK" ] || die "give the mount point of the stick: ./install.sh --uninstall --ventoy /run/media/you/Ventoy"
+  fi
+  exec python3 "$HERE/install/bin/material-grub-ventoy" "$STICK" --uninstall
+fi
 [ "$UNINSTALL" = 1 ] && exec sh "$HERE/install/uninstall.sh"
-[ -e /etc/NIXOS ] && [ "$FORCE" = 0 ] && die "NixOS manages GRUB declaratively; this installer does not support it."
-[ -e /run/ostree-booted ] && IMM=1
+if [ "$VENTOY" = 0 ]; then
+  [ -e /etc/NIXOS ] && [ "$FORCE" = 0 ] && die "NixOS manages GRUB declaratively; this installer does not support it."
+  [ -e /run/ostree-booted ] && IMM=1
+fi
 # ---------- questions (TUI) ----------
 CONFSETS=""; TUIRAN=0
 want_tui() {
   [ "$TUIMODE" != no ] && [ "$YES" = 0 ] && [ -t 0 ] && [ -t 1 ] && command -v python3 >/dev/null 2>&1 || return 1
   [ "$TUIMODE" = force ] && return 0
+  [ "$VENTOY" = 1 ] && { [ -z "$STICK" ] || [ -z "$RES" ] || [ -z "$STYLE" ] || [ "$SCHEME_SET" = 0 ]; } && return 0
   [ "$STAGE" = 0 ] && { [ -z "$RES" ] || [ -z "$STYLE" ] || [ "$SCHEME_SET" = 0 ]; }
 }
 if want_tui; then
@@ -90,6 +106,8 @@ if want_tui; then
   [ -n "$RES" ] && PRE="$PRE --preset RES=$RES"; [ -n "$STYLE" ] && PRE="$PRE --preset STYLE=$STYLE"; [ "$SCHEME_SET" = 1 ] && PRE="$PRE --preset SCHEME=$SCHEME"
   [ -n "$COOKIE" ] && PRE="$PRE --preset COOKIE=$COOKIE"; [ -n "$LOGO" ] && PRE="$PRE --preset LOGO=$LOGO"
   [ "$HINTS_SET" = 1 ] && PRE="$PRE --preset HINTS=$( [ "$HINTS" = 1 ] && echo on || echo off )"
+  [ "$VENTOY" = 1 ] && PRE="$PRE --preset TARGET=ventoy"; [ -n "$STICK" ] && PRE="$PRE --preset STICK=$STICK"; [ -n "$VMODE" ] && PRE="$PRE --preset MODE=$VMODE"
+  [ "$VENTOY" = 0 ] && [ "$IMM" = 0 ] && [ "$STAGE" = 0 ] && PRE="$PRE --ask-target"
   IMMQ=""; [ "$IMM" = 1 ] && [ "$STAGE" = 0 ] && IMMQ=--immutable
   # shellcheck disable=SC2086
   python3 "$HERE/install/tui.py" --out "$ANS" $PRE $IMMQ || { rm -f "$ANS"; die "cancelled, nothing was changed"; }
@@ -98,6 +116,9 @@ if want_tui; then
   [ -n "${A_COOKIE:-}" ] && COOKIE=$A_COOKIE; [ -n "${A_LOGO:-}" ] && LOGO=$A_LOGO
   [ -n "${A_HINTS:-}" ] && { [ "$A_HINTS" = off ] && HINTS=0 || HINTS=1; HINTS_SET=1; }
   [ "${A_IMMUTABLE:-}" = yes ] && YES=1
+  [ "${A_TARGET:-}" = ventoy ] && VENTOY=1
+  [ -n "${A_STICK:-}" ] && STICK=$A_STICK; [ -n "${A_MODE:-}" ] && VMODE=$A_MODE
+  [ -n "${A_RESX:-}" ] && RES="$RES,$A_RESX"
   for k in RAW_NAME COUNTDOWN; do eval "v=\${A_$k:-}"; [ -n "$v" ] && [ "$v" = off ] && CONFSETS="$CONFSETS --set $k=off"; done
   [ -n "${A_TIMEOUT:-}" ] && CONFSETS="$CONFSETS --set TIMEOUT=$A_TIMEOUT"
   TUIRAN=1
@@ -108,7 +129,13 @@ fi
 [ -n "$LOGO" ] && CONFSETS="$CONFSETS --set LOGO=$LOGO"
 [ "$HINTS_SET" = 1 ] && CONFSETS="$CONFSETS --set HINTS=$( [ "$HINTS" = 1 ] && echo on || echo off )"
 [ "$SCHEME_SET" = 1 ] && CONFSETS="$CONFSETS --set SCHEME=$SCHEME"
-[ -z "$CONFSETS" ] || info "settings for /etc/material-grub.conf:$(echo $CONFSETS | sed 's/--set / /g')"
+[ "$VENTOY" = 1 ] && CONFSETS="$CONFSETS --set MODE=${VMODE:-dynamic}"
+[ "$VENTOY" = 1 ] && TOTAL=5
+if [ "$VENTOY" = 1 ]; then       # fail early, before a multi-minute build
+  [ -n "$STICK" ] || die "no Ventoy stick given: ./install.sh --ventoy /run/media/you/Ventoy   (or run it in a terminal to pick one)"
+  case $STICK in dev:*) ;; *) [ -d "$STICK/ventoy" ] || die "$STICK has no /ventoy folder: it is not the data partition of a Ventoy stick.";; esac
+fi
+[ -z "$CONFSETS" ] || info "settings for $( [ "$VENTOY" = 1 ] && echo the Ventoy stick || echo /etc/material-grub.conf ):$(echo $CONFSETS | sed 's/--set / /g')"
 if [ "$IMM" = 1 ] && [ "$STAGE" = 0 ]; then
   warn "immutable (ostree/bootc) system: using the immutable layout. Support for it is EXPERIMENTAL and could not be tested on a real ostree boot."
   cat <<MSG
@@ -137,7 +164,7 @@ info "free space in /var/tmp: $(df -h /var/tmp | awk 'NR==2{print $4}')   (the b
 step "Checking dependencies"
 missing() {   # prints what is missing
   command -v grub2-mkfont >/dev/null 2>&1 || command -v grub-mkfont >/dev/null 2>&1 || printf 'grub-mkfont '
-  command -v grub2-mkconfig >/dev/null 2>&1 || command -v grub-mkconfig >/dev/null 2>&1 || printf 'grub-mkconfig '
+  [ "$VENTOY" = 1 ] || command -v grub2-mkconfig >/dev/null 2>&1 || command -v grub-mkconfig >/dev/null 2>&1 || printf 'grub-mkconfig '
   command -v rsvg-convert >/dev/null 2>&1 || printf 'rsvg-convert '
   command -v python3 >/dev/null 2>&1 || { printf 'python3 '; return; }
   python3 -c "import venv, ensurepip" 2>/dev/null || printf 'python3-venv '
@@ -199,10 +226,17 @@ detect_res() {
   echo 1920x1080
 }
 if [ -n "$RES" ]; then info "resolution: $RES ($( [ "$TUIRAN" = 1 ] && echo chosen || echo from --res))"; else RES=$(detect_res); info "resolution: $RES (auto-detected)"; fi
+[ "$VENTOY" = 0 ] && case $RES in *,*) die "several resolutions (--res A,B) are only supported with --ventoy";; esac
 # the bundle to build: the exact resolution if supported, else the closest aspect ratio, then the closest height (same rule as material-grub-assemble)
 BUILD_RES=$(python3 -c 'import sys
-a="1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split(); w,h=map(int,sys.argv[1].split("x"))
-print(sys.argv[1] if sys.argv[1] in a else min(a,key=lambda r:(abs(int(r.split("x")[0])/int(r.split("x")[1])-w/h)>0.02,abs(int(r.split("x")[1])-h))))' "$RES") || die "Bad resolution '$RES' (expected WxH)."
+a="1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split()
+def snap(r):
+    w,h=map(int,r.split("x")); return r if r in a else min(a,key=lambda x:(abs(int(x.split("x")[0])/int(x.split("x")[1])-w/h)>0.02,abs(int(x.split("x")[1])-h)))
+out=[]
+for r in sys.argv[1].split(","):
+    s=snap(r)
+    if s not in out: out.append(s)
+print(",".join(out))' "$RES") || die "Bad resolution '$RES' (expected WxH)."
 [ "$BUILD_RES" != "$RES" ] && info "$RES is not a built-in size: using the $BUILD_RES theme"
 info "supported: 1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160 (others snap to the closest aspect ratio)"
 
@@ -254,6 +288,28 @@ if [ "$STAGE" = 1 ]; then
 fi
 
 # ---------- [5/6] install ----------
+if [ "$VENTOY" = 1 ]; then
+  step "Installing onto the Ventoy stick"
+  [ -n "$STICK" ] || die "no Ventoy stick given: ./install.sh --ventoy /run/media/you/Ventoy"
+  case $STICK in dev:*)       # not mounted: mount it for the copy, unmount at the end
+    DEV=${STICK#dev:}; MNT=$(mktemp -d /var/tmp/material-grub-stick.XXXXXX)
+    if [ "$(id -u)" -eq 0 ]; then mount "$DEV" "$MNT" || die "could not mount $DEV"; MOUNTED_BY_US=$MNT
+    else rmdir "$MNT"; U=$(udisksctl mount -b "$DEV" 2>&1) || die "could not mount $DEV (mount it in your file manager, or run with sudo): $U"; MNT=$(printf '%s' "$U" | sed -n 's/.* at \(.*\)\.$/\1/p'); [ -d "$MNT" ] || die "mounted $DEV but could not find where: $U"; UDISKS_DEV=$DEV; fi
+    STICK=$MNT; info "mounted $DEV at $STICK";; esac
+  [ -d "$STICK/ventoy" ] || die "$STICK has no /ventoy folder: it is not the data partition of a Ventoy stick."
+  CONF="$STICK/ventoy/material-grub.conf"; : > "$CONF"
+  for w in $CONFSETS; do case $w in --set) ;; *) printf '%s\n' "$w" >> "$CONF";; esac; done
+  info "options written to $CONF:$(tr '\n' ' ' < "$CONF")"
+  python3 "$HERE/install/bin/material-grub-ventoy" "$STICK" --pkg "$DIST" --res "$BUILD_RES" || die "the Ventoy installation failed (output above)."
+  sync
+  if [ -n "${MOUNTED_BY_US:-}" ]; then umount "$MOUNTED_BY_US" && rmdir "$MOUNTED_BY_US" && MOUNTED_BY_US=""; info "stick unmounted: safe to remove"; fi
+  if [ -n "${UDISKS_DEV:-}" ]; then udisksctl unmount -b "$UDISKS_DEV" >/dev/null 2>&1 && info "stick unmounted: safe to remove"; fi
+  step "Finished"
+  printf "      ${G}The Ventoy stick is themed.${Z} Total time: %s\n\n" "$(elapsed)"
+  echo "      Boot from it. In the default (dynamic) mode you can add, remove or rename ISOs on any computer: the theme follows, nothing to re-run."
+  echo "      Change the style, scheme or resolutions: run this installer again.   Undo: ./install.sh --uninstall --ventoy MOUNTPOINT"
+  exit 0
+fi
 step "Installing into GRUB"
 sh "$HERE/install/install.sh" --res "$RES" --pkg "$DIST" $( [ "$IMM" = 1 ] && echo --immutable ) $CONFSETS
 

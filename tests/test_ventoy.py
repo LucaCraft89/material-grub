@@ -33,6 +33,21 @@ class Names(unittest.TestCase):
                      ("Win11_24H2_English_x64.iso", "windows11"), ("Win10_22H2_x64.iso", "windows10"), ("gparted-live-1.6.iso", "tux"), ("KALI-linux-2026.3.iso", "kali")):
             self.assertEqual(key_of(n, rules), k, n)
 
+LSBLK = json.dumps({"blockdevices": [
+    {"name": "sda", "path": "/dev/sda", "type": "disk", "model": "Samsung SSD", "children": [{"name": "sda1", "path": "/dev/sda1", "label": "EFI", "fstype": "vfat", "size": 600000000, "type": "part", "mountpoints": ["/boot/efi"]}]},
+    {"name": "sdb", "path": "/dev/sdb", "type": "disk", "model": "DataTraveler 3.0 ", "children": [
+        {"name": "sdb1", "path": "/dev/sdb1", "label": "Ventoy", "fstype": "exfat", "size": 59000000000, "type": "part", "mountpoints": ["/run/media/u/Ventoy"]},
+        {"name": "sdb2", "path": "/dev/sdb2", "label": "VTOYEFI", "fstype": "vfat", "size": 33554432, "type": "part", "mountpoints": [None]}]},
+    {"name": "sdc", "path": "/dev/sdc", "type": "disk", "model": "Other", "children": [
+        {"name": "sdc1", "path": "/dev/sdc1", "label": "Ventoy", "fstype": "ntfs", "size": 1000000000, "type": "part", "mountpoints": [None]},
+        {"name": "sdc2", "path": "/dev/sdc2", "label": "VTOYEFI", "fstype": "vfat", "size": 33554432, "type": "part", "mountpoints": [None]}]}]})
+class Sticks(unittest.TestCase):
+    def test_parse_lsblk(self):
+        sys.path.insert(0, str(ROOT / "install")); import ventoy_sticks as vs
+        s = vs.parse_lsblk(LSBLK); self.assertEqual([x["path"] for x in s], ["/run/media/u/Ventoy", "dev:/dev/sdc1"])      # the system disk has no VTOYEFI; VTOYEFI itself is never listed
+        self.assertEqual((s[0]["mounted"], s[0]["model"], s[1]["mounted"]), (True, "DataTraveler 3.0", False)); self.assertIn("not mounted", vs.describe(s[1]))
+        self.assertEqual(vs.parse_lsblk("not json"), [])
+
 def ventoy_class(rules, name):
     """What Ventoy does with menu_class: the first rule whose key is a (case-sensitive) substring of the file name wins."""
     return next((r["class"] for r in rules if r["key"] in name), None)
