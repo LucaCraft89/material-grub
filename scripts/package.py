@@ -21,16 +21,18 @@ if "--no-hints" in sys.argv:
         "note: --no-hints is a no-op at build time since 0.4 (hints are drawn at install time); the installer writes HINTS=off to /etc/material-grub.conf"
     )
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "install/bin"))
 import build_theme as B
 import catalog as C
+import mgrub
 
 ROOT = B.ROOT
 PKG = ROOT / "dist/material-grub"
-RES_ALL = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split()
+RES_ALL = mgrub.RESOLUTIONS
 # --res WxH[,WxH...] builds only those resolutions and the scene sets they need (the 2160-high sets are 4x the size of the 1080-high ones)
 RES = opt("--res", "").split(",") if opt("--res") else RES_ALL
 SETS = list(dict.fromkeys(B.aspect_for(*map(int, r.split("x"))) for r in RES))
-GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}
+GENERIC = mgrub.GENERIC
 
 
 def bundle(res):  # one resolution bundle (theme.txt, bitmap fonts, bar slices); independent per resolution
@@ -66,7 +68,9 @@ if __name__ == "__main__":
             toks = re.findall(r"[a-z0-9]+", p.lower())
             if toks:
                 rules.append({"key": k, "tokens": toks})
-    rules.sort(key=lambda r: -len("".join(r["tokens"])))
+    rules.sort(
+        key=lambda r: (-len("".join(r["tokens"])), r["key"], r["tokens"])
+    )  # most specific first; ties in a fixed order
     (PKG / "rules.json").write_text(json.dumps(rules))
     (PKG / "titles.json").write_text(json.dumps({k: t for k, t, *_ in C.D + C.X}))
     (PKG / "fonts").mkdir()

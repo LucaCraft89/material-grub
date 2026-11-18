@@ -1,8 +1,31 @@
 """Shared helpers for material-grub tools (stdlib only)."""
 
+import hashlib
 import json
 import re
+import sys
 from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+
+# The one list of built-in resolutions (install/bin/resolutions.json); the packager, the installer, the TUI and the README check read it.
+RESOLUTIONS = json.loads((HERE / "resolutions.json").read_text())["resolutions"]
+
+# Catalog aliases that are too generic to match an entry by themselves (shared by the packager, the Ventoy tool and the distro table).
+GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}
+
+
+def snap(res, available=None):
+    """The resolution to build for `res`: exact size, else the closest aspect ratio, then the closest height."""
+    avail = list(available or RESOLUTIONS)
+    w, h = map(int, res.split("x"))
+    if res in avail:
+        return res
+
+    def size(r):
+        return tuple(map(int, r.split("x")))
+
+    return min(avail, key=lambda r: (abs(size(r)[0] / size(r)[1] - w / h) > 0.02, abs(size(r)[1] - h)))
 
 
 def load_rules(pkg):
@@ -22,9 +45,6 @@ def key_for(title, rules):
         if "".join(t) in toks:
             return r["key"]
     return None
-
-
-import hashlib
 
 
 def uid(*parts):
@@ -188,3 +208,20 @@ def bls_call(line):
 
 def bls_restructurable(call):
     return call is not None and call[1] in ("", "--enable-fallback")
+
+
+if __name__ == "__main__":  # used by install.sh: `mgrub.py list` / `mgrub.py snap WxH[,WxH...]`
+    if sys.argv[1:2] == ["list"]:
+        print(" ".join(RESOLUTIONS))
+    elif sys.argv[1:2] == ["snap"] and len(sys.argv) == 3:
+        out = []
+        for r in sys.argv[2].split(","):
+            try:
+                s = snap(r)
+            except ValueError:
+                sys.exit(f"mgrub: bad resolution {r!r} (expected WxH)")
+            if s not in out:
+                out.append(s)
+        print(",".join(out))
+    else:
+        sys.exit("usage: mgrub.py list | snap WxH[,WxH...]")

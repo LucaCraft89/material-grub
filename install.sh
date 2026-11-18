@@ -230,17 +230,9 @@ detect_res() {
 if [ -n "$RES" ]; then info "resolution: $RES ($( [ "$TUIRAN" = 1 ] && echo chosen || echo from --res))"; else RES=$(detect_res); info "resolution: $RES (auto-detected)"; fi
 [ "$VENTOY" = 0 ] && case $RES in *,*) die "several resolutions (--res A,B) are only supported with --ventoy";; esac
 # the bundle to build: the exact resolution if supported, else the closest aspect ratio, then the closest height (same rule as material-grub-assemble)
-BUILD_RES=$(python3 -c 'import sys
-a="1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split()
-def snap(r):
-    w,h=map(int,r.split("x")); return r if r in a else min(a,key=lambda x:(abs(int(x.split("x")[0])/int(x.split("x")[1])-w/h)>0.02,abs(int(x.split("x")[1])-h)))
-out=[]
-for r in sys.argv[1].split(","):
-    s=snap(r)
-    if s not in out: out.append(s)
-print(",".join(out))' "$RES") || die "Bad resolution '$RES' (expected WxH)."
+BUILD_RES=$(python3 "$HERE/install/bin/mgrub.py" snap "$RES" 2>/dev/null) || die "Bad resolution '$RES' (expected WxH)."
 [ "$BUILD_RES" != "$RES" ] && info "$RES is not a built-in size: using the $BUILD_RES theme"
-info "supported: 1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160 (others snap to the closest aspect ratio)"
+info "supported: $(python3 "$HERE/install/bin/mgrub.py" list) (others snap to the closest aspect ratio)"
 
 # ---------- [3/6] build environment ----------
 step "Preparing the build environment"

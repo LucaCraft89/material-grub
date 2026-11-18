@@ -14,8 +14,11 @@ import textwrap
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "bin"))
 
-BUILTIN = "1280x720 1920x1080 1920x1200 2560x1080 2560x1440 2880x1800 3440x1440 3840x1080 3840x1600 3840x2160 5120x1440 5120x2160".split()
+import mgrub  # noqa: E402
+
+BUILTIN = mgrub.RESOLUTIONS
 RES_RE = re.compile(r"^[0-9]{3,5}x[0-9]{3,5}$")
 
 
@@ -33,16 +36,7 @@ def stick_ok(p):
 
 def snap(res):
     """Same rule as install.sh / material-grub-assemble: exact size, else the closest aspect ratio, then the closest height."""
-    w, h = map(int, res.split("x"))
-
-    def size(r):
-        return tuple(map(int, r.split("x")))
-
-    return (
-        res
-        if res in BUILTIN
-        else min(BUILTIN, key=lambda r: (abs(size(r)[0] / size(r)[1] - w / h) > 0.02, abs(size(r)[1] - h)))
-    )
+    return mgrub.snap(res, BUILTIN)
 
 
 WIRE = {

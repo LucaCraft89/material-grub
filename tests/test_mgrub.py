@@ -9,6 +9,57 @@ sys.path.insert(0, str(ROOT / "install/bin"))
 import mgrub
 
 
+class SharedLists(unittest.TestCase):
+    """The resolution list and the GENERIC alias set each live in one place; any copy that appears again fails here."""
+
+    def sources(self):
+        for pat in (
+            "install.sh",
+            "install/*.py",
+            "install/*.sh",
+            "install/bin/*.py",
+            "install/bin/material-grub-*",
+            "scripts/*.py",
+        ):
+            yield from ROOT.glob(pat)
+
+    def test_no_second_resolution_list(self):
+        for f in self.sources():
+            text = f.read_text()
+            self.assertNotIn("1280x720 1920x1080", text, f"{f}: a hard-coded resolution list; read mgrub.RESOLUTIONS")
+            self.assertNotIn('"1280x720", "1920x1080", "1920x1200"', text, f"{f}: a hard-coded resolution list")
+
+    def test_no_second_generic_set(self):
+        for f in self.sources():
+            if f.name == "mgrub.py":
+                continue
+            self.assertNotIn("GENERIC = {", f.read_text(), f"{f}: a copy of mgrub.GENERIC")
+
+    def test_resolution_list_shape(self):
+        res = mgrub.RESOLUTIONS
+        self.assertEqual(len(res), len(set(res)))
+        for r in res:
+            w, h = map(int, r.split("x"))
+            self.assertGreater(w, h)
+
+    def test_readme_lists_every_resolution(self):
+        readme = (ROOT / "README.md").read_text()
+        for r in mgrub.RESOLUTIONS:
+            self.assertIn(f"`{r}`", readme, f"README does not list {r}")
+
+    def test_package_uses_the_shared_list(self):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        text = (ROOT / "scripts/package.py").read_text()
+        self.assertIn("RES_ALL = mgrub.RESOLUTIONS", text)
+        self.assertIn("GENERIC = mgrub.GENERIC", text)
+
+    def test_snap(self):
+        self.assertEqual(mgrub.snap("1920x1080"), "1920x1080")
+        self.assertEqual(mgrub.snap("1600x1000"), "1920x1200")
+        self.assertEqual(mgrub.snap("1366x768"), "1280x720")
+        self.assertEqual(mgrub.snap("1000x1000", ["1920x1080", "1920x1200"]), "1920x1080")
+
+
 class Parse(unittest.TestCase):
     def test_bls(self):
         d = mgrub.parse_title("Fedora Linux (7.3.3-200.fc44.x86_64) 44 (Workstation Edition)")

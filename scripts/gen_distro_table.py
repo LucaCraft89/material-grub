@@ -14,13 +14,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "install/bin"))
 import catalog as C
+import mgrub
 
 REQ = "https://github.com/LucaCraft89/material-grub/issues/new?template=distro_request.yml"
 IMG = ROOT / "docs/distros"
 DOCS = ROOT / "docs/distros.md"
 GALLERY = ROOT / "docs/gallery.md"
 BEGIN, END = "<!-- distros:begin -->", "<!-- distros:end -->"
-GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}
+GENERIC = mgrub.GENERIC
 SRC = {"chosen": "chosen", "si": "brand colour (Simple Icons)", "proposed": "proposed"}
 
 

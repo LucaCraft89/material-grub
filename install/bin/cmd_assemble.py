@@ -20,9 +20,6 @@ def main():
     mode = (arg("--mode", "") or "").split(",")[0].split("x")
     avail = sorted(p.name for p in (pkg / "res").iterdir())
 
-    def size(s):
-        return tuple(map(int, s.split("x")))
-
     try:
         w, h = int(mode[0]), int(mode[1])
     except Exception:
@@ -30,7 +27,7 @@ def main():
     if f"{w}x{h}" in avail:
         best = f"{w}x{h}"
     else:  # nearest by aspect ratio first, then by size
-        best = min(avail, key=lambda r: (abs(size(r)[0] / size(r)[1] - w / h) > 0.02, abs(size(r)[1] - h)))
+        best = mgrub.snap(f"{w}x{h}", avail)
         print(f"material-grub: {w}x{h} unsupported, using {best}", file=sys.stderr)
     res = pkg / "res" / best
     aspect = (res / "aspect").read_text().strip()

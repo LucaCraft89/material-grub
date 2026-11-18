@@ -76,9 +76,9 @@ def scan(stick):
 
 
 def key_of(name, rules):
+    """Catalog key from an ISO file name: the PC matcher (case-insensitive tokens), then Windows 10/11 by name, else the Tux fallback."""
     if "pnlug" in name.lower():
         return "pnlug"  # Pordenone Linux User Group: any letter case
-    """Catalog key from an ISO file name: the PC matcher (case-insensitive tokens), then Windows 10/11 by name, else the Tux fallback."""
     stem = re.sub(r"\.[^.]+$", "", name)
     low = stem.lower()
     k = mgrub.key_for(stem, rules)
@@ -102,7 +102,7 @@ def pick_key(name, others):
     return None
 
 
-GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}
+GENERIC = mgrub.GENERIC
 SYSTEM = {"tux", "iso", "firmware", "reboot", "shutdown", "windows10", "windows11"}
 WIN_KEYS = [
     ("windows10", ("Windows10", "Windows_10", "Windows-10", "Windows 10", "Win10", "Win_10", "Win-10", "Win 10")),
