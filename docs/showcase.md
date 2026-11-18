@@ -54,6 +54,27 @@ On machines whose firmware has no boot logo (virtual machines, many desktops) th
 </tr>
 </table>
 
+## Ventoy: your own name, colour and icon per image
+
+Tested on real Ventoy 1.1.18 (QEMU + OVMF) in both styles and both modes, with the customisation made by hand or in the GUI's *Ventoy* page. Here: Fedora is "Work laptop", tangerine, with a picture of the user's own (the green square), everything else untouched; and the same stick in one colour.
+
+<table>
+<tr>
+<td><img src="screenshots/ventoy-custom/list-custom.png" alt="Ventoy list style, custom image"></td>
+<td><img src="screenshots/ventoy-custom/full-custom.png" alt="Ventoy full-screen style, custom image"></td>
+</tr>
+<tr>
+<td><img src="screenshots/ventoy-custom/snapshot-custom.png" alt="Ventoy snapshot list, custom row"></td>
+<td><img src="screenshots/ventoy-custom/single-colour.png" alt="Ventoy, one colour for the whole stick"></td>
+</tr>
+<tr>
+<td><img src="screenshots/ventoy-custom/gui-editor.png" alt="The GUI's Ventoy page while customising an image"></td>
+<td><img src="screenshots/ventoy-custom/gui-written-stick.png" alt="The stick as the GUI wrote it, booted in Ventoy"></td>
+</tr>
+</table>
+
+Ventoy 1.1.18 does not show a `menu_alias` in its list (not even on a plain stick), so the custom name is drawn on the image's screen (and in the row of the snapshot list), while the plain list keeps the file name.
+
 ## The GUI
 
 A local web UI in your browser (`material-grub gui`), Material 3 Expressive with a forest-green seed and Google Sans Flex. The live preview on the right is drawn by the same code that writes your real menu.

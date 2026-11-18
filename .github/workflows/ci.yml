@@ -204,6 +204,26 @@ jobs:
       - run: .venv/bin/python scripts/package.py --res 1920x1080
       - run: PATH="$PWD/.venv/bin:$PATH" python3 tests/ventoy_smoke.py
 
+  ventoy-features:
+    # Real Ventoy 1.1.18 with the 0.7 customisations: per-image colour, icon and name and the one-colour mode on the stick, in both Ventoy styles and both modes, and the same
+    # made through the GUI in Chrome (the GUI writes the stick, then it is booted). Software emulation on the runner, so the script waits 4x longer. Screenshots are artifacts.
+    name: Ventoy features in QEMU (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [list-dynamic, full-dynamic, list-snapshot, single, gui]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf mtools python3-pil librsvg2-bin grub-common
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+      - run: .venv/bin/pip install playwright      # only the gui scenario drives a browser (the runner's Chrome; nothing is downloaded)
+      - run: .venv/bin/python scripts/package.py --res 1920x1080
+      - run: PATH="$PWD/.venv/bin:$PATH" GUI_BROWSER=/usr/bin/google-chrome .venv/bin/python tests/ventoy_features.py ${{ matrix.scenario }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "ventoy-features-${{ matrix.scenario }}", path: build/ventoy-feature-shots/}
+
   gallery:
     name: Distro gallery is up to date
     runs-on: ubuntu-latest

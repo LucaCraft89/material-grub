@@ -46,6 +46,15 @@ class PanelScene(unittest.TestCase):
             mine = self.R.panel_scene(ic.size, key, self.titles[key], self.subs[key], hero=True)
             self.assertLess(mean_diff(ic, mine), 0.05, key)
 
+    def test_a_square_picture_fits_inside_its_card(self):
+        sq = self.Image.new("RGBA", (500, 500), (30, 160, 30, 255))
+        wide = self.Image.new("RGBA", (800, 200), (30, 160, 30, 255))
+        fitted = self.R.fit_logo(sq, 440, 240)
+        self.assertLessEqual(fitted.height, 240)
+        self.assertEqual(fitted.width, fitted.height)  # the proportions are kept
+        self.assertEqual(self.R.fit_logo(wide, 440, 240).size, (440, 110))  # a wide logo still fills the width
+        self.assertEqual(self.R.fit_logo(wide, 440).size, (440, 110))
+
     def test_custom_palette_changes_the_colours(self):
         import mgpalette
 

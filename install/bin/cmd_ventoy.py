@@ -638,8 +638,9 @@ def main():
 
         for k in keys:
             class_scene(k).save(tmp / "icons" / f"mg_{k}.png")
-        for e in custom_done:  # one scene per customised file
-            class_scene(e["key"]).save(tmp / "icons" / f"{e['class']}.png")
+        if not (per_entry and not dynamic):  # (snapshot list: the per-entry scenes below carry the customised rows)
+            for e in custom_done:  # one scene per customised file
+                class_scene(e["key"]).save(tmp / "icons" / f"{e['class']}.png")
         generic = (
             Image.open(tmp / "icons" / "mg_iso.png") if "iso" in keys else class_scene("iso")
         )  # Ventoy's own classes (vtoyiso, vtoywim, ...) and every file the rules do not recognise
@@ -666,8 +667,14 @@ def main():
                     img = R.render_list_hero(pk, bg, opts)
                 img.save(tmp / "icons" / f"{c}.png")
         if per_entry and not dynamic:
-            for e in entries:
-                im = R.render_entry(e, bgdir / f"{e['key']}.png", groups, "list", opts, menu, by_class)
+            done = {c["path"]: c for c in custom_done}
+            rows = [
+                done.get(e["path"], e) for e in entries
+            ]  # a customised file's row carries its own name, colour and icon
+            rows_menu = [{"level": "top", "items": [e["class"] for e in rows]}]
+            rows_by_class = {e["class"]: e for e in rows}
+            for e in rows:
+                im = R.render_entry(e, bgdir / f"{e['key']}.png", groups, "list", opts, rows_menu, rows_by_class)
                 im.save(tmp / "icons" / f"{e['class']}.png")
         shutil.rmtree(tmp / "_hero", ignore_errors=True)
         shutil.rmtree(ov_tmp, ignore_errors=True)

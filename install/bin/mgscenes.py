@@ -436,7 +436,7 @@ class Renderer:
         ink = hexc(p["onPrimaryContainer"]) + (255,)
         acc = {"advanced": "gear", "rescue": "wrench"}.get(e["kind"])
         if logo:
-            paste_c(canvas, self.fit_logo(logo, u(440)), cx, u(360))
+            paste_c(canvas, self.fit_logo(logo, u(440), u(240)), cx, u(360))
         elif acc:
             paste_c(canvas, self.glyph(e["key"], u(190), ink), cx - u(92), u(360))
             paste_c(canvas, self.glyph(acc, u(120), ink), cx + u(140), u(360))
@@ -721,9 +721,12 @@ class Renderer:
     def split_x(W):
         return round(W * 0.47)  # left edge of the list in `split` (and in the dynamic Ventoy list)
 
-    def fit_logo(self, logo, w):
-        """A full-colour logo scaled to width `w` (RGBA)."""
-        return logo.convert("RGBA").resize((w, max(1, round(logo.height * w / logo.width))), Image.LANCZOS)
+    def fit_logo(self, logo, w, h=None):
+        """A full-colour logo scaled to fit a `w` x `h` box (RGBA): by width only when h is not given. A square picture of your own must not spill out of its card."""
+        s = min(w / logo.width, (h / logo.height) if h else float("inf"))
+        return logo.convert("RGBA").resize(
+            (max(1, round(logo.width * s)), max(1, round(logo.height * s))), Image.LANCZOS
+        )
 
     def draw_arrows(self, canvas, p):
         """Two small arrows (up, down) in a rounded container on the left: the only hint of the full-screen picker that more entries are above / below."""
@@ -750,7 +753,9 @@ class Renderer:
         logo = self.logos.get(key)
         if logo:
             self.paste_c(sc, self.rrect(u(480), u(270), u(64), (255, 255, 255, 255)), cx, cy)
-            self.paste_c(sc, self.fit_logo(logo, u(420)), cx, cy)  # a logo with its own colours sits on a white card
+            self.paste_c(
+                sc, self.fit_logo(logo, u(420), u(230)), cx, cy
+            )  # a logo with its own colours sits on a white card
         else:
             self.paste_c(sc, self.shape("cookie", u(400), p["primaryContainer"]), cx, cy)
         ink = hexc(p["onPrimaryContainer"]) + (255,)

@@ -8,13 +8,14 @@ An optional GUI, a one-colour theme and per-entry customisation.
 - **GUI** (`material-grub-gui`, a separate optional package; `sudo ./install.sh --with-gui` for source installs; never installed by the theme or the TUI): a Material 3 Expressive web UI in your browser with a live preview, drag and drop ordering, per-entry name, colour, icon and visibility, Ventoy sticks, presets, health checks and one-click updates with a progress pop-up. It never runs as root: changes go through `pkexec` to a small helper that validates every request. See `docs/gui.md`.
 - **One colour for the whole theme:** pick one of 32 seed colours (or any `#RRGGBB`) and every entry uses its Material 3 palette. In the installer's TUI (new *Colours* and *Seed colour* steps, `--seed '#RRGGBB'`, `--seed-mode multi|single`) and in the GUI.
 - **`/etc/material-grub/overrides.json`:** colours, names and icons per entry (your own PNG, JPEG, SVG, ...), hidden entries, section and entry order (the real GRUB menu is reordered), validated strictly when written and leniently at boot (a bad file never breaks the menu). `material-grub doctor` checks it. See `docs/customising.md`.
-- **Ventoy:** the same overrides on the stick (`ventoy/material-grub-overrides.json`): per-ISO colour, icon and display name (`menu_class` and `menu_alias`), and the single-colour mode.
+- **Ventoy:** the same overrides on the stick (`ventoy/material-grub-overrides.json`): per-ISO colour, icon and name (the name is drawn on the image's screen; it is also written as a `menu_alias`, which Ventoy 1.1.18 does not show in its list), and the single-colour mode.
 - The installer's TUI asks whether to install the optional GUI (default no; `--with-gui` answers it).
 - The firmware (BGRT) logo now shows in the cookie of the previews (the GUI's live preview and `material-grub preview`); on a real menu GRUB draws it from `machine-logo.png` as before. When the firmware has no logo (a VM, many desktops) the cookie now gets the Linux penguin instead of staying empty, in the previews and on the real menu.
 - **Presets:** save the look under a name, move it to another machine as one JSON file.
 - `install.sh --progress json` (machine-readable progress for tools), a persistent install log in `/var/log/material-grub/install.log`, `material-grub doctor --status-json`.
 
 **Fixed**
+- A square picture of your own no longer spills out of its white badge on an entry's screen (it is fitted into the badge). In the Ventoy snapshot list a customised file's row now carries its own name, colour and icon.
 - `list` style: the countdown bar overlapped the info chips under the list (found by the new QEMU feature tests); the chips now sit between the list and the countdown.
 
 **Changed**

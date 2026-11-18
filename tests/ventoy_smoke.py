@@ -20,7 +20,11 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-PKG = Path(sys.argv[1] if len(sys.argv) > 1 else ROOT / "dist/material-grub")
+PKG = Path(
+    sys.argv[1]
+    if len(sys.argv) > 1 and (Path(sys.argv[1]) / "palettes.json").is_file()
+    else ROOT / "dist/material-grub"
+)  # (imported by ventoy_features.py, whose argument is not a directory)
 VER = "1.1.18"
 SHA = "d86ff9de63d94c8b8f1f6b14d23c55af4b88e8207bf2893890892a6a97b1ad54"
 URL = f"https://github.com/ventoy/Ventoy/releases/download/v{VER}/ventoy-{VER}-linux.tar.gz"

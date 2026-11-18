@@ -37,7 +37,7 @@ A preset is the whole look (style, options, overrides, the pictures) saved under
 
 ## Ventoy sticks
 
-The same format lives on the stick: `ventoy/material-grub-overrides.json`, with `{"match": {"title": "text of the file name"}}` rules, pictures in `ventoy/material-grub-icons/`. A customised file gets its own scene, a `menu_class` rule (the shortest piece of its name no other file has) and, with a `name`, a Ventoy `menu_alias`. Hiding and ordering do not apply to Ventoy (it sorts by name). See [ventoy.md](ventoy.md).
+The same format lives on the stick: `ventoy/material-grub-overrides.json`, with `{"match": {"title": "text of the file name"}}` rules, pictures in `ventoy/material-grub-icons/`. A customised file gets its own scene, a `menu_class` rule (the shortest piece of its name no other file has) and, with a `name`, that name drawn on its screen (plus a Ventoy `menu_alias`, which Ventoy 1.1.18 does not show in its list). Hiding and ordering do not apply to Ventoy (it sorts by name). See [ventoy.md](ventoy.md).
 
 ## For contributors
 
