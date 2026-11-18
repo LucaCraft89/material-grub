@@ -1,0 +1,23 @@
+# Maintainer: LucaCraft89
+# Builds from source: the package ships the sources, and the theme is rendered on the target machine by the install script
+# (post_install / post_upgrade), so nothing prebuilt is ever downloaded. Not published on the AUR yet.
+pkgname=material-grub
+pkgver=0.5.0
+pkgrel=1
+pkgdesc='Material 3 Expressive GRUB theme, built from source on your machine'
+arch=('any')
+url='https://github.com/LucaCraft89/material-grub'
+license=('MIT')
+depends=('grub' 'librsvg' 'python>=3.9' 'python-pip' 'python-pillow')
+backup=('etc/material-grub.conf')
+install=material-grub.install
+# MG_SOURCE overrides the source (CI builds from the checked-out tree: MG_SOURCE=file:///path/material-grub-$pkgver.tar.gz)
+source=("$pkgname-$pkgver.tar.gz::${MG_SOURCE:-https://github.com/LucaCraft89/material-grub/archive/v$pkgver.tar.gz}"
+        'material-grub.hook')
+sha256sums=('SKIP' 'SKIP')   # the release script fills in the real sums once the tag exists
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  sh packaging/common/install-tree.sh . "$pkgdir"
+  install -Dm644 "$srcdir/material-grub.hook" "$pkgdir/usr/share/libalpm/hooks/material-grub.hook"
+}

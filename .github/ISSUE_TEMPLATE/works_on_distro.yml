@@ -1,0 +1,50 @@
+name: Works on my distro
+description: Tell us you installed it and it works (or half works) on your distribution
+labels: [tested-on]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! Confirmed systems are listed in [docs/tested-on.md](https://github.com/LucaCraft89/material-grub/blob/main/docs/tested-on.md). Please do not post anything private.
+  - type: input
+    id: distro
+    attributes: {label: Distribution and version, placeholder: "Linux Mint 22 Cinnamon"}
+    validations: {required: true}
+  - type: input
+    id: grub
+    attributes: {label: GRUB version, description: "grub2-install --version  or  grub-install --version", placeholder: "2.12"}
+    validations: {required: true}
+  - type: dropdown
+    id: boot
+    attributes: {label: Firmware, options: [UEFI, BIOS (legacy), Not sure]}
+    validations: {required: true}
+  - type: input
+    id: res
+    attributes: {label: Screen resolution, placeholder: "2560x1440"}
+    validations: {required: true}
+  - type: input
+    id: look
+    attributes: {label: Style and colour scheme, placeholder: "split, dark"}
+    validations: {required: true}
+  - type: checkboxes
+    id: tested
+    attributes:
+      label: What did you test?
+      options:
+        - {label: Installed and rebooted into the themed menu}
+        - {label: Installed a kernel update and the menu followed}
+        - {label: Uninstalled and the original menu came back}
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `sudo material-grub doctor`
+      render: text
+    validations: {required: true}
+  - type: textarea
+    id: photo
+    attributes:
+      label: A photo or screenshot of the real menu
+      description: Drag the image here.
+  - type: textarea
+    id: notes
+    attributes: {label: Anything that looked wrong}

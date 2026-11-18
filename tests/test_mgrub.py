@@ -42,10 +42,10 @@ class SharedLists(unittest.TestCase):
             w, h = map(int, r.split("x"))
             self.assertGreater(w, h)
 
-    def test_readme_lists_every_resolution(self):
-        readme = (ROOT / "README.md").read_text()
+    def test_docs_list_every_resolution(self):
+        readme = (ROOT / "docs/install.md").read_text()
         for r in mgrub.RESOLUTIONS:
-            self.assertIn(f"`{r}`", readme, f"README does not list {r}")
+            self.assertIn(f"`{r}`", readme, f"docs/install.md does not list {r}")
 
     def test_package_uses_the_shared_list(self):
         sys.path.insert(0, str(ROOT / "scripts"))

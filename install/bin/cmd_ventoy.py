@@ -103,6 +103,9 @@ def pick_key(name, others):
 
 
 GENERIC = mgrub.GENERIC
+MIN_KEY = 4
+# A Ventoy key is a plain substring, so these common words would match archive, kalimba, mintchoc, tailsman...: they only count with a separator after them
+RISKY = {"arch", "kali", "mint", "tails"}
 SYSTEM = {"tux", "iso", "firmware", "reboot", "shutdown", "windows10", "windows11"}
 WIN_KEYS = [
     ("windows10", ("Windows10", "Windows_10", "Windows-10", "Windows 10", "Win10", "Win_10", "Win-10", "Win 10")),
@@ -164,8 +167,12 @@ def dynamic_rules(classes, titles):
             if a.lower() in GENERIC:
                 continue
             for f in (a, a.lower(), a.upper(), a[:1].upper() + a[1:].lower()):
-                if len(f) >= 4 and 0 < len(f) <= 30:
-                    rules.setdefault(f, f"mg_{k}")
+                if len(f) >= MIN_KEY and 0 < len(f) <= 30:
+                    if a.lower() in RISKY:
+                        for sep in ("-", "_", " ", "."):
+                            rules.setdefault(f + sep, f"mg_{k}")
+                    else:
+                        rules.setdefault(f, f"mg_{k}")
     for k, keys in EXTRA_KEYS.items():
         for s in keys:
             for f in (s, s.lower(), s.upper()):

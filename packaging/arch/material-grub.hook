@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/lib/modules/*/vmlinuz
+
+[Action]
+Description = Re-applying the Material GRUB theme after a kernel change...
+When = PostTransaction
+Exec = /bin/sh -c 'command -v material-grub-apply >/dev/null && /usr/local/sbin/material-grub-apply || true'
