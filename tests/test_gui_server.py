@@ -203,6 +203,43 @@ class Server(unittest.TestCase):
         after = (root / "etc/material-grub.conf").read_text() if (root / "etc/material-grub.conf").exists() else ""
         self.assertEqual(after, before)
 
+    # ------------------------------------------------------------ Ventoy
+    def stick(self):
+        d = Path(tempfile.mkdtemp(dir=self.t))
+        (d / "ventoy").mkdir()
+        (d / "ISO").mkdir()
+        (d / "ISO/Fedora-Workstation-44.iso").write_bytes(b"")
+        return d
+
+    def test_ventoy_state_rejects_non_sticks(self):
+        self.assertEqual(self.req("GET", "/api/ventoy/state?path=/etc")[0], 400)
+        self.assertEqual(self.req("GET", "/api/ventoy/state?path=relative")[0], 400)
+
+    def test_ventoy_state_icon_and_apply(self):
+        d = self.stick()
+        st, s, _ = self.req("GET", "/api/ventoy/state?path=" + str(d))
+        self.assertEqual(st, 200)
+        self.assertEqual([f["name"] for f in s["files"]], ["Fedora-Workstation-44.iso"])
+        self.assertEqual(s["files"][0]["key"], "fedora")
+        from PIL import Image
+
+        buf = io.BytesIO()
+        Image.new("RGBA", (32, 32), (200, 0, 0, 255)).save(buf, "PNG")
+        self.assertEqual(self.req("POST", f"/api/ventoy/icon?path={d}&name=logo.png", buf.getvalue(), headers={"Content-Type": "image/png"})[0], 200)
+        self.assertEqual(self.req("POST", f"/api/ventoy/icon?path={d}&name=../x.png", buf.getvalue(), headers={"Content-Type": "image/png"})[0], 400)
+        draft = {"conf": {"STYLE": "list"}, "overrides": {"entries": [{"match": {"title": "Fedora"}, "name": "Mine", "icon": "file:logo.png"}]}}
+        st, j, _ = self.req("POST", "/api/ventoy/apply", {"path": str(d), "draft": draft, "res": "1920x1080"})
+        self.assertEqual(st, 200, j)
+        ev = self.events(j["job"])
+        self.assertTrue(ev[-1]["ok"], ev[-6:])
+        vj = json.loads((d / "ventoy/ventoy.json").read_text())
+        self.assertTrue(vj["menu_class"][0]["class"].startswith("mgu_"))
+        self.assertEqual(vj["menu_alias"][0]["alias"], "Mine")
+        self.assertIn("STYLE=list", (d / "ventoy/material-grub.conf").read_text())
+        for bad in ({"conf": {"STYLE": "neon"}}, {"overrides": {"seed": {"mode": "x"}}}):
+            self.assertEqual(self.req("POST", "/api/ventoy/apply", {"path": str(d), "draft": bad})[0], 400)
+        self.assertEqual(self.req("POST", "/api/ventoy/apply", {"path": str(d), "draft": draft, "res": "1920x1080; rm -rf /"})[0], 400)
+
     def test_apply_rejects_bad_drafts_before_any_helper_runs(self):
         self.assertEqual(self.req("POST", "/api/apply", {"draft": {"conf": {"STYLE": "neon"}}})[0], 400)
         self.assertEqual(self.req("POST", "/api/apply", {"draft": {"overrides": {"entries": [{"match": {"key": "x"}, "icon": "file:../../etc/passwd"}]}}})[0], 400)

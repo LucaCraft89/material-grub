@@ -43,7 +43,8 @@ def setup():
     mods = modules_dir(pkg)
     if mods is None:
         raise SystemExit("material-grub is not installed (no shared modules found); install it first")
-    for p in (str(mods), str(HERE)):
+    extra = [str(REPO / "install")] if in_checkout() else []  # ventoy_sticks.py lives there in a checkout; the GUI package ships a copy next to the server
+    for p in (str(mods), str(HERE), *extra):
         if p not in sys.path:
             sys.path.insert(0, p)
     return pkg, mods

@@ -7,7 +7,7 @@ const S = {
   srv: null, // what the server last said
   draft: null, // {conf, overrides}: what the user is editing
   base: "", // JSON of the draft as last applied/loaded
-  view: location.hash.slice(1) || "overview",
+  view: "overview",
   sel: null, // class of the selected entry
   dark: matchMedia("(prefers-color-scheme: dark)").matches,
   status: null,
@@ -77,8 +77,10 @@ async function load(keepDraft = false) {
   if (!S.srv.entries.some((e) => e.class === S.sel)) S.sel = topRows()[0]?.class || null;
 }
 function go(v) {
-  S.view = VIEWS.some((x) => x[0] === v) ? v : "overview";
+  const [name, arg] = String(v).split(":");
+  S.view = VIEWS.some((x) => x[0] === name) ? name : "overview";
   history.replaceState(null, "", "#" + S.view);
+  if (S.view === "ventoy" && arg && VT.path !== decodeURIComponent(arg)) vtLoad(decodeURIComponent(arg));
   render();
   scrollTo({ top: 0 });
 }
@@ -129,6 +131,7 @@ function renderTop() {
 }
 function renderFab() {
   const f = document.getElementById("fabbar");
+  if (S.view === "ventoy") return f.replaceChildren(); // the stick has its own button
   f.replaceChildren(
     h("button", { class: "btn fab" + (dirty() ? " attention" : ""), disabled: !dirty() || !S.srv.installed, onClick: applyDraft, title: dirty() ? "Write your changes to GRUB (asks for your password or fingerprint)" : "Nothing to apply yet" }, icon("apply"), "Apply to GRUB"),
   );
@@ -367,14 +370,15 @@ function entryEditor(e) {
   return wrap;
 }
 function renderListOnly() { const el = document.querySelector(".entries"); if (el) { const p = el.parentNode; const n = entryList(topRows(), S.draft.overrides.groups.length > 0); p.replaceChild(n, el); } }
-function iconPicker(e, eff, patch) {
+function iconPicker(e, eff, patch, src) {
+  src = src || { icons: () => S.srv.icons, url: (n) => "/api/icon/" + encodeURIComponent(n), upload: async (name, f) => { const r = await api.uploadIcon(name, f); S.srv.icons = [...new Set([...S.srv.icons, r.name])].sort(); return r; } };
   let q = "";
   const grid = h("div", { class: "icon-grid" });
   const cats = Object.entries(S.srv.catalog).filter(([, c]) => c.glyph).map(([k, c]) => [k, c.title]);
   const draw = () => {
     grid.replaceChildren(
       h("button", { class: "icon-cell", type: "button", title: "Automatic", "aria-pressed": String(!eff.icon), onClick: () => patch({ icon: undefined }) }, "Auto"),
-      ...S.srv.icons.map((n) => h("button", { class: "icon-cell", type: "button", title: n, "aria-pressed": String(eff.icon === "file:" + n), onClick: () => patch({ icon: "file:" + n }) }, h("img", { src: "/api/icon/" + encodeURIComponent(n), alt: n }))),
+      ...src.icons().map((n) => h("button", { class: "icon-cell", type: "button", title: n, "aria-pressed": String(eff.icon === "file:" + n), onClick: () => patch({ icon: "file:" + n }) }, h("img", { src: src.url(n), alt: n }))),
       ...cats.filter(([k, t]) => !q || (k + t).toLowerCase().includes(q)).map(([k, t]) => h("button", { class: "icon-cell", type: "button", title: t, "aria-label": t, "aria-pressed": String(eff.icon === k), onClick: () => patch({ icon: k }) }, h("span", { class: "glyph", style: { "--g": `url(/api/glyph/${encodeURIComponent(k)})` } }))),
     );
   };
@@ -385,8 +389,7 @@ function iconPicker(e, eff, patch) {
     if (!f) return;
     const name = f.name.replace(/[^A-Za-z0-9._-]/g, "_").replace(/^\.+/, "") || "icon.png";
     try {
-      const r = await api.uploadIcon(name, f);
-      S.srv.icons = [...new Set([...S.srv.icons, r.name])].sort();
+      const r = await src.upload(name, f);
       patch({ icon: "file:" + r.name });
       toast("Picture added: " + r.name);
     } catch (err) { toast("Could not add the picture: " + err.message); }
@@ -430,8 +433,93 @@ function vColours(v) {
 }
 
 // ---------------------------------------------------------------- Ventoy
+const VT = { sticks: null, path: "", data: null, draft: null, base: "", sel: null, busy: false };
+const vtDirty = () => VT.draft && JSON.stringify(VT.draft) !== VT.base;
+async function vtLoad(path) {
+  try {
+    VT.data = await api.ventoyState(path);
+    VT.path = path;
+    VT.draft = { conf: clone(VT.data.conf), overrides: clone(VT.data.overrides) };
+    VT.base = JSON.stringify(VT.draft);
+    VT.sel = VT.data.files[0]?.path || null;
+  } catch (e) { VT.data = null; toast(e.message); }
+  render();
+}
+async function vtDetect() {
+  VT.busy = true; render();
+  try { VT.sticks = (await api.ventoySticks()).sticks; } catch (e) { toast(e.message); VT.sticks = []; }
+  VT.busy = false; render();
+}
 function vVentoy(v) {
-  v.append(card("Ventoy sticks", h("p", { class: "muted" }, "Customise the theme on a Ventoy USB stick: names, icons and colours per ISO. This editor is coming in the next step of this release.")));
+  const sticks = VT.sticks;
+  v.append(
+    card("Your Ventoy stick",
+      h("p", { class: "muted" }, "Plug in a Ventoy stick and mount it (your file manager does this when you open it). The theme is written to the stick itself; no root is needed."),
+      h("div", { class: "row" },
+        h("button", { class: "btn tonal", onClick: vtDetect, disabled: VT.busy }, icon("ventoy"), VT.busy ? "Looking..." : sticks ? "Look again" : "Find sticks"),
+        hint("Looks for disks with a Ventoy partition, and for a /ventoy folder on removable drives."),
+      ),
+      sticks && !sticks.length ? h("p", { class: "muted", style: { marginTop: "12px" } }, "No Ventoy stick found. You can also type the mount point below.") : null,
+      sticks?.length ? h("div", { class: "grid cols2", style: { marginTop: "14px" } }, ...sticks.map((s) => h("div", { class: "card high" }, h("h3", {}, s.label || "Ventoy"), h("p", { class: "muted small" }, [s.model, s.fstype, s.size ? (s.size / 1e9).toFixed(1) + " GB" : ""].filter(Boolean).join(" · ")), s.mounted ? h("button", { class: "btn small", onClick: () => vtLoad(s.path) }, "Edit this stick") : h("span", { class: "chip warn" }, "not mounted")))) : null,
+      h("div", { class: "row", style: { marginTop: "14px" } }, (() => { const i = h("input", { type: "text", placeholder: "/run/media/you/Ventoy", "aria-label": "Mount point of the stick", style: { flex: "1" } }); return h("div", { class: "row", style: { flex: "1" } }, i, h("button", { class: "btn small outline", onClick: () => vtLoad(i.value.trim()) }, "Open")); })()),
+    ),
+  );
+  if (!VT.data) return;
+  const d = VT.draft, c = d.conf;
+  const set = (k, val) => { c[k] = val; vtTouch(); };
+  v.append(
+    card("Look on the stick",
+      h("p", { class: "muted small mono" }, VT.data.path + (VT.data.installed.length ? " · themed for " + VT.data.installed.join(", ") : " · not themed yet")),
+      h("div", { class: "grid cols2" },
+        h("div", { class: "field" }, h("label", {}, "Style", hint("Ventoy has two layouts: 'list' (the distro's logo and name on the left, the ISO list on the right) and 'full' (a full-screen picker, one ISO at a time).")), seg([["list", "List"], ["full", "Full screen"]], c.STYLE === "full" ? "full" : "list", (x) => set("STYLE", x))),
+        h("div", { class: "field" }, h("label", {}, "Mode", hint("Dynamic works for any ISO you add later (rules match the file name). Snapshot draws one scene per file that is on the stick right now.")), seg([["dynamic", "Dynamic"], ["snapshot", "Snapshot"]], c.MODE, (x) => set("MODE", x))),
+        toggle("Cookie shape", c.COOKIE === "on", (x) => { set("COOKIE", x ? "on" : "off"); render(); }, "The scalloped shape at the top right, with the Ventoy logo inside."),
+        toggle("Ventoy logo", c.LOGO === "on" && c.COOKIE === "on", (x) => set("LOGO", x ? "on" : "off"), "The Ventoy logo inside the cookie.", c.COOKIE !== "on"),
+        toggle("Key hints", c.HINTS === "on", (x) => set("HINTS", x ? "on" : "off"), "The pills at the bottom with Ventoy's keys (F1 Help, F2 Browse, ...)."),
+        toggle("Raw file name", c.RAW_NAME === "on", (x) => set("RAW_NAME", x ? "on" : "off"), "In the full-screen picker: the real file name in a pill under the title."),
+      ),
+      h("hr"),
+      h("div", { class: "field" }, h("label", {}, "Colours", hint("One colour for the whole stick, or every distro in its own brand colour.")),
+        seg([["multi", "A colour per distro"], ["single", "One colour"]], d.overrides.seed.mode, (x) => { d.overrides.seed.mode = x; vtTouch(); render(); }),
+        d.overrides.seed.mode === "single" ? swatchGrid(d.overrides.seed.color, (col) => { d.overrides.seed.color = col; vtTouch(); render(); }) : null),
+    ),
+    card("Your images (" + VT.data.files.length + ")",
+      VT.data.files.length ? h("div", { class: "entries" }, ...VT.data.files.map((f) => {
+        const r = vtRule(f);
+        return h("div", { class: "entry", role: "option", tabindex: 0, "aria-selected": String(VT.sel === f.path), onClick: () => { VT.sel = f.path; render(); }, onKeydown: (ev) => { if (ev.key === "Enter") { VT.sel = f.path; render(); } } },
+          h("span", { class: "badge-ico", style: { background: r?.color || S.srv.catalog[f.key]?.seed || "var(--c-primary-container)", color: "#fff" } }, h("span", { class: "glyph", style: { "--g": `url(/api/glyph/${encodeURIComponent(S.srv.catalog[f.key]?.glyph ? f.key : "tux")})` } })),
+          h("div", { class: "names" }, h("b", {}, r?.name || f.name), h("small", {}, f.path + " · " + (S.srv.catalog[f.key]?.title || f.key))),
+          r ? h("span", { class: "chip ok" }, "customised") : null);
+      })) : h("div", { class: "empty" }, "No ISO, WIM, IMG or VHD files on the stick yet. Dynamic mode still works for files you add later."),
+    ),
+  );
+  const f = VT.data.files.find((x) => x.path === VT.sel);
+  if (f) v.append(vtEditor(f));
+  v.append(h("div", { class: "row" },
+    h("button", { class: "btn", disabled: !vtDirty() && !!VT.data.installed.length, onClick: vtApply }, icon("apply"), "Write to the stick"),
+    h("select", { id: "vt-res", style: { width: "auto" }, "aria-label": "Screen resolution of the theme" }, ...VT.data.resolutions.map((r) => h("option", { value: r, ...(r === (VT.data.installed[0] || "1920x1080") ? { selected: "" } : {}) }, r))),
+    hint("The resolution Ventoy starts in. Pick your screen's, or the nearest."),
+    vtDirty() ? h("span", { class: "chip dirty" }, "unsaved changes") : null));
+}
+const vtTouch = () => {};
+const vtRule = (f) => VT.draft.overrides.entries.find((r) => r.match.title === f.name) || VT.draft.overrides.entries.find((r) => r.match.key === f.key) || null;
+function vtEditor(f) {
+  const r = vtRule(f) || {};
+  const patch = (p) => { const list = VT.draft.overrides.entries; let x = list.find((y) => y.match.title === f.name); if (!x) { x = { match: { title: f.name } }; list.push(x); } for (const [k, val] of Object.entries(p)) { if (val === undefined || val === "") delete x[k]; else x[k] = val; } if (Object.keys(x).length === 1) list.splice(list.indexOf(x), 1); render(); };
+  const src = { icons: () => VT.data.icons, url: (n) => "/api/ventoy/icon?path=" + encodeURIComponent(VT.path) + "&name=" + encodeURIComponent(n), upload: async (name, file) => { const res = await api.ventoyIcon(VT.path, name, file); VT.data.icons = [...new Set([...VT.data.icons, res.name])].sort(); return res; } };
+  return h("section", { class: "card high" },
+    h("div", { class: "card-head" }, h("h2", {}, "Customise: " + f.name), r.match ? h("button", { class: "btn text small", onClick: () => patch({ name: undefined, color: undefined, icon: undefined }) }, icon("reset"), "Reset") : null),
+    h("div", { class: "field" }, h("label", {}, "Name", hint("Shown in Ventoy's list instead of the file name (Ventoy's own alias feature). Leave empty to keep the file name.")), h("input", { type: "text", value: r.name || "", placeholder: f.name, maxlength: 60, onChange: (ev) => patch({ name: ev.target.value.trim() }) })),
+    h("hr"),
+    h("div", { class: "field" }, h("label", {}, "Colour", hint("The screen shown for this image is made in this colour.")), swatchGrid(r.color, (c) => patch({ color: c }), [h("button", { class: "swatch", type: "button", style: { background: "repeating-conic-gradient(var(--c-surface-container-highest) 0 25%, var(--c-surface) 0 50%) 0 0/14px 14px" }, title: "Automatic", "aria-pressed": String(!r.color), onClick: () => patch({ color: undefined }) })]), hexField(r.color || "", (c) => patch({ color: c }))),
+    h("hr"),
+    iconPicker(f, r, patch, src),
+    h("p", { class: "muted small" }, "The rule applies to files whose name contains \"" + f.name + "\". Ventoy matches by a piece of the name, so the theme picks the shortest piece that no other file has."),
+  );
+}
+function vtApply() {
+  const res = document.getElementById("vt-res")?.value || "1920x1080";
+  runJob("Writing the theme to the stick", () => api.ventoyApply(VT.path, VT.draft, res), async () => { await vtLoad(VT.path); });
 }
 
 // ---------------------------------------------------------------- Presets
@@ -573,4 +661,4 @@ async function drawPreview() {
 // ---------------------------------------------------------------- go
 setInterval(() => api.ping().catch(() => {}), 8000);
 addEventListener("beforeunload", (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
-load().then(() => { render(); refreshStatus(); }).catch((e) => { document.body.prepend(h("p", { style: { padding: "2rem" } }, "Could not talk to the Material GRUB GUI program: " + e.message)); });
+load().then(() => { go(location.hash.slice(1) || "overview"); refreshStatus(); }).catch((e) => { document.body.prepend(h("p", { style: { padding: "2rem" } }, "Could not talk to the Material GRUB GUI program: " + e.message)); });

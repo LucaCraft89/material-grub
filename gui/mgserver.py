@@ -129,6 +129,28 @@ class App:
         threading.Thread(target=self._run_job, args=(job, request), daemon=True).start()
         return job
 
+    def start_callable(self, fn):
+        """Like start_job, but `fn(emit)` runs in-process (Ventoy sticks are written as the user: no root involved)."""
+        with self.lock:
+            if self.job_busy:
+                raise RuntimeError("another change is still running")
+            self.job_busy = True
+        job = Job(secrets.token_hex(6))
+        self.jobs[job.id] = job
+
+        def run():
+            try:
+                fn(job.add)
+            except Exception as e:
+                job.add({"event": "error", "msg": str(e), "code": 1})
+                job.add({"event": "done", "rc": 1, "ok": False})
+            finally:
+                with self.lock:
+                    self.job_busy = False
+
+        threading.Thread(target=run, daemon=True).start()
+        return job
+
     def _run_job(self, job, request):
         try:
             cmd = helper_command()
@@ -309,7 +331,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 302,
                 b"",
                 "text/plain",
-                {"Location": "/" + ("#" + q["view"][0] if re.fullmatch(r"[a-z]{3,12}", q.get("view", [""])[0]) else ""), "Set-Cookie": f"mg={app.token}; HttpOnly; SameSite=Strict; Path=/"},
+                {"Location": "/" + ("#" + q["view"][0] if re.fullmatch(r"[a-z]{3,12}(:[A-Za-z0-9/_.%-]{1,200})?", q.get("view", [""])[0]) else ""), "Set-Cookie": f"mg={app.token}; HttpOnly; SameSite=Strict; Path=/"},
             )
         if not self.cookie_ok():
             return self.send(403, "<h1>Material GRUB</h1><p>Open the link printed in the terminal by <code>material-grub-gui</code>.</p>", "text/html; charset=utf-8")
@@ -427,6 +449,145 @@ def api_glyph(h, q, g):
     return h.send(200, f.read_bytes(), "image/png", {"Cache-Control": "max-age=3600"})
 
 
+# ---------------------------------------------------------------- Ventoy (written as the user: a mounted stick belongs to them)
+def ventoy_path(path):
+    import ventoy_sticks
+
+    p = Path(path or "")
+    if not p.is_absolute() or not p.is_dir() or not ventoy_sticks.check(str(p)):
+        raise ValueError("that is not the mount point of a Ventoy data partition")
+    p = p.resolve()
+    if not os.access(p / "ventoy", os.W_OK) and (p / "ventoy").is_dir():
+        raise ValueError("the stick is read-only for you: remount it or run the GUI with enough permissions")
+    return p
+
+
+def api_ventoy_sticks(h, q, g):
+    import ventoy_sticks
+
+    return h.send(200, {"sticks": ventoy_sticks.detect()})
+
+
+def api_ventoy_state(h, q, g):
+    import cmd_ventoy
+    import mgrub
+
+    stick = ventoy_path(q.get("path", [""])[0])
+    rules = mgrub.load_rules(PKG)
+    conf = mgrub.load_conf(str(stick / "ventoy/material-grub.conf"))
+    ov, problems = mgoverrides.load(stick / cmd_ventoy.OVERRIDES)
+    files = [{"path": r, "name": Path(r).name, "key": cmd_ventoy.key_of(Path(r).name, rules)} for r in cmd_ventoy.scan(stick)]
+    icons_dir = stick / cmd_ventoy.ICONS
+    icons = sorted(f.name for f in icons_dir.iterdir() if f.suffix.lower() in mgoverrides.IMAGE_EXT) if icons_dir.is_dir() else []
+    themes = sorted(d.name[len("material_"):] for d in (stick / cmd_ventoy.THEMES).glob("material_*") if d.is_dir()) if (stick / cmd_ventoy.THEMES).is_dir() else []
+    avail = sorted(p.name for p in (PKG / "res").iterdir()) if PKG and (PKG / "res").is_dir() else ["1920x1080"]
+    return h.send(
+        200,
+        {
+            "path": str(stick),
+            "conf": {k: conf[k] for k in ("STYLE", "COOKIE", "LOGO", "HINTS", "RAW_NAME", "TIMEOUT", "MODE")},
+            "overrides": ov,
+            "problems": problems,
+            "files": files,
+            "icons": icons,
+            "installed": themes,
+            "resolutions": avail,
+            "styles": ["list", "full"],
+        },
+    )
+
+
+def api_ventoy_icon(h, q, g):
+    import cmd_ventoy
+
+    stick = ventoy_path(q.get("path", [""])[0])
+    name = q.get("name", [""])[0]
+    if not mgoverrides._icon_ok("file:" + name):
+        return h.fail(400, "the file name must be letters, digits, - _ . and end in a picture extension")
+    raw = h.body()
+    if not raw or len(raw) > 4 * 1024 * 1024:
+        return h.fail(400, "the picture must be between 1 byte and 4 MB")
+    if not name.lower().endswith(".svg"):
+        import io
+
+        from PIL import Image
+
+        try:
+            im = Image.open(io.BytesIO(raw))
+            im.verify()
+        except Exception:
+            return h.fail(400, "that is not a readable picture")
+    elif b"<svg" not in raw[:65536].lower():
+        return h.fail(400, "that is not an SVG file")
+    d = stick / cmd_ventoy.ICONS
+    d.mkdir(parents=True, exist_ok=True)
+    (d / name).write_bytes(raw)
+    return h.send(200, {"name": name})
+
+
+def api_ventoy_icon_get(h, q, g):
+    import cmd_ventoy
+
+    stick = ventoy_path(q.get("path", [""])[0])
+    name = q.get("name", [""])[0]
+    f = stick / cmd_ventoy.ICONS / name
+    if not mgoverrides._icon_ok("file:" + name) or not f.is_file():
+        return h.fail(404, "no such picture")
+    im = mgcustom.load_image(f, 256)
+    if im is None:
+        return h.fail(415, "cannot read that picture")
+    import io
+
+    im.thumbnail((256, 256))
+    out = io.BytesIO()
+    im.save(out, "PNG")
+    return h.send(200, out.getvalue(), "image/png")
+
+
+def api_ventoy_apply(h, q, g):
+    import cmd_ventoy
+    import mgrub
+
+    req = h.json_body()
+    stick = ventoy_path(req.get("path", ""))
+    draft, errs = mgstate.check_draft({"conf": {}, "overrides": (req.get("draft") or {}).get("overrides", {})})
+    if errs:
+        return h.fail(400, "; ".join(errs))
+    conf = (req.get("draft") or {}).get("conf", {})
+    allowed = ("STYLE", "COOKIE", "LOGO", "HINTS", "RAW_NAME", "TIMEOUT", "MODE")
+    if not isinstance(conf, dict) or any(k not in allowed or not mgrub._conf_ok(k, str(v)) for k, v in conf.items()):
+        return h.fail(400, "the options are not valid")
+    res = str(req.get("res", "1920x1080"))
+    if not re.fullmatch(r"\d{3,5}x\d{3,5}(,\d{3,5}x\d{3,5})*", res):
+        return h.fail(400, "bad resolution")
+
+    def run(emit):
+        emit({"event": "step", "n": 1, "total": 3, "msg": "Saving your settings on the stick"})
+        mgrub.write_conf(stick / "ventoy/material-grub.conf", {k: str(v) for k, v in conf.items()})
+        mgoverrides.save(draft["overrides"], stick / cmd_ventoy.OVERRIDES)
+        emit({"event": "ok", "msg": "settings saved"})
+        emit({"event": "step", "n": 2, "total": 3, "msg": "Drawing the theme and updating ventoy.json"})
+        p = subprocess.Popen([sys.executable, str(MODS / "material-grub-ventoy"), str(stick), "--pkg", str(PKG), "--res", res], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+        with p.stdout:
+            for line in p.stdout:
+                if line.strip():
+                    emit({"event": "log", "text": line.rstrip(), "level": "info"})
+        rc = p.wait()
+        if rc != 0:
+            emit({"event": "error", "msg": "the Ventoy tool failed (see the log)", "code": rc})
+            emit({"event": "done", "rc": rc, "ok": False})
+            return
+        emit({"event": "step", "n": 3, "total": 3, "msg": "Done"})
+        emit({"event": "ok", "msg": "The stick is themed. Eject it safely before unplugging."})
+        emit({"event": "done", "rc": 0, "ok": True})
+
+    try:
+        job = h.app.start_callable(run)
+    except RuntimeError as e:
+        return h.fail(409, str(e))
+    return h.send(200, {"job": job.id})
+
+
 def api_apply(h, q, g):
     req = h.json_body()
     try:
@@ -534,6 +695,11 @@ ROUTES = {
     ("GET", "/api/status"): api_status,
     ("GET", "/api/ping"): api_ping,
     ("GET", "/api/palette"): api_palette,
+    ("GET", "/api/ventoy/sticks"): api_ventoy_sticks,
+    ("GET", "/api/ventoy/state"): api_ventoy_state,
+    ("POST", "/api/ventoy/icon"): api_ventoy_icon,
+    ("GET", "/api/ventoy/icon"): api_ventoy_icon_get,
+    ("POST", "/api/ventoy/apply"): api_ventoy_apply,
     ("POST", "/api/preview"): api_preview,
     ("POST", "/api/icon"): api_icon_upload,
     ("POST", "/api/apply"): api_apply,
