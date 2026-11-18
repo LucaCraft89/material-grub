@@ -84,6 +84,43 @@ jobs:
         if: always()
         with: {name: "boot-${{ matrix.scheme }}-${{ matrix.style }}", path: build/ci-shots/}
 
+  safety:
+    # The safety nets in a real GRUB: a theme that is missing at boot gives the plain menu, and a broken rewrite is rolled back (QEMU/OVMF, Fedora container like `boot`).
+    name: Safety nets in QEMU (plain-menu fallback, rollback)
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:latest
+    steps:
+      - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
+      - uses: actions/checkout@v4
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+      - run: .venv/bin/python scripts/package.py --res 1920x1080
+      - run: BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/fallback_smoke.py 1920x1080 dark
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: safety-shots, path: build/fallback-*.png}
+
+  dry-run:
+    # `install.sh --dry-run` as root in a distro container with a fake /boot: it must show a diff and leave the system byte for byte unchanged.
+    name: Dry run on ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: Debian, distro: debian, image: "docker.io/library/debian:stable"}
+          - {name: Fedora, distro: fedora, image: "registry.fedoraproject.org/fedora:latest"}
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+      - run: .venv/bin/python scripts/package.py --res 1920x1080
+      - run: |
+          mkdir -p build/out
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/dry_run.sh ${{ matrix.distro }}
+          cat build/out/dry-${{ matrix.distro }}.txt
+          grep -q "^exit: 0" build/out/dry-${{ matrix.distro }}.txt
+          grep -q "^SYSTEM UNCHANGED" build/out/dry-${{ matrix.distro }}.txt
+
   ventoy:
     # Real Ventoy 1.1.18 (downloaded, sha256 checked) booted in QEMU/OVMF with the theme installed; ISOs are then added, renamed and removed WITHOUT running the installer again.
     # Software emulation on the runner, so the script waits 4x longer.
