@@ -111,4 +111,5 @@ if __name__ == "__main__":
     (PKG / "palettes.json").write_text(json.dumps({k: v for k, v in B.R.PAL.items()}))
     shutil.copytree(ROOT / "install/bin", PKG / "bin")
     shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
+    shutil.copy(ROOT / "VERSION", PKG / "VERSION")
     print("package at", PKG)

@@ -11,13 +11,13 @@ if [ -f /var/lib/material-grub/env ] && grep -q '^MG_IMMUTABLE=1' /var/lib/mater
     rm -rf "$(dirname "$(readlink -f "$f")")/themes/material" "$(dirname "$(readlink -f "$f")")/material"
   done
   [ "$RO" = 1 ] && mount -o remount,ro /boot
-  rm -f /usr/local/sbin/material-grub-apply
+  rm -f /usr/local/sbin/material-grub-apply /usr/local/sbin/material-grub
   rm -rf /var/lib/material-grub /etc/systemd/system/material-grub.* /etc/systemd/system/material-grub-finalize.service
   systemctl daemon-reload 2>/dev/null || true
   echo "(your /etc/material-grub.conf was kept)"; echo "material-grub removed (immutable install); backups stay in /var/backups/material-grub"
   exit 0
 fi
-rm -f /usr/local/sbin/material-grub-apply
+rm -f /usr/local/sbin/material-grub-apply /usr/local/sbin/material-grub
 rm -rf /usr/share/material-grub /etc/grub.d/05_material /etc/grub.d/15_material_menu /etc/grub.d/90_material_system /usr/libexec/material-grub-postprocess /etc/systemd/system/material-grub.* /boot/grub2/themes/material /boot/grub/themes/material
 if command -v grub2-mkconfig >/dev/null; then grub2-mkconfig -o /boot/grub2/grub.cfg; else grub-mkconfig -o /boot/grub/grub.cfg; fi
 echo "material-grub removed (GRUB_GFXMODE in /etc/default/grub left as is)"

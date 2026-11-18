@@ -3,7 +3,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 echo "== shell syntax"
-for f in install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh; do sh -n "$f" && echo "ok $f"; done
+for f in install.sh install/*.sh install/material-grub install/material-grub-apply install/05_material install/15_material_menu install/90_material_system tests/run.sh; do sh -n "$f" && echo "ok $f"; done
 echo "== python syntax"
 python3 -m py_compile scripts/*.py install/bin/material-grub-* install/bin/*.py install/*.py tests/*.py && echo ok
 echo "== lint (when ruff / shellcheck are installed; CI always runs them)"
@@ -18,6 +18,7 @@ python3 tests/test_grubscript.py
 python3 tests/test_safety.py
 python3 tests/test_dryrun.py
 python3 tests/test_installer.py
+python3 tests/test_doctor.py
 python3 scripts/gen_distro_table.py --check
 echo "== pipeline test (needs a built package)"
 python3 tests/test_pipeline.py

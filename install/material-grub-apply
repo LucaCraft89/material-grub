@@ -1,6 +1,7 @@
 #!/bin/sh
 # Re-apply Material GRUB after editing /etc/material-grub.conf (or to force a refresh).
 set -e
+case ${1:-} in --status) [ -f /var/lib/material-grub/env ] && . /var/lib/material-grub/env; exec "${MATERIAL_PY:-python3}" "${MATERIAL_PKG:-/usr/share/material-grub}/bin/material-grub-doctor" ;; esac
 [ "$(id -u)" -eq 0 ] || { echo "run as root: sudo $0"; exit 1; }
 if [ -f /var/lib/material-grub/env ] && grep -q '^MG_IMMUTABLE=1' /var/lib/material-grub/env; then
   MG_FORCE=1 exec sh /var/lib/material-grub/postprocess
