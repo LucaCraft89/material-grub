@@ -255,5 +255,60 @@ class DrivePill(unittest.TestCase):
         self.assertNotEqual(mgrub.uid("top", "Ubuntu (on /dev/sda5)"), mgrub.uid("top", "Ubuntu (on /dev/sdb5)"))
 
 
+class ListLayout(unittest.TestCase):
+    """The `list` style stacks (1080-high design): the list (ends at 840), the info chips, the countdown bar and label, the key hints (start at 960). Nothing may overlap."""
+
+    def test_chips_countdown_and_hints_do_not_overlap(self):
+        import mgscenes
+
+        theme = "# mg:begin countdown\n+ progress_bar {\n  top = 755\n  height = 14\n}\n+ label {\n  top = 790\n  height = 34\n}\n# mg:end countdown\n"
+        out = mgrub._list_layout(theme)
+        import re
+
+        bar, label = (int(x) for x in re.findall(r"top = (\d+)", out))
+        chips_top, chips_h = mgscenes.LIST_CHIPS
+        self.assertGreaterEqual(chips_top, 840)  # under the "+1 more" row
+        self.assertLessEqual(chips_top + chips_h, bar)
+        self.assertLessEqual(bar + 14, label)
+        self.assertLessEqual(label + 34, 960)  # the key hints
+
+
+class WriteConf(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+
+        self.d = tempfile.TemporaryDirectory()
+        self.p = Path(self.d.name) / "material-grub.conf"
+
+    def tearDown(self):
+        self.d.cleanup()
+
+    def test_replaces_sample_and_keeps_comments(self):
+        self.p.write_text("# header\n#STYLE=rail\n#HINTS=on\n")
+        mgrub.write_conf(self.p, {"STYLE": "list"})
+        self.assertEqual(self.p.read_text(), "# header\nSTYLE=list\n#HINTS=on\n")
+
+    def test_replaces_active_line_then_appends(self):
+        self.p.write_text("STYLE=rail\n")
+        mgrub.write_conf(self.p, {"STYLE": "split", "HINTS": "off"})
+        self.assertEqual(self.p.read_text(), "STYLE=split\nHINTS=off\n")
+        self.assertEqual(mgrub.load_conf(self.p)["STYLE"], "split")
+
+    def test_creates_missing_file_and_keeps_mode(self):
+        mgrub.write_conf(self.p, {"SCHEME": "light"})
+        self.assertEqual(mgrub.load_conf(self.p)["SCHEME"], "light")
+        self.p.chmod(0o600)
+        mgrub.write_conf(self.p, {"TIMEOUT": "7"})
+        self.assertEqual(self.p.stat().st_mode & 0o777, 0o600)
+
+    def test_rejects_bad_values_without_writing(self):
+        self.p.write_text("STYLE=rail\n")
+        for bad in ({"STYLE": "neon"}, {"NOPE": "on"}, {"TIMEOUT": "x"}, {"HINTS": "maybe"}):
+            with self.assertRaises(ValueError):
+                mgrub.write_conf(self.p, bad)
+        self.assertEqual(self.p.read_text(), "STYLE=rail\n")
+        self.assertEqual([f.name for f in Path(self.d.name).iterdir()], [self.p.name])
+
+
 if __name__ == "__main__":
     unittest.main()

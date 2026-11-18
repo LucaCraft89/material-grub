@@ -10,13 +10,16 @@
 #   ./install.sh --ventoy [MOUNTPOINT]   # theme a Ventoy USB stick instead (no root needed; a TUI picks the stick when no path is given)
 #        --res A,B,C  themes for several screen sizes (the first is Ventoy's start mode)    --mode dynamic|snapshot  (default dynamic: follows the ISOs on the stick)
 #        ./install.sh --uninstall --ventoy MOUNTPOINT   removes it from the stick again
-#   Runtime options (STYLE, HINTS, COOKIE, LOGO) go to /etc/material-grub.conf and can be changed later without rebuilding: sudo material-grub-apply
+#   Runtime options (STYLE, HINTS, COOKIE, LOGO) go to /etc/material-grub.conf and can be changed later without rebuilding: sudo material-grub apply
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
 #            --keep-build  keep the temporary build dir     --force  ignore the NixOS check
 #            --immutable  use the ostree/bootc layout (automatic when /run/ostree-booted exists)   --yes  do not ask for confirmation
 #            --pkg DIR  install a package built elsewhere   --dist-out DIR  with --stage-only: copy the built package to DIR
 #            --preview  render your boot entries with the chosen style as a web page; no root, nothing installed, no VM
 #            --dry-run  build in a scratch directory and show a diff of grub.cfg and /etc/default/grub plus the files it would write; changes nothing (needs sudo for the grub.cfg part)
+#            --seed '#RRGGBB'  one seed colour for every entry (single-colour theme); --seed-mode multi|single  switch back and forth without changing the colour
+#            --with-gui  also install the optional graphical editor (material-grub-gui; source installs, needs the gui/ folder; packages have their own material-grub-gui package)
+#            --progress json  machine-readable output for the GUI: one JSON object per line (step, info, ok, warn, error, progress, log, done); never asks anything
 #   The logic is install/installer.py (Python 3.8+, standard library only); this file finds a Python 3.8+ (installing one with the
 #   distribution's package manager when needed, which takes root) and hands over.
 set -eu
@@ -24,7 +27,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 
 # --help needs no Python
 for a in "$@"; do
-  case $a in -h|--help) sed -n 2,19p "$0" | sed 's/^# \{0,1\}//'; exit 0;; esac
+  case $a in -h|--help) sed -n 2,22p "$0" | sed 's/^# \{0,1\}//'; exit 0;; esac
 done
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="mg-token" content="__MG_TOKEN__">
+<meta name="color-scheme" content="light dark">
+<title>Material GRUB</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2300a86b' d='M12 1.5l2.6 2 3.3-.3 1.2 3.1 3 1.4-.7 3.2 1.7 2.8-2.3 2.4.1 3.3-3.2.9-1.8 2.8L12 21l-2.9 1.1-1.8-2.8-3.2-.9.1-3.3L1.9 12.7l1.7-2.8-.7-3.2 3-1.4 1.2-3.1 3.3.3z'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/tokens.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="app">
+  <nav class="rail" id="rail" aria-label="Sections"></nav>
+  <main>
+    <div class="topbar" id="topbar"></div>
+    <div id="layout" class="layout"></div>
+  </main>
+</div>
+<div class="fabbar" id="fabbar"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<dialog id="job" aria-labelledby="job-title"></dialog>
+<noscript><p style="padding:2rem">This page needs JavaScript. Everything stays on this computer: the page talks only to the local Material GRUB GUI program.</p></noscript>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

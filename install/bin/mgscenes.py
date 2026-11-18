@@ -7,11 +7,16 @@ import math
 import os
 import subprocess
 from pathlib import Path
+from struct import error as struct_error
 
 from PIL import Image, ImageDraw, ImageFont
 
 WIN, SYS = {"windows10", "windows11"}, {"firmware", "reboot", "shutdown"}
 STYLES = ("rail", "clean", "list", "split")
+LIST_CHIPS = (
+    846,
+    46,
+)  # 1080-high design: top and height of the info chips under the list (mgrub._list_layout puts the countdown below them)
 LISTY = (
     "list",
     "split",
@@ -43,16 +48,63 @@ SHAPES = {  # same outlines as scripts/render_scene.py (the build-time panels)
 }
 
 
-def groups_of(keys):
-    return [
-        g
-        for g in (
-            [k for k in keys if k not in WIN | SYS],
-            [k for k in keys if k in WIN],
-            [k for k in ("firmware", "reboot", "shutdown") if k in keys],
-        )
-        if g
-    ]
+def base_key(k):
+    """The catalog key of a (possibly customised) entry key: 'fedora~2' is the second customised Fedora."""
+    return k.split("~", 1)[0]
+
+
+def tux_logo(pkg, size):
+    """The Linux penguin as a dark silhouette: the logo for machines whose firmware has none."""
+    try:
+        a = Image.open(Path(pkg) / "glyphs" / "tux.png").convert("RGBA").getchannel("A")
+    except OSError:
+        return None
+    im = Image.new("RGBA", (size, size), (0x14, 0x14, 0x18, 255))
+    im.putalpha(a.resize((size, size), Image.LANCZOS))
+    return im
+
+
+def machine_logo(pkg, size, src=None, fallback=True):
+    """The firmware (BGRT) logo as the theme shows it (a dark silhouette), for the PREVIEWS: on a real menu GRUB draws it from machine-logo.png,
+    so it is never baked into a scene. When the firmware has no usable logo: the Linux penguin (fallback=True) or None. Uses the installer's code (bgrt-logo.py)."""
+    import importlib.util
+
+    src = src or os.environ.get("MG_BGRT_IMAGE", "/sys/firmware/acpi/bgrt/image")
+
+    for c in (Path(pkg) / "bin/bgrt-logo.py", Path(__file__).resolve().parents[2] / "scripts/bgrt-logo.py"):
+        if c.is_file():
+            break
+    else:
+        return tux_logo(pkg, size) if fallback else None
+    try:
+        spec = importlib.util.spec_from_file_location("bgrt_logo", c)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        w, h, px = mod.read_bmp(src)
+        res = mod.crop(mod.alpha_rows(w, h, px), w, h)
+        if res is None:
+            return tux_logo(pkg, size) if fallback else None
+        n, _, rows = mod.fit_square(*res, size)
+    except (OSError, ValueError, ImportError, struct_error):
+        return tux_logo(pkg, size) if fallback else None
+    mask = Image.new("L", (n, n))
+    mask.putdata([a for r in rows for a in r])
+    im = Image.new("RGBA", (n, n), (0x14, 0x14, 0x18, 255))
+    im.putalpha(mask)
+    return im
+
+
+def groups_of(keys, order=None):
+    """The rail sections: Linux, Windows, System (firmware and power). `order` (names from mgoverrides.GROUPS) moves sections; those left out keep their place after."""
+    parts = {
+        "linux": [k for k in keys if base_key(k) not in WIN | SYS],
+        "windows": [k for k in keys if base_key(k) in WIN],
+        "system": sorted(
+            (k for k in keys if base_key(k) in SYS), key=lambda k: ("firmware", "reboot", "shutdown").index(base_key(k))
+        ),
+    }
+    names = list(order or []) + [n for n in ("linux", "windows", "system") if n not in (order or [])]
+    return [parts[n] for n in names if parts[n]]
 
 
 class Renderer:
@@ -67,6 +119,7 @@ class Renderer:
         self.light = light if light is not None else (sch.exists() and sch.read_text().strip() == "light")
         self.font_path = str(font_path or self.pkg / "fonts/GoogleSansFlex-VF.ttf")
         self._g, self._nd, self._fb = {}, {}, {}
+        self.preview_logo = None  # PIL image of the firmware logo: only the previews set it (on a real menu GRUB draws machine-logo.png itself)
         self.logos = {}  # catalog key -> full-colour logo (PIL image on a white background): drawn on a white card instead of the glyph in a cookie (Ventoy: PNLug)
         self.galias = {}  # pseudo entry key -> glyph name (Ventoy's own menus borrow glyphs and palettes of catalog entries)
         self.hint_labels = [
@@ -89,9 +142,16 @@ class Renderer:
         return round(v * self.S)
 
     # ---- fonts / glyphs ----
-    def font(self, size, wght=500, wdth=100, rond=0):
+    def font(self, size, wght=500, wdth=100, rond=0, opsz=None):
         f = ImageFont.truetype(self.font_path, size)
-        want = {"optical": size * 0.75, "width": wdth, "weight": wght, "roundness": rond, "grade": 0, "slant": 0}
+        want = {
+            "optical": opsz or size * 0.75,
+            "width": wdth,
+            "weight": wght,
+            "roundness": rond,
+            "grade": 0,
+            "slant": 0,
+        }
         vals = []
         for ax in f.get_variation_axes():  # by name: works with any version of the font (GRAD removed in v5)
             n = ax["name"].decode() if isinstance(ax["name"], bytes) else ax["name"]
@@ -158,7 +218,9 @@ class Renderer:
 
     def glyph(self, name, size, color):
         name = self.galias.get(name, name)
-        a = self._g.setdefault(name, Image.open(self.pkg / "glyphs" / f"{name}.png").convert("RGBA").getchannel("A"))
+        a = self._g.get(name)
+        if a is None:
+            a = self._g[name] = Image.open(self.pkg / "glyphs" / f"{name}.png").convert("RGBA").getchannel("A")
         im = Image.new("RGBA", (size, size), color)
         im.putalpha(a.resize((size, size), Image.LANCZOS))
         return im
@@ -201,9 +263,9 @@ class Renderer:
         d.text((x, h // 2 + u(1)), text, font=f, fill=fg + (255,), anchor="lm")
         return im
 
-    def pill_row(self, items, p, W, y, canvas, cx=None, maxw=None):
-        """Info pills in a row centred on cx (default: the middle of the scene), dropping the last ones that do not fit in maxw."""
-        pills = [self.pill(*i[:1], p, *i[1:]) for i in items]
+    def pill_row(self, items, p, W, y, canvas, cx=None, maxw=None, h=None):
+        """Info pills in a row centred on cx (default: the middle of the scene), dropping the last ones that do not fit in maxw. h: pill height."""
+        pills = [self.pill(*i[:1], p, *i[1:], h=h) for i in items]
         g = self.u(14)
         maxw = maxw or W * 0.78
         while pills and sum(x.width for x in pills) + g * (len(pills) - 1) > maxw:
@@ -251,7 +313,11 @@ class Renderer:
         return []
 
     def title_for(self, e):
-        return {"advanced": "Advanced", "rescue": "Rescue"}.get(e["kind"]) or self.titles.get(e["key"], e["key"])
+        return (
+            e.get("name")
+            or {"advanced": "Advanced", "rescue": "Rescue"}.get(e["kind"])
+            or self.titles.get(e["key"], e["key"])
+        )
 
     # ---- cookie (top-right) and key hints: drawn at config time, so they are runtime options ----
     def draw_cookie(self, canvas, p):
@@ -261,6 +327,8 @@ class Renderer:
         canvas.alpha_composite(
             c, (int(W - u(150 - self.cookie_off[0]) - c.width / 2), int(u(140 + self.cookie_off[1]) - c.height / 2))
         )
+        if self.preview_logo is not None:
+            self.paste_c(canvas, self.preview_logo, W - u(150 - self.cookie_off[0]), u(140 + self.cookie_off[1]))
 
     def key_hints(self, p):
         u = self.u
@@ -368,7 +436,7 @@ class Renderer:
         ink = hexc(p["onPrimaryContainer"]) + (255,)
         acc = {"advanced": "gear", "rescue": "wrench"}.get(e["kind"])
         if logo:
-            paste_c(canvas, self.fit_logo(logo, u(440)), cx, u(360))
+            paste_c(canvas, self.fit_logo(logo, u(440), u(240)), cx, u(360))
         elif acc:
             paste_c(canvas, self.glyph(e["key"], u(190), ink), cx - u(92), u(360))
             paste_c(canvas, self.glyph(acc, u(120), ink), cx + u(140), u(360))
@@ -470,6 +538,8 @@ class Renderer:
         if opts.get("cookie", True):
             ck = self.shape("cookie", u(230), p["primaryContainer"])
             canvas.alpha_composite(ck, (int(W - m - u(150) - ck.width / 2), int(t + u(140) - ck.height / 2)))
+            if self.preview_logo is not None:
+                self.paste_c(canvas, self.preview_logo, W - m - u(150), t + u(140))
         if opts.get("hints", True):
             hint = self.key_hints(p)
             canvas.alpha_composite(hint, ((W - hint.width) // 2, t + ph - cp - ch.height - u(12) - hint.height))
@@ -494,7 +564,7 @@ class Renderer:
     LIST = dict(col=640, row=76, gap=12, div=30, top=110, bottom=840, more_h=40, shape_glyph=40)
 
     def _group(self, key):
-        return 2 if key in SYS else 1 if key in WIN else 0
+        return 2 if base_key(key) in SYS else 1 if base_key(key) in WIN else 0
 
     def list_label(self, e):
         return {"advanced": "Advanced options", "rescue": "Rescue"}.get(e["kind"]) or self.label_for(e)
@@ -625,7 +695,9 @@ class Renderer:
                     self.info_pills(e), p, sc.width, u(818), sc, cx=round(sc.width * 0.25), maxw=sc.width * 0.42
                 )
             else:
-                self.pill_row(self.info_pills(e), p, sc.width, u(880), sc)
+                self.pill_row(
+                    self.info_pills(e), p, sc.width, u(LIST_CHIPS[0]), sc, h=u(LIST_CHIPS[1])
+                )  # between the list (ends at 840) and the countdown (896)
             return sc.convert("RGB")
         if e["kind"] != "plain":
             self.hero(sc, e, p)
@@ -649,9 +721,12 @@ class Renderer:
     def split_x(W):
         return round(W * 0.47)  # left edge of the list in `split` (and in the dynamic Ventoy list)
 
-    def fit_logo(self, logo, w):
-        """A full-colour logo scaled to width `w` (RGBA)."""
-        return logo.convert("RGBA").resize((w, max(1, round(logo.height * w / logo.width))), Image.LANCZOS)
+    def fit_logo(self, logo, w, h=None):
+        """A full-colour logo scaled to fit a `w` x `h` box (RGBA): by width only when h is not given. A square picture of your own must not spill out of its card."""
+        s = min(w / logo.width, (h / logo.height) if h else float("inf"))
+        return logo.convert("RGBA").resize(
+            (max(1, round(logo.width * s)), max(1, round(logo.height * s))), Image.LANCZOS
+        )
 
     def draw_arrows(self, canvas, p):
         """Two small arrows (up, down) in a rounded container on the left: the only hint of the full-screen picker that more entries are above / below."""
@@ -678,7 +753,9 @@ class Renderer:
         logo = self.logos.get(key)
         if logo:
             self.paste_c(sc, self.rrect(u(480), u(270), u(64), (255, 255, 255, 255)), cx, cy)
-            self.paste_c(sc, self.fit_logo(logo, u(420)), cx, cy)  # a logo with its own colours sits on a white card
+            self.paste_c(
+                sc, self.fit_logo(logo, u(420), u(230)), cx, cy
+            )  # a logo with its own colours sits on a white card
         else:
             self.paste_c(sc, self.shape("cookie", u(400), p["primaryContainer"]), cx, cy)
         ink = hexc(p["onPrimaryContainer"]) + (255,)
@@ -705,6 +782,65 @@ class Renderer:
         self.decorate(sc, p, opts)
         self.draw_side_hero(sc, key, p, opts)
         return sc.convert("RGB")
+
+    # ---- build-time panels, redrawn at config time (custom colours): a port of scripts/render_scene.panel + build_theme.scene ----
+    def panel_scene(self, size, key, title="", sub="", hero=True, p=None):
+        """The class scene of `key` (the 'icons/<class>.png' with its hero when hero=True, else the 'bg/<key>.png' panel) drawn here with the
+        palette `p` (default: this renderer's), so a custom colour needs no rebuild. `size` is the scene size (W, H); H must be this renderer's height."""
+        u, ss = self.u, 3
+        p = p or self.pal[key]
+        W, H = size
+        pw, ph, yoff, r64 = W, H, u(60), u(64)
+
+        def mask(w, h, r):
+            im = Image.new("L", (w * ss, h * ss), 0)
+            ImageDraw.Draw(im).rounded_rectangle([0, 0, w * ss - 1, h * ss - 1], radius=r * ss, fill=255)
+            return im.resize((w, h), Image.LANCZOS)
+
+        def fill(m, color):
+            im = Image.new("RGBA", m.size, hexc(color) + (255,))
+            im.putalpha(m)
+            return im
+
+        def at(dst, src, cx, cy):  # int() like the build, so the pixels agree
+            dst.alpha_composite(src, (int(cx - src.width / 2), int(cy - src.height / 2)))
+
+        def shape(name, n, color):
+            return fill(poly_mask(n, SHAPES[name]), color)
+
+        im = fill(mask(pw, ph, r64), p["surface"])
+        cx = pw // 2
+        deco = Image.new("RGBA", im.size, (0, 0, 0, 0))
+        at(deco, shape("cookie", u(620), p["surfaceContainerHigh"]), cx - int(pw * 0.36), ph - u(120))
+        at(deco, shape("sunny", u(460), p["surfaceContainer"]), cx + int(pw * 0.34), ph - u(60))
+        at(deco, shape("clover", u(300), p["surfaceContainer"]), cx - int(pw * 0.29), u(150))
+        clip = Image.new("L", im.size, 0)
+        clip.paste(mask(pw, ph, r64))
+        from PIL import ImageChops
+
+        deco.putalpha(ImageChops.multiply(deco.getchannel("A"), clip))
+        im.alpha_composite(deco)
+        if hero:
+            w0, h0 = u(560), u(280)
+            at(im, fill(mask(w0 + u(40), h0 + u(40), (h0 + u(40)) // 2), p["surfaceContainerHigh"]), cx, u(300) + yoff)
+            at(im, fill(mask(w0, h0, h0 // 2), p["primaryContainer"]), cx, u(300) + yoff)
+            try:
+                at(im, self.glyph(key, u(230), hexc(p["onPrimaryContainer"]) + (255,)), cx, u(300) + yoff)
+            except OSError:
+                pass  # an entry without a glyph (the build draws nothing either)
+            tsz = u(150)
+            while tsz > u(60) and self.font(tsz, 800, 135, 60, 144).getlength(title) > pw * 0.62:
+                tsz -= u(6)
+            d = ImageDraw.Draw(im)
+            d.text(
+                (cx, u(530) + yoff), title, font=self.font(tsz, 800, 135, 60, 144), fill=hexc(p["primary"]), anchor="mm"
+            )
+            d.text(
+                (cx, u(644) + yoff), sub, font=self.font(u(40), 420, 105), fill=hexc(p["onSurfaceVariant"]), anchor="mm"
+            )
+        canvas = Image.new("RGBA", (W, H), hexc(p["surface"]) + (255,))
+        canvas.alpha_composite(im)
+        return canvas.convert("RGB")
 
     def render_class(self, key, icon_path, groups, style="rail", opts=None, menu=None, rail_sel=None):
         """Class-level scene (fallbacks, and plain entries in the rail style): the build-time hero scene + cookie + hints + style furniture."""

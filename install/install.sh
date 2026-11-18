@@ -22,6 +22,7 @@ if [ "$IMM" = 1 ]; then
   echo "    - copying the theme package to $DEST (immutable layout: nothing is written under /usr)"
   rm -rf "$DEST"; install -d "$DEST"; cp -a "$PKG/." "$DEST/"; chmod +x "$DEST/bin/"*
   install -m755 "$HERE/postprocess.sh" "$ST/postprocess"
+  install -m755 "$HERE/uninstall.sh" "$ST/uninstall.sh"     # `material-grub uninstall`
   install -d "$D/usr/local/sbin"; install -m755 "$HERE/material-grub-apply" "$D/usr/local/sbin/material-grub-apply"; install -m755 "$HERE/material-grub" "$D/usr/local/sbin/material-grub"
   TO=5; [ -f /etc/default/grub ] && TO=$(sed -n 's/^GRUB_TIMEOUT=\([0-9]\{1,\}\).*/\1/p' /etc/default/grub | head -n1); TO=${TO:-5}
   { echo "MATERIAL_PKG=$DEST"; echo "MATERIAL_PY=$PY"; echo "MG_IMMUTABLE=1"; echo "MG_RES=${RES:-1920x1080}"; echo "MG_TIMEOUT=$TO"; } > "$ST/env"
@@ -33,6 +34,7 @@ else
   install -d "$D/usr/share/material-grub" "$D/usr/libexec" "$D/etc/grub.d" "$D/etc/systemd/system"
   cp -a "$PKG/." "$D/usr/share/material-grub/"
   chmod +x "$D/usr/share/material-grub/bin/"*
+  install -m755 "$HERE/uninstall.sh" "$D/usr/share/material-grub/uninstall.sh"     # `material-grub uninstall`
   echo "    - installing GRUB hooks (05_material, 15_material_menu, 90_material_system) and the systemd path unit"
   install -m755 "$HERE/postprocess.sh" "$D/usr/libexec/material-grub-postprocess"
   install -d "$D/usr/local/sbin"; install -m755 "$HERE/material-grub-apply" "$D/usr/local/sbin/material-grub-apply"; install -m755 "$HERE/material-grub" "$D/usr/local/sbin/material-grub"
@@ -44,6 +46,7 @@ else
   if [ -n "$PYARG" ]; then install -d "$D/var/lib/material-grub"; echo "MATERIAL_PY=$PYARG" > "$D/var/lib/material-grub/env"; fi
 fi
 [ -e "$D/etc/material-grub.conf" ] || install -m644 "$HERE/material-grub.conf" "$D/etc/material-grub.conf"     # never overwrite the user's settings
+install -d "$D/etc/material-grub/icons"     # overrides.json (colours, names, order, hidden entries) and the pictures it points to
 for kv in $SETS; do      # explicit --set choices (installer flags / TUI): replace the sample line or the existing value, else append
   k=${kv%%=*}; v=${kv#*=}; f="$D/etc/material-grub.conf"
   if grep -q "^#\{0,1\}$k=" "$f"; then sed -i "s|^#\{0,1\}$k=.*|$k=$v|" "$f"; else echo "$k=$v" >> "$f"; fi

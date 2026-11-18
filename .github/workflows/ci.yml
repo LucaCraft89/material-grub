@@ -14,7 +14,8 @@ jobs:
       - run: pipx install ruff shellcheck-py
       - run: ruff check .
       - run: ruff format --check .
-      - run: shellcheck -x --severity=warning install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh
+      - run: shellcheck -x --severity=warning install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh packaging/common/*.sh
+      - run: for f in gui/web/*.js; do node --check "$f"; done      # the GUI front end has no build step: a syntax error would only show in the browser
 
   checks:
     name: Syntax and unit tests
@@ -25,6 +26,7 @@ jobs:
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
       - run: PATH="$PWD/.venv/bin:$PATH" sh tests/run.sh
+      - run: .venv/bin/python scripts/gen_gui_tokens.py && git diff --exit-code gui/web/tokens.css      # the GUI's colours are generated, never edited by hand
 
   requirements:
     name: Pinned requirements on Python ${{ matrix.python }}
@@ -84,6 +86,51 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with: {name: "boot-${{ matrix.scheme }}-${{ matrix.style }}", path: build/ci-shots/}
+
+  features:
+    # The 0.7 customisations in a real GRUB (QEMU/OVMF): one seed colour, a custom entry colour and name, Windows first, hidden entries, and the firmware
+    # logo (the penguin on a machine without one) in the cookie; every style. The screenshots are artifacts (they feed the docs gallery).
+    name: Features in QEMU (${{ matrix.scheme }}, ${{ matrix.style }})
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {scheme: dark,  style: rail}
+          - {scheme: dark,  style: clean}
+          - {scheme: dark,  style: list}
+          - {scheme: dark,  style: split}
+          - {scheme: light, style: rail}
+          - {scheme: light, style: split}
+    steps:
+      - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
+      - uses: actions/checkout@v4
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+      - run: .venv/bin/python scripts/package.py --res 1920x1080 --scheme ${{ matrix.scheme }}
+      - run: |
+          for sc in single entry order hidden logo; do
+            BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/boot_features.py $sc ${{ matrix.style }} || exit 1
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "features-${{ matrix.scheme }}-${{ matrix.style }}", path: build/feature-shots/}
+
+  gui:
+    # The GUI in a real browser (Chrome, driven by Playwright): every page, the live preview, drag and drop, edits, Apply through the real helper (scratch root,
+    # fake material-grub-apply), a failing Apply, Ventoy, the update page, phone width, dark and light, and the browser-side security. Screenshots are artifacts.
+    name: GUI in Chrome (end to end)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+      - run: .venv/bin/pip install playwright      # test tooling only; the browser is the runner's Chrome, nothing is downloaded
+      - run: .venv/bin/python scripts/package.py --res 1920x1080
+      - run: GUI_BROWSER=/usr/bin/google-chrome .venv/bin/python tests/gui_e2e.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: gui-screenshots, path: build/gui-shots/}
 
   safety:
     # The safety nets in a real GRUB: a theme that is missing at boot gives the plain menu, and a broken rewrite is rolled back (QEMU/OVMF, Fedora container like `boot`).
@@ -156,6 +203,26 @@ jobs:
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
       - run: PATH="$PWD/.venv/bin:$PATH" python3 tests/ventoy_smoke.py
+
+  ventoy-features:
+    # Real Ventoy 1.1.18 with the 0.7 customisations: per-image colour, icon and name and the one-colour mode on the stick, in both Ventoy styles and both modes, and the same
+    # made through the GUI in Chrome (the GUI writes the stick, then it is booted). Software emulation on the runner, so the script waits 4x longer. Screenshots are artifacts.
+    name: Ventoy features in QEMU (${{ matrix.scenario }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [list-dynamic, full-dynamic, list-snapshot, single, gui]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf mtools python3-pil librsvg2-bin grub-common
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+      - run: .venv/bin/pip install playwright      # only the gui scenario drives a browser (the runner's Chrome; nothing is downloaded)
+      - run: .venv/bin/python scripts/package.py --res 1920x1080
+      - run: PATH="$PWD/.venv/bin:$PATH" GUI_BROWSER=/usr/bin/google-chrome .venv/bin/python tests/ventoy_features.py ${{ matrix.scenario }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "ventoy-features-${{ matrix.scenario }}", path: build/ventoy-feature-shots/}
 
   gallery:
     name: Distro gallery is up to date

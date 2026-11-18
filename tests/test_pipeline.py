@@ -12,6 +12,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+os.environ.setdefault(
+    "MATERIAL_OVERRIDES", "/nonexistent/material-grub/overrides.json"
+)  # never the overrides of the machine running the tests
 ROOT = Path(__file__).resolve().parent.parent
 PKG = Path(sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else ROOT / "dist/material-grub")
 BIN = ROOT / "install/bin"

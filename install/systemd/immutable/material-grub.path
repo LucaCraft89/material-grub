@@ -7,5 +7,6 @@ PathChanged=/boot/loader
 PathChanged=/boot/loader/entries
 PathChanged=/boot/grub2/grubenv
 PathChanged=/etc/material-grub.conf
+PathChanged=/etc/material-grub/overrides.json
 [Install]
 WantedBy=multi-user.target

@@ -1,7 +1,8 @@
 """material-grub doctor: check the installation and print a report that can be pasted into a bug report. stdlib only.
 
-usage: material-grub doctor [--root DIR] [--json]       (also: material-grub-apply --status)
+usage: material-grub doctor [--root DIR] [--json | --status-json]       (also: material-grub-apply --status)
 Exit status: 0 when nothing failed (warnings are fine), 1 when something failed.
+--json: the list of checks. --status-json: one object for the GUI (installed, version, style, scheme, health, checks).
 --root DIR looks at an installation staged under DIR (tests, `install.sh --dest`); systemd is not asked then.
 """
 
@@ -13,6 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import mgoverrides
 import mgrub
 import mgsafe
 
@@ -25,6 +27,7 @@ class Doctor:
     def __init__(self, root=""):
         self.root = Path(root) if root else None
         self.rows = []
+        self.conf = {}
 
     def p(self, path):
         return (self.root / str(path).lstrip("/")) if self.root else Path(path)
@@ -95,6 +98,41 @@ class Doctor:
             self.add(OK, "config", f"{path} is valid (STYLE={conf['STYLE']}, SCHEME={conf['SCHEME']})")
         return conf
 
+    def overrides(self, pkg):
+        path = self.p(str(mgoverrides.path()) if not self.root else "/etc/material-grub/overrides.json")
+        if not path.is_file():
+            self.add(INFO, "overrides", "none (no custom colours, names, icons or order)")
+            return
+        ov, problems = mgoverrides.load(path)
+        if problems and ov == mgoverrides.DEFAULTS:
+            self.add(WARN, "overrides", "ignored, the defaults are used: " + "; ".join(problems))
+            return
+        missing = []
+        for r in ov["entries"]:
+            ic = r.get("icon", "")
+            if ic.startswith("file:") and not (path.parent / "icons" / ic[5:]).is_file():
+                missing.append(ic[5:])
+            elif ic and not ic.startswith("file:") and pkg and not (pkg / "glyphs" / f"{ic}.png").is_file():
+                missing.append(ic)
+        if missing:
+            self.add(WARN, "overrides", "icons not found, the default ones are used: " + ", ".join(missing))
+            return
+        meta = self.p("/var/lib/material-grub/cfg-meta.json") if self.root else mgsafe.state_dir() / "cfg-meta.json"
+        try:
+            applied = json.loads(meta.read_text()).get("layout")
+        except (OSError, ValueError):
+            applied = None
+        if applied is not None and applied != mgoverrides.layout_sha(ov):
+            self.add(
+                WARN,
+                "overrides",
+                "the order or hidden entries changed since grub.cfg was generated: run sudo material-grub apply",
+            )
+            return
+        n = len(ov["entries"])
+        mode = "single colour " + ov["seed"]["color"] if ov["seed"]["mode"] == "single" else "per-entry colours"
+        self.add(OK, "overrides", f"{path} is valid ({n} entr{'y' if n == 1 else 'ies'} customised, {mode})")
+
     def package(self, here):
         pkg = self.p(os.environ.get("MATERIAL_PKG") or "/usr/share/material-grub")
         immutable = self.p("/var/lib/material-grub/pkg")
@@ -140,7 +178,7 @@ class Doctor:
                     self.add(
                         FAIL,
                         "resolution",
-                        f"the theme was built for aspect {have}, but GRUB_GFXMODE={gfx} needs {need} ({want}): run sudo material-grub-apply",
+                        f"the theme was built for aspect {have}, but GRUB_GFXMODE={gfx} needs {need} ({want}): run sudo material-grub apply",
                     )
                 else:
                     self.add(OK, "resolution", f"GRUB_GFXMODE={gfx} -> {want} theme")
@@ -162,7 +200,7 @@ class Doctor:
         self.add(
             OK if MARK in text else FAIL,
             "grub.cfg annotated",
-            f"{cfg}" + ("" if MARK in text else " has not been processed: run sudo material-grub-apply"),
+            f"{cfg}" + ("" if MARK in text else " has not been processed: run sudo material-grub apply"),
         )
         ok, msgs = mgsafe.check_script(cfg)
         self.add(OK if ok else FAIL, "grub.cfg valid", "passes the GRUB script check" if ok else "; ".join(msgs))
@@ -196,7 +234,7 @@ class Doctor:
             self.add(
                 FAIL,
                 "scenes",
-                f"{len(missing)} of {len(entries)} menu entries have no scene (first: {missing[0]}): run sudo material-grub-apply",
+                f"{len(missing)} of {len(entries)} menu entries have no scene (first: {missing[0]}): run sudo material-grub apply",
             )
         else:
             self.add(OK, "scenes", f"every one of the {len(entries)} menu entries has a scene")
@@ -255,10 +293,28 @@ class Doctor:
             self.add(FAIL, "last error", f"{f} exists but cannot be read")
 
     # ---------------------------------------------------------------- run
+    def summary(self):
+        """One object for the GUI, built from the rows of a finished run()."""
+        row = {w: (s, x) for s, w, x in self.rows}
+        ver = row.get("installed version", (None, ""))[1]
+        theme = row.get("theme", (None, ""))[0]
+        return {
+            "installed": "installed version" in row and theme == OK,
+            "version": ver or None,
+            "style": self.conf.get("STYLE"),
+            "scheme": self.conf.get("SCHEME"),
+            "config": self.conf,
+            "failed": sum(1 for r in self.rows if r[0] == FAIL),
+            "warnings": sum(1 for r in self.rows if r[0] == WARN),
+            "last_error": None if row.get("last error", (OK,))[0] == OK else row["last error"][1],
+            "checks": [{"status": s, "check": w, "detail": x} for s, w, x in self.rows],
+        }
+
     def run(self, here):
         gfx = self.system()
-        self.config()
+        self.conf = self.config()
         pkg = self.package(here)
+        self.overrides(pkg)
         self.hooks()
         self.path_unit()
         if pkg:
@@ -284,7 +340,9 @@ def main(argv=None):
     root = argv[argv.index("--root") + 1] if "--root" in argv else ""
     d = Doctor(root)
     ok = d.run(Path(__file__).resolve())
-    if "--json" in argv:
+    if "--status-json" in argv:
+        print(json.dumps(d.summary(), indent=1))
+    elif "--json" in argv:
         print(json.dumps([{"status": s, "check": w, "detail": x} for s, w, x in d.rows], indent=1))
     else:
         print(d.render())

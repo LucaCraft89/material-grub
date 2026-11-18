@@ -358,5 +358,77 @@ class Stick(unittest.TestCase):
         self.assertFalse((self.d / "ventoy/themes/material_1920x1080").exists())
 
 
+class Custom(unittest.TestCase):
+    """overrides on the stick (ventoy/material-grub-overrides.json): per-file colour / icon / name, the single seed, and a clean uninstall."""
+
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp())
+        (self.d / "ventoy").mkdir()
+        (self.d / "ISO").mkdir()
+        for n in ("Fedora-Workstation-44.iso", "ubuntu-24.04.iso"):
+            (self.d / "ISO" / n).write_bytes(b"")
+        self.vj = self.d / "ventoy/ventoy.json"
+        self.vj.write_text(json.dumps({"menu_alias": [{"image": "/ISO/mine.iso", "alias": "Mine"}]}))
+
+    def tearDown(self):
+        shutil.rmtree(self.d, ignore_errors=True)
+
+    def run_tool(self, conf, ov=None, *a):
+        (self.d / "ventoy/material-grub.conf").write_text(conf)
+        if ov is not None:
+            (self.d / "ventoy/material-grub-overrides.json").write_text(json.dumps(ov))
+        r = subprocess.run(
+            [sys.executable, str(TOOL), str(self.d), "--pkg", str(PKG), "--res", "1920x1080", *a],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout, json.loads(self.vj.read_text())
+
+    def check(self, conf):
+        orig_alias = json.loads(self.vj.read_text())["menu_alias"]
+        ov = {"entries": [{"match": {"title": "Fedora"}, "name": "Work laptop", "color": "#E95420"}]}
+        out, j = self.run_tool(conf, ov)
+        first = j["menu_class"][0]
+        self.assertTrue(first["class"].startswith("mgu_"), first)
+        self.assertIn(first["key"], "Fedora-Workstation-44.iso")
+        icons = self.d / "ventoy/themes/material_1920x1080/icons"
+        self.assertTrue((icons / f"{first['class']}.png").exists())
+        self.assertIn({"image": "/ISO/Fedora-Workstation-44.iso", "alias": "Work laptop"}, j["menu_alias"])
+        self.assertEqual(j["menu_alias"][0], orig_alias[0])  # the user's alias stays first
+        for m in j["menu_class"]:
+            self.assertTrue((icons / f"{m['class']}.png").exists(), m)
+        self.run_tool(conf, ov, "--uninstall")
+        self.assertEqual(json.loads(self.vj.read_text())["menu_alias"], orig_alias)
+        self.assertNotIn("menu_class", json.loads(self.vj.read_text()))
+
+    def test_dynamic_list(self):
+        self.check("STYLE=list\n")
+
+    def test_dynamic_full(self):
+        self.check("STYLE=full\n")
+
+    def test_snapshot_list(self):
+        self.check("MODE=snapshot\nSTYLE=list\n")
+
+    def test_single_seed_and_user_picture(self):
+        from PIL import Image
+
+        (self.d / "ventoy/material-grub-icons").mkdir()
+        Image.new("RGBA", (64, 64), (20, 160, 20, 255)).save(self.d / "ventoy/material-grub-icons/logo.png")
+        ov = {
+            "seed": {"mode": "single", "color": "#7E57C2"},
+            "entries": [{"match": {"title": "ubuntu"}, "icon": "file:logo.png"}],
+        }
+        out, j = self.run_tool("STYLE=list\n", ov)
+        self.assertEqual(j["menu_class"][0]["class"][:4], "mgu_")
+        self.assertNotIn("cannot read", out)
+
+    def test_bad_overrides_are_ignored_with_a_message(self):
+        out, j = self.run_tool("STYLE=list\n", {"seed": {"mode": "rainbow"}})
+        self.assertIn("overrides:", out)
+        self.assertFalse(any(m["class"].startswith("mgu_") for m in j["menu_class"]))
+
+
 if __name__ == "__main__":
     unittest.main()

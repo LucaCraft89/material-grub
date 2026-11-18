@@ -69,6 +69,66 @@ PYTHON_PACKAGES = {
 STYLES = ("rail", "clean", "list", "split", "full")
 
 
+class LineEvents:
+    """File-like stand-in for sys.stdout/sys.stderr in --progress json mode: every printed line becomes a 'log' event."""
+
+    def __init__(self, emit, level):
+        self.emit, self.level, self.buf = emit, level, ""
+
+    def write(self, text):
+        self.buf += text
+        *lines, self.buf = self.buf.split("\n")
+        for ln in lines:
+            if ln.strip():
+                self.emit("log", text=ln.rstrip(), level=self.level)
+        return len(text)
+
+    def flush(self):
+        if self.buf.strip():
+            self.emit("log", text=self.buf.rstrip(), level=self.level)
+        self.buf = ""
+
+    def isatty(self):
+        return False
+
+
+class Tee:
+    """Copies everything printed to the terminal into the install log too (colour codes stripped)."""
+
+    def __init__(self, real, logf):
+        self.real, self.logf, self.buf = real, logf, ""
+
+    def write(self, text):
+        self.real.write(text)
+        self.buf += text.replace("\r", "\n")
+        *lines, self.buf = self.buf.split("\n")
+        for ln in lines:
+            ln = re.sub(r"\x1b\[[0-9;]*m", "", ln).rstrip()
+            if ln.strip():
+                self.logf.write(time.strftime("%F %T ") + ln + "\n")
+        self.logf.flush()
+        return len(text)
+
+    def flush(self):
+        self.real.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.real, name)
+
+
+def open_log():
+    """The persistent install log: $MG_INSTALL_LOG, else /var/log/material-grub/install.log. None when it cannot be written
+    (no root, read-only /var): logging is never a reason to fail an install."""
+    path = Path(os.environ.get("MG_INSTALL_LOG", "/var/log/material-grub/install.log"))
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > 1_000_000:  # keep one old log, the file never grows without bound
+            os.replace(path, str(path) + ".1")
+        return open(path, "a", errors="replace")
+    except OSError:
+        return None
+
+
 class Installer:
     def __init__(self, argv):
         self.argv = argv
@@ -88,6 +148,9 @@ class Installer:
         self.res = ""
         self.scheme = "dark"
         self.scheme_set = False
+        self.with_gui = False  # --with-gui: also install the optional GUI (source installs; packages have their own material-grub-gui package)
+        self.seed_mode = ""  # "", "multi" or "single": empty leaves overrides.json alone
+        self.seed = ""
         self.style = ""
         self.cookie = ""
         self.logo = ""
@@ -111,6 +174,26 @@ class Installer:
         self.pm = ""
         self.build_dir = None
         self.runtime_py = "python3"
+        self.json = False  # --progress json: one JSON object per line on stdout (for the GUI)
+        self.out = sys.stdout
+        self.logf = None
+
+    # ------------------------------------------------------------ machine-readable progress
+    def emit(self, event, **kw):
+        """One line of JSON: {"event": step|info|ok|warn|error|progress|log|done, ...}. Only used with --progress json."""
+        if self.json:
+            self.out.write(json.dumps({"event": event, "t": round(time.time() - self.t0, 1), **kw}) + "\n")
+            self.out.flush()
+        if self.logf and self.json:
+            text = kw.get("text") or kw.get("msg") or ""
+            if text:
+                self.logf.write(f"{time.strftime('%F %T')} {'' if event == 'log' else event + ': '}{text}\n")
+                self.logf.flush()
+
+    def start_json(self):
+        self.json, self.yes, self.tuimode, self.tty = True, True, "no", False
+        self.B = self.D = self.M = self.Y = self.RD = self.G = self.Z = ""
+        sys.stdout, sys.stderr = LineEvents(self.emit, "info"), LineEvents(self.emit, "warn")
 
     # ------------------------------------------------------------ output helpers
     def elapsed(self):
@@ -119,20 +202,31 @@ class Installer:
 
     def step(self, msg):
         self.n += 1
+        if self.json:
+            return self.emit("step", n=self.n, total=self.total, msg=msg)
         print(
             f"\n{self.M}[{self.n}/{self.total}]{self.Z} {self.B}{msg}{self.Z}  {self.D}(total elapsed {self.elapsed()}){self.Z}"
         )
 
     def info(self, msg):
+        if self.json:
+            return self.emit("info", msg=msg)
         print(f"      {msg}")
 
     def ok(self, msg):
+        if self.json:
+            return self.emit("ok", msg=msg)
         print(f"      {self.G}ok{self.Z} {msg}")
 
     def warn(self, msg):
+        if self.json:
+            return self.emit("warn", msg=msg)
         print(f"{self.Y}warning:{self.Z} {msg}", file=sys.stderr)
 
     def die(self, msg, code=1):
+        if self.json:
+            self.emit("error", msg=msg, code=code)
+            sys.exit(code)
         print(f"{self.RD}error:{self.Z} {msg}", file=sys.stderr)
         sys.exit(code)
 
@@ -191,6 +285,17 @@ class Installer:
                 self.scheme_set = True
                 if self.scheme not in ("light", "dark"):
                     self.usage_error("--scheme must be light or dark")
+            elif o == "--with-gui":
+                self.with_gui = True
+            elif o == "--seed":
+                self.seed = need(o, "a colour like #2E7D32").upper()
+                if not re.fullmatch(r"#[0-9A-F]{6}", self.seed):
+                    self.usage_error("--seed must look like #RRGGBB")
+                self.seed_mode = "single"
+            elif o == "--seed-mode":
+                self.seed_mode = need(o, "multi or single")
+                if self.seed_mode not in ("multi", "single"):
+                    self.usage_error("--seed-mode must be multi or single")
             elif o == "--immutable":
                 self.imm = True
             elif o in ("--yes", "-y"):
@@ -211,6 +316,10 @@ class Installer:
                 self.from_package, self.yes, self.deps, self.tuimode = True, True, False, "no"
             elif o == "--preview":
                 self.preview, self.deps = True, False
+            elif o == "--progress":
+                if need(o, "json") != "json":
+                    self.usage_error("--progress only knows json")
+                self.json = True
             elif o == "--keep-build":
                 self.keep = True
             elif o == "--uninstall":
@@ -235,14 +344,31 @@ class Installer:
         return os.geteuid() == 0
 
     def run(self, cmd, **kw):
-        return subprocess.run([str(c) for c in cmd], **kw)
+        cmd = [str(c) for c in cmd]
+        if not self.json or "capture_output" in kw or "stdout" in kw:
+            return subprocess.run(cmd, **kw)
+        # json mode: the child's output becomes 'log' events instead of leaking onto our stdout
+        p = subprocess.Popen(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            **kw,
+        )
+        with p.stdout:
+            for line in p.stdout:
+                if line.strip():
+                    self.emit("log", text=line.rstrip(), level="info")
+        return subprocess.CompletedProcess(cmd, p.wait())
 
     def have(self, name):
         return shutil.which(name) is not None
 
     def wait_job(self, proc, log, label, total=0):
         """Wait for a background process, printing a heartbeat so the terminal never looks frozen."""
-        start, last = time.time(), 0.0
+        start, last, seen = time.time(), 0.0, 0
         while proc.poll() is None:
             now = time.time()
             e = int(now - start)
@@ -259,7 +385,25 @@ class Installer:
                 msg = f"{label}: {count}/{total} ({p}%)  {e // 60}m{e % 60:02d}s elapsed"
             else:
                 msg = f"{label} ... {e // 60}m{e % 60:02d}s elapsed"
-            if self.tty:
+            if self.json:
+                if now - last >= 2:
+                    self.emit(
+                        "progress",
+                        label=label,
+                        count=count if total > 0 else None,
+                        total=total or None,
+                        percent=p if total > 0 else None,
+                        elapsed=e,
+                    )
+                    last = now
+                try:  # the job's own log lines, for the verbose view
+                    lines = Path(log).read_text(errors="ignore").splitlines()
+                except OSError:
+                    lines = []
+                for ln in lines[seen:]:
+                    self.emit("log", text=ln, level="info")
+                seen = len(lines)
+            elif self.tty:
                 sys.stdout.write(f"\r      {msg}   ")
                 sys.stdout.flush()
             elif now - last >= 10:
@@ -356,6 +500,14 @@ class Installer:
                 preset("STYLE", self.style)
             if self.scheme_set:
                 preset("SCHEME", self.scheme)
+            if self.with_gui or not (HERE / "gui/mgserver.py").is_file():
+                preset(
+                    "GUI", "yes" if self.with_gui else "no"
+                )  # given by a flag, or there is no gui/ folder to install from: not asked
+            if self.seed_mode:
+                preset("SEED_MODE", self.seed_mode)
+            if self.seed:
+                preset("SEED", self.seed)
             if self.cookie:
                 preset("COOKIE", self.cookie)
             if self.logo:
@@ -397,6 +549,12 @@ class Installer:
             self.style = a["STYLE"]
         if a.get("SCHEME"):
             self.scheme, self.scheme_set = a["SCHEME"], True
+        if a.get("GUI") == "yes":
+            self.with_gui = True
+        if a.get("SEED_MODE"):
+            self.seed_mode = a["SEED_MODE"]
+        if a.get("SEED"):
+            self.seed = a["SEED"]
         if a.get("COOKIE"):
             self.cookie = a["COOKIE"]
         if a.get("LOGO"):
@@ -887,7 +1045,40 @@ class Installer:
             "      Change the style, scheme or resolutions: run this installer again.   Undo: ./install.sh --uninstall --ventoy MOUNTPOINT"
         )
 
+    def install_gui(self):
+        """--with-gui: copy the optional GUI (plain Python and web files, nothing is built) next to the theme. Needs root; the GUI never runs as root itself."""
+        tree = HERE / "packaging/common/install-gui-tree.sh"
+        if not tree.is_file() or not (HERE / "gui/mgserver.py").is_file():
+            self.warn(
+                "--with-gui: this copy has no gui/ folder (use a checkout of the repository, or your package manager's material-grub-gui package)"
+            )
+            return
+        if not self.root():
+            self.warn("--with-gui needs root: run it with sudo")
+            return
+        self.step("Installing the optional GUI")
+        if self.run(["sh", tree, HERE, "/"]).returncode != 0:
+            self.warn("the GUI could not be installed (the theme itself is fine)")
+            return
+        self.ok(
+            "installed: start it with material-grub-gui (opens in your browser; changes ask for your password through polkit)"
+        )
+
+    def write_seed(self):
+        """--seed / --seed-mode and the TUI's colour answers go to overrides.json (the one place every tool reads), keeping the rest of the file."""
+        if not self.seed_mode:
+            return
+        import mgoverrides
+
+        ov, _ = mgoverrides.load()
+        ov["seed"] = {"mode": self.seed_mode, "color": self.seed or ov["seed"]["color"]}
+        mgoverrides.save(ov)
+        self.info(
+            f"colours: {'one seed colour ' + ov['seed']['color'] if self.seed_mode == 'single' else 'every entry its own colour'} ({mgoverrides.path()})"
+        )
+
     def grub_install(self):
+        self.write_seed()
         step_cmd = ["sh", HERE / "install/install.sh", "--res", self.res, "--pkg", self.dist]
         if self.imm:
             step_cmd.append("--immutable")
@@ -910,6 +1101,34 @@ class Installer:
     # ------------------------------------------------------------ main
     def main(self):
         self.parse()
+        if not (self.stage or self.dry or self.preview):  # those change nothing on the system, so they are not logged
+            self.logf = open_log()
+            if self.logf:
+                self.logf.write(
+                    f"{time.strftime('%F %T')} ---- material-grub {VERSION_TEXT()}: {' '.join(self.argv)}\n"
+                )
+                if not self.json:
+                    sys.stdout, sys.stderr = Tee(sys.stdout, self.logf), Tee(sys.stderr, self.logf)
+        try:
+            return self.main_json()
+        finally:
+            if self.logf:
+                self.logf.close()
+
+    def main_json(self):
+        if self.json:
+            self.start_json()
+            try:
+                rc = self.main_inner()
+            except SystemExit as e:
+                rc = e.code if isinstance(e.code, int) else 1
+            sys.stdout.flush()
+            sys.stderr.flush()
+            self.emit("done", rc=rc or 0, ok=not rc, elapsed=self.elapsed())
+            return rc or 0
+        return self.main_inner()
+
+    def main_inner(self):
         if not self.from_package:
             return self.run_all()
         # packages: keep the user's scheme, pick the resolution like a plain run; a failure must not break the package transaction
@@ -960,6 +1179,14 @@ class Installer:
                 return self.run(cmd + self.confset_args()).returncode
             if self.preview:
                 self.step("Preview: rendering your menu (nothing is installed)")
+                if self.seed_mode:  # show the colours that were asked for without touching /etc
+                    import mgoverrides
+
+                    ov, _ = mgoverrides.load()
+                    ov["seed"] = {"mode": self.seed_mode, "color": self.seed or ov["seed"]["color"]}
+                    tmpf = Path(self.build_dir) / "overrides.json"
+                    mgoverrides.save(ov, tmpf)
+                    os.environ["MATERIAL_OVERRIDES"] = str(tmpf)
                 cmd = [
                     sys.executable,
                     HERE / "install/bin/material-grub-preview",
@@ -985,6 +1212,8 @@ class Installer:
                 self.ventoy_install()
                 return 0
             self.grub_install()
+            if self.with_gui:
+                self.install_gui()
             return 0
         finally:
             if self.build_dir:
@@ -992,6 +1221,13 @@ class Installer:
                     self.info(f"build directory kept: {self.build_dir}")
                 else:
                     shutil.rmtree(self.build_dir, ignore_errors=True)
+
+
+def VERSION_TEXT():
+    try:
+        return (HERE / "VERSION").read_text().strip()
+    except OSError:
+        return "?"
 
 
 def main(argv=None):

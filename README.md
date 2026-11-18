@@ -79,6 +79,20 @@ Install options, all screenshots and what was tested: **[docs/ventoy.md](docs/ve
 
 Two screenshots of every style (rail, clean, list, split) in dark and light, the same for a Ventoy stick, the ultrawide layout and a rendered sample of all 54 supported distros: **[docs/gallery.md](docs/gallery.md)**. Using a Ventoy stick? See **[docs/ventoy.md](docs/ventoy.md)**.
 
+## Make it yours
+
+One colour for the whole theme, or a colour, name, icon and position per entry, hide entries you never use, windows first or linux first, your own PNG or SVG as an icon, presets to save a look. Everything is stored in `/etc/material-grub/overrides.json` and works without a rebuild:
+
+```sh
+sudo ./install.sh --seed '#7E57C2'      # one seed colour for every entry (the TUI offers 32 preset colours)
+```
+
+An **optional GUI** does all of it with a live preview, drag and drop and Ventoy support, in a Material 3 Expressive web UI that opens in your browser. It is a separate package (`material-grub-gui`, or `sudo ./install.sh --with-gui` from a checkout) and is never installed by default: **[docs/gui.md](docs/gui.md)**, [docs/customising.md](docs/customising.md).
+
+<img src="docs/screenshots/gui/entries.png" alt="The GUI: entries, per-entry editor and live preview">
+
+More pictures (one colour, per-entry colours, Windows first, the GUI): **[docs/showcase.md](docs/showcase.md)**.
+
 ## Options
 
 ```sh
@@ -86,8 +100,10 @@ sudo ./install.sh                                  # asks for style, scheme and 
 sudo ./install.sh --res 1920x1200 --style list --scheme light --yes
 ./install.sh --preview                             # see your own menu as a web page first: no root, nothing installed
 sudo ./install.sh --dry-run                        # show the diff of grub.cfg and /etc/default/grub, change nothing
-sudo material-grub doctor                          # check the installation (paste it into a bug report)
-sudo material-grub-apply                           # re-apply after editing /etc/material-grub.conf
+material-grub                                      # one command for everything: a menu of the subcommands below
+material-grub doctor                               # check the installation (paste it into a bug report)
+sudo material-grub apply                           # re-apply after editing /etc/material-grub.conf or overrides.json
+material-grub gui | preview | colour | presets | overrides | conf | ventoy | update | uninstall | help
 sudo ./install.sh --uninstall                      # back to your original GRUB files
 ```
 
@@ -98,7 +114,7 @@ recomputed whenever `grub.cfg` is regenerated, so an upgrade from 10 to 11 shows
 
 The theme is always built from source on your machine (there are no prebuilt downloads). Details and every option: [docs/install.md](docs/install.md)
 ([supported resolutions](docs/install.md#supported-resolutions), immutable systems: [docs/immutable.md](docs/immutable.md), packages: [docs/packaging.md](docs/packaging.md)),
-how it works and what GRUB cannot do: [docs/how-it-works.md](docs/how-it-works.md), customising: [docs/customising.md](docs/customising.md).
+the `material-grub` command: [docs/cli.md](docs/cli.md), **how to use it, start to finish: [docs/usage.md](docs/usage.md)**; how it works and what GRUB cannot do: [docs/how-it-works.md](docs/how-it-works.md), customising: [docs/customising.md](docs/customising.md).
 Does it work on your distro? [Tell us](https://github.com/LucaCraft89/material-grub/issues/new?template=works_on_distro.yml); confirmed systems: [docs/tested-on.md](docs/tested-on.md).
 
 ## Development

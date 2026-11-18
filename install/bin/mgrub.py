@@ -136,6 +136,56 @@ def load_conf(path=None):
     return c
 
 
+def _conf_ok(key, value):
+    """Strict check for write_conf (load_conf is lenient on purpose; a writer must not store junk)."""
+    if key not in CONF_DEFAULTS:
+        return False
+    if key == "TIMEOUT":
+        return value == "" or value.isdigit()
+    if key in CONF_CHOICES:
+        return value in CONF_CHOICES[key]
+    return value in ("on", "off")
+
+
+def write_conf(path, updates):
+    """Set KEY=value in the conf file, atomically (temp file in the same directory, then rename).
+    Replaces the first active or commented-out sample line of a key (keeps the comments), else appends.
+    Raises ValueError for an unknown key or a bad value, before anything is written."""
+    import os
+    import tempfile
+
+    for k, v in updates.items():
+        if not _conf_ok(k, str(v)):
+            raise ValueError(f"bad config: {k}={v!r}")
+    path = Path(path)
+    try:
+        lines = path.read_text().splitlines()
+        mode = path.stat().st_mode & 0o7777
+    except OSError:
+        lines, mode = [], 0o644
+    for k, v in updates.items():
+        new = f"{k}={v}"
+        active = re.compile(rf"^\s*{k}\s*=")
+        sample = re.compile(rf"^#\s*{k}\s*=")
+        for rx in (active, sample):
+            hit = next((i for i, ln in enumerate(lines) if rx.match(ln)), None)
+            if hit is not None:
+                lines[hit] = new
+                break
+        else:
+            lines.append(new)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".mgconf.")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        os.chmod(tmp, mode)
+        os.replace(tmp, str(path))
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
 def apply_conf_to_theme(text, conf):
     """Drop the '# mg:begin NAME' .. '# mg:end NAME' blocks of theme.txt that the config switches off (no cookie also means no logo in it)."""
     for key, name in (("RAW_NAME", "raw"), ("COUNTDOWN", "countdown"), ("LOGO", "logo")):
@@ -149,7 +199,7 @@ def apply_conf_to_theme(text, conf):
 
 
 def _list_layout(text):
-    """`list` centres the menu on the screen, so the countdown moves down between the list and the key hints (1080-high design: bar 868, label 884)."""
+    """`list` centres the menu on the screen, so the countdown moves down between the list and the key hints (1080-high design: info chips 846-892, bar 896, label 912, key hints from 960)."""
     m = re.search(r"(?ms)^# mg:begin countdown\n(.*?)^# mg:end countdown\n", text)
     if not m:
         return text
@@ -164,8 +214,8 @@ def _list_layout(text):
         return re.sub(r"^(\s*top = )-?\d+$", rf"\g<1>{v}", chunk, count=1, flags=re.M)
 
     parts = body.split("+ label {")
-    parts[0] = settop(parts[0], round(868 * f))
-    parts[1] = settop(parts[1], round(884 * f))
+    parts[0] = settop(parts[0], round(896 * f))
+    parts[1] = settop(parts[1], round(912 * f))
     return text[: m.start(1)] + "+ label {".join(parts) + text[m.end(1) :]
 
 

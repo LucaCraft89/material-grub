@@ -2,10 +2,14 @@
 (tests/containers/dry_run.sh: Debian and Fedora, proving the system is byte-for-byte unchanged afterwards).
 usage: python3 tests/test_dryrun.py"""
 
+import os
 import sys
 import unittest
 from pathlib import Path
 
+os.environ.setdefault(
+    "MATERIAL_OVERRIDES", "/nonexistent/material-grub/overrides.json"
+)  # never the overrides of the machine running the tests
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "install/bin"))
 import cmd_dryrun as dr  # noqa: E402
