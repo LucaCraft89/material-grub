@@ -3,6 +3,7 @@
 stdlib only. usage: bgrt-logo.py [in.bmp] out.png [--ink RRGGBB] [--size N]
 Exit 0 and writes a fully transparent 1x1 PNG if no usable logo exists."""
 
+import os
 import struct
 import sys
 import zlib
@@ -93,7 +94,7 @@ def main():
         v = sys.argv[sys.argv.index("--ink") + 1]
         ink = tuple(int(v[i : i + 2], 16) for i in (0, 2, 4))
         a = [x for x in a if x != v]
-    src, out = (a[0], a[1]) if len(a) > 1 else ("/sys/firmware/acpi/bgrt/image", a[0])
+    src, out = (a[0], a[1]) if len(a) > 1 else (os.environ.get("MG_BGRT_IMAGE", "/sys/firmware/acpi/bgrt/image"), a[0])
     try:
         w, h, px = read_bmp(src)
         res = crop(alpha_rows(w, h, px), w, h)

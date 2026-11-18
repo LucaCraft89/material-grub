@@ -16,6 +16,21 @@ def arg(n, d=None):
     return sys.argv[sys.argv.index(n) + 1] if n in sys.argv else d
 
 
+def penguin_if_no_logo(path, pkg, size):
+    """bgrt-logo.py writes a 1x1 transparent PNG when the firmware has no logo (a VM, many desktops): draw the Linux penguin instead. Needs Pillow; without it the cookie stays empty."""
+    try:
+        import mgscenes
+        from PIL import Image
+
+        if Image.open(path).size != (1, 1):
+            return
+        im = mgscenes.tux_logo(pkg, size)
+        if im is not None:
+            im.save(path)
+    except (ImportError, OSError):
+        pass
+
+
 def main():
     pkg, out = Path(arg("--pkg", "/usr/share/material-grub")), Path(arg("--out"))
     mode = (arg("--mode", "") or "").split(",")[0].split("x")
@@ -74,6 +89,7 @@ def main():
             check=False,
             stdout=subprocess.DEVNULL,
         )
+        penguin_if_no_logo(tmp / "machine-logo.png", pkg, int((res / "logo_size").read_text().strip()))
     problems = mgsafe.theme_problems(tmp, pkg)
     if problems:  # keep the theme that is installed now; the half-built one is dropped
         shutil.rmtree(tmp, ignore_errors=True)

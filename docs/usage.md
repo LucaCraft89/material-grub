@@ -18,7 +18,7 @@ In a terminal this opens the installer's questions. Left: the current question; 
 | Style | `rail`, `clean`, `list` or `split` (see the [gallery](gallery.md)) |
 | Colour scheme | dark or light (chosen when the images are built) |
 | Colours | *every entry its own colour* (the default) or *one colour for the whole theme*, then one of 32 seed colours or any `#RRGGBB` |
-| Cookie and firmware logo, key hints, extras | the top-right cookie (with your machine's own boot logo inside), the key-hint pills, the raw-name line, the countdown bar, the timeout |
+| Cookie and firmware logo, key hints, extras | the top-right cookie (with your machine's own boot logo inside, or the Linux penguin when the firmware has none), the key-hint pills, the raw-name line, the countdown bar, the timeout |
 | Graphical editor | **yes or no** (default no): the optional GUI, see below |
 
 It then builds the theme from source (a few minutes), backs up your GRUB files to `/var/backups/material-grub`, installs, and regenerates `grub.cfg`. Reboot to see it. Packages (`dnf`, `apt`, `pacman`) use the same pipeline without questions; scripts can pass flags (`--yes --no-tui --style list --seed '#7E57C2' ...`).

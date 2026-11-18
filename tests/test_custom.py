@@ -128,6 +128,35 @@ class Custom(unittest.TestCase):
         self.assertIn("overrides:", out)
         self.assertEqual(self.scene("mg_aaaaaaaaaa").tobytes(), base)
 
+    def test_machine_logo_falls_back_to_the_penguin(self):
+        """No firmware logo (a VM, many desktops): the cookie gets the Linux penguin; with a real logo it is that one."""
+        for src in ("/nonexistent/bgrt",):
+            out = self.d / "theme-nologo"
+            subprocess.run(
+                [sys.executable, BIN / "material-grub-assemble", "--mode", "1920x1080", "--pkg", PKG, "--out", out],
+                check=True,
+                capture_output=True,
+                env=dict(os.environ, MG_BGRT_IMAGE=src),
+            )
+            logo = self.Image.open(out / "machine-logo.png")
+            size = int((PKG / "res/1920x1080/logo_size").read_text())
+            self.assertEqual(logo.size, (size, size))
+            self.assertGreater(logo.convert("RGBA").getchannel("A").getbbox()[2], size // 3)
+        bmp = self.d / "bgrt.bmp"
+        im = self.Image.new("RGB", (80, 60), (255, 255, 255))
+        im.paste((0, 0, 0), (20, 15, 60, 45))
+        im.save(bmp, "BMP")
+        out2 = self.d / "theme-logo"
+        subprocess.run(
+            [sys.executable, BIN / "material-grub-assemble", "--mode", "1920x1080", "--pkg", PKG, "--out", out2],
+            check=True,
+            capture_output=True,
+            env=dict(os.environ, MG_BGRT_IMAGE=str(bmp)),
+        )
+        penguin = self.Image.open(out / "machine-logo.png").convert("RGBA").tobytes()
+        real = self.Image.open(out2 / "machine-logo.png").convert("RGBA").tobytes()
+        self.assertNotEqual(real, penguin)
+
     def test_other_styles_still_render(self):
         for style in ("clean", "list", "split"):
             self.bake({"entries": [{"match": {"key": "fedora"}, "color": "#2E7D32", "name": "Mine"}]}, style=style)

@@ -49,16 +49,29 @@ def base_key(k):
     return k.split("~", 1)[0]
 
 
-def machine_logo(pkg, size, src="/sys/firmware/acpi/bgrt/image"):
-    """The firmware (BGRT) logo as the theme shows it (a dark silhouette), for the PREVIEWS only: on a real menu GRUB draws it from machine-logo.png,
-    so it is never baked into a scene. None when the firmware has no usable logo. Uses the same code as the installer (bgrt-logo.py)."""
+def tux_logo(pkg, size):
+    """The Linux penguin as a dark silhouette: the logo for machines whose firmware has none."""
+    try:
+        a = Image.open(Path(pkg) / "glyphs" / "tux.png").convert("RGBA").getchannel("A")
+    except OSError:
+        return None
+    im = Image.new("RGBA", (size, size), (0x14, 0x14, 0x18, 255))
+    im.putalpha(a.resize((size, size), Image.LANCZOS))
+    return im
+
+
+def machine_logo(pkg, size, src=None, fallback=True):
+    """The firmware (BGRT) logo as the theme shows it (a dark silhouette), for the PREVIEWS: on a real menu GRUB draws it from machine-logo.png,
+    so it is never baked into a scene. When the firmware has no usable logo: the Linux penguin (fallback=True) or None. Uses the installer's code (bgrt-logo.py)."""
     import importlib.util
+
+    src = src or os.environ.get("MG_BGRT_IMAGE", "/sys/firmware/acpi/bgrt/image")
 
     for c in (Path(pkg) / "bin/bgrt-logo.py", Path(__file__).resolve().parents[2] / "scripts/bgrt-logo.py"):
         if c.is_file():
             break
     else:
-        return None
+        return tux_logo(pkg, size) if fallback else None
     try:
         spec = importlib.util.spec_from_file_location("bgrt_logo", c)
         mod = importlib.util.module_from_spec(spec)
@@ -66,10 +79,10 @@ def machine_logo(pkg, size, src="/sys/firmware/acpi/bgrt/image"):
         w, h, px = mod.read_bmp(src)
         res = mod.crop(mod.alpha_rows(w, h, px), w, h)
         if res is None:
-            return None
+            return tux_logo(pkg, size) if fallback else None
         n, _, rows = mod.fit_square(*res, size)
     except (OSError, ValueError, ImportError, struct_error):
-        return None
+        return tux_logo(pkg, size) if fallback else None
     mask = Image.new("L", (n, n))
     mask.putdata([a for r in rows for a in r])
     im = Image.new("RGBA", (n, n), (0x14, 0x14, 0x18, 255))

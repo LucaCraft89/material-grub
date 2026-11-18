@@ -66,7 +66,10 @@ class PanelScene(unittest.TestCase):
         logo = mgscenes_mod.machine_logo(PKG, 120, src=str(bmp))
         self.assertEqual(logo.size, (120, 120))
         self.assertGreater(logo.getchannel("A").getpixel((60, 60)), 200)  # the silhouette is in the middle
-        self.assertIsNone(mgscenes_mod.machine_logo(PKG, 120, src="/nonexistent/bgrt"))  # no logo: nothing is drawn
+        self.assertIsNone(mgscenes_mod.machine_logo(PKG, 120, src="/nonexistent/bgrt", fallback=False))
+        tux = mgscenes_mod.machine_logo(PKG, 120, src="/nonexistent/bgrt")  # no firmware logo: the penguin
+        self.assertEqual(tux.size, (120, 120))
+        self.assertGreater(tux.getchannel("A").getbbox()[2], 40)
         p = self.R.pal["fedora"]
         plain = self.Image.new("RGBA", (1920, 1080))
         self.R.draw_cookie(plain, p)
