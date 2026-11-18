@@ -122,6 +122,29 @@ jobs:
           grep -q "^exit: 0" build/out/dry-${{ matrix.distro }}.txt
           grep -q "^SYSTEM UNCHANGED" build/out/dry-${{ matrix.distro }}.txt
 
+  packages:
+    # Source-only packages: build each from the checked-out tree, install it in a distro container with a fake /boot (the theme is built on install),
+    # upgrade it, and force a rejected upgrade: the package manager must still succeed and grub.cfg must be rolled back.
+    name: Package ${{ matrix.fmt }} (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {fmt: rpm,  name: Fedora, image: "registry.fedoraproject.org/fedora:latest"}
+          - {fmt: deb,  name: Debian, image: "docker.io/library/debian:stable"}
+          - {fmt: arch, name: Arch,   image: "docker.io/library/archlinux:latest"}
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p build/pkg build/out
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/pkg:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/pkg:/pkg:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/pkg_smoke.sh ${{ matrix.fmt }}
+      - run: cat build/out/pkg-${{ matrix.fmt }}.txt; grep -q "^ALL OK" build/out/pkg-${{ matrix.fmt }}.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "package-${{ matrix.fmt }}", path: build/out/}
+
   ventoy:
     # Real Ventoy 1.1.18 (downloaded, sha256 checked) booted in QEMU/OVMF with the theme installed; ISOs are then added, renamed and removed WITHOUT running the installer again.
     # Software emulation on the runner, so the script waits 4x longer.
