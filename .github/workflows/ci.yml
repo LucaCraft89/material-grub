@@ -22,9 +22,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
-      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
       - run: PATH="$PWD/.venv/bin:$PATH" sh tests/run.sh
+
+  requirements:
+    name: Pinned requirements on Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    container: python:${{ matrix.python }}-slim
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+      - run: .venv/bin/python -c "import fontTools, materialyoucolor, PIL; print(PIL.__version__)"
+      - run: python scripts/update_requirements.py --check   # the pins still match requirements.in (PyPI hashes)
 
   installer:
     name: Installer on ${{ matrix.name }} (${{ matrix.scheme }})
@@ -63,7 +77,7 @@ jobs:
     steps:
       - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
       - uses: actions/checkout@v4
-      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080 --scheme ${{ matrix.scheme }}
       - run: BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/boot_smoke.py 1920x1080 ${{ matrix.scheme }} ${{ matrix.style }}
       - uses: actions/upload-artifact@v4
@@ -78,7 +92,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf mtools python3-pil librsvg2-bin grub-common
-      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
       - run: PATH="$PWD/.venv/bin:$PATH" python3 tests/ventoy_smoke.py
 
@@ -96,7 +110,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
-      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install -r requirements.txt
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080 --scheme dark && .venv/bin/python scripts/gen_distro_table.py
       - uses: actions/upload-artifact@v4
         with: {name: distro-gallery, path: "docs/distros.md\ndocs/distros/"}

@@ -43,7 +43,7 @@ Aliases are therefore for the spellings GRUB actually emits: the `ID=` from `/et
 ## 4. Test it
 
 ```sh
-python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once
+python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt   # once
 make package                              # rebuild scenes, about 3 minutes (or: .venv/bin/python scripts/package.py --res 1920x1080)
 make screenshots                          # boots the theme in QEMU + OVMF, writes docs/screenshots/
 ```

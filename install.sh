@@ -258,7 +258,7 @@ else
   info "creating a Python virtual environment"
   python3 -m venv --system-site-packages .venv 2>/dev/null || python3 -m venv .venv || die "python3 venv module missing."
   info "installing Python build requirements (fonttools, materialyoucolor); needs network access"
-  .venv/bin/pip install --disable-pip-version-check -r requirements.txt >pip.log 2>&1 &
+  .venv/bin/pip install --disable-pip-version-check --require-hashes -r requirements.txt >pip.log 2>&1 &
   wait_job $! pip.log "downloading Python packages" 0 || { tail -n 15 pip.log >&2; die "pip failed (network needed)."; }
   ok "build environment ready"
 

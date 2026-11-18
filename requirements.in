@@ -1,0 +1,12 @@
+# Build-time requirements, the human-edited source of requirements.txt (run `make update-requirements`).
+# One line per package and Python range: the newest release that supports that range. materialyoucolor needs pillow.
+# The build needs Python 3.9 or newer: materialyoucolor ships no wheel for 3.8 (its sdist needs a C compiler). The installer itself
+# (stdlib only) still runs on 3.8; on such a system it has to find a newer Python for the build step.
+# Format: name==version ; marker
+fonttools==4.68.0 ; python_version >= "3.11"
+fonttools==4.65.0 ; python_version == "3.10"
+fonttools==4.60.2 ; python_version == "3.9"
+pillow==13.0.0 ; python_version >= "3.11"
+pillow==12.3.0 ; python_version == "3.10"
+pillow==11.3.0 ; python_version == "3.9"
+materialyoucolor==3.0.4

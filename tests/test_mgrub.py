@@ -204,5 +204,24 @@ class Catalog(unittest.TestCase):
             self.assertTrue(all(a == a.lower() for a in al), f"{k}: aliases must be lowercase")
 
 
+class Requirements(unittest.TestCase):
+    """requirements.txt is exact and hashed: pip install --require-hashes refuses anything else."""
+
+    def test_every_pin_is_exact_and_hashed(self):
+        import re
+
+        text = (ROOT / "requirements.txt").read_text().replace("\\\n", " ")
+        reqs = [l for l in text.splitlines() if l.strip() and not l.startswith("#")]
+        self.assertGreaterEqual(len(reqs), 3)
+        for l in reqs:
+            self.assertRegex(l, r"^[A-Za-z0-9_.-]+==[0-9][^\s;]* ")
+            self.assertGreaterEqual(len(re.findall(r"--hash=sha256:[0-9a-f]{64}", l)), 1, l[:60])
+
+    def test_covers_the_direct_requirements(self):
+        text = (ROOT / "requirements.txt").read_text().lower()
+        for name in ("fonttools==", "pillow==", "materialyoucolor=="):
+            self.assertIn(name, text)
+
+
 if __name__ == "__main__":
     unittest.main()
