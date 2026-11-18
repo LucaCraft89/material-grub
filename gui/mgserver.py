@@ -684,21 +684,25 @@ def api_job_events(h, q, g):
     h.send_response(200)
     h.send_header("Content-Type", "text/event-stream")
     h.send_header("Cache-Control", "no-store")
-    h.send_header("Connection", "close")
+    h.send_header("Transfer-Encoding", "chunked")
     h.end_headers()
-    h.close_connection = True
+
+    def chunk(data):
+        h.wfile.write(b"%x\r\n" % len(data) + data + b"\r\n")
+        h.wfile.flush()
+
     i = 0
     while True:
         evs, done = job.wait(i)
         for ev in evs:
-            h.wfile.write(b"data: " + json.dumps(ev).encode() + b"\n\n")
-        h.wfile.flush()
+            chunk(b"data: " + json.dumps(ev).encode() + b"\n\n")
         i += len(evs)
         if done and not evs:
+            h.wfile.write(b"0\r\n\r\n")
+            h.wfile.flush()
             return None
         if not evs and not done:
-            h.wfile.write(b": keep-alive\n\n")
-            h.wfile.flush()
+            chunk(b": keep-alive\n\n")
 
 
 def api_preset_save(h, q, g):

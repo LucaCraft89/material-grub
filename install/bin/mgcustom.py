@@ -173,7 +173,8 @@ def apply(R, ov, entries, pkg, aspect, size, classes, icon_dir=None, tmp=None, l
                 R.galias[pk] = icon
             else:
                 log(f"material-grub: there is no catalog icon '{icon}', keeping the default one")
-        if "name" in rule:
+        # a name given to a whole distro ({"key": ...}) is for its main entry: "Advanced options" and "Rescue" keep theirs
+        if "name" in rule and not (e["kind"] in ("advanced", "rescue") and "key" in rule["match"]):
             R.titles[pk] = rule["name"]
             R.titles_changed.add(pk)
             e["name"] = rule["name"]

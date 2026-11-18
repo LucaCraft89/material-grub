@@ -32,6 +32,20 @@ grep -q "classes applied" $CFG && say "grub.cfg annotated" || { say "grub.cfg NO
 [ -e /etc/material-grub.conf ] && say "config present"
 [ -e /usr/bin/material-grub-gui ] && { say "the GUI was installed with the theme (it must not be)"; exit 1; } || say "the GUI is not installed by the theme package"
 
+say "== features: a style per distro, one seed colour, overrides, the single command"
+case $fmt in rpm) ST=split;; deb) ST=list;; *) ST=clean;; esac
+material-grub conf STYLE=$ST >/dev/null && grep -q "^STYLE=$ST" /etc/material-grub.conf && say "conf STYLE=$ST: ok" || { say "material-grub conf FAILED"; exit 1; }
+material-grub colour '#7E57C2' --apply > /tmp/colour.log 2>&1 && say "colour + apply: ok" || { say "colour --apply FAILED"; tail -20 /tmp/colour.log | tee -a $R; exit 1; }
+material-grub colour | grep -q "#7E57C2" && say "colour is recorded" || { say "colour not recorded"; exit 1; }
+material-grub overrides check | grep -q "^valid" && say "overrides check: valid" || { say "overrides check FAILED"; exit 1; }
+printf '{"version":1,"seed":{"mode":"single","color":"#7E57C2"},"entries":[{"match":{"key":"tux"},"name":"Penguin","color":"#E95420"}]}' > /etc/material-grub/overrides.json
+material-grub apply > /tmp/ov.log 2>&1 && say "apply with overrides: ok" || { say "apply with overrides FAILED"; tail -20 /tmp/ov.log | tee -a $R; exit 1; }
+material-grub doctor > /tmp/doctor-ov.txt 2>&1 && say "doctor after overrides: ok" || { say "doctor after overrides FAILED"; cat /tmp/doctor-ov.txt | tee -a $R; exit 1; }
+grep -q "overrides .*valid" /tmp/doctor-ov.txt && say "doctor sees the overrides" || { say "doctor does not report the overrides"; cat /tmp/doctor-ov.txt | tee -a $R; exit 1; }
+material-grub presets save smoke >/dev/null && material-grub presets list | grep -q smoke && say "presets: ok" || { say "presets FAILED"; exit 1; }
+material-grub update | grep -q "installed: Material GRUB" && say "update info: ok"
+rm -f /etc/material-grub/overrides.json; material-grub conf STYLE=rail >/dev/null
+
 say "== upgrade"
 echo "STYLE=list" >> /etc/material-grub.conf    # a user edit must survive
 reinst > /tmp/up.log 2>&1 && say "package manager: ok" || { say "package manager: FAILED"; tail -30 /tmp/up.log | tee -a $R; exit 1; }
@@ -44,6 +58,7 @@ for f in /usr/bin/material-grub-gui /usr/libexec/material-grub-gui-helper /usr/s
   [ -e "$f" ] || { say "gui file missing: $f"; exit 1; }
 done
 material-grub-gui --help >/dev/null 2>&1 && say "material-grub-gui starts" || { say "material-grub-gui --help FAILED"; material-grub-gui --help 2>&1 | tail -5 | tee -a $R; exit 1; }
+python3 /src/tests/containers/gui_probe.py > /tmp/guiprobe.txt 2>&1 && say "the packaged GUI answers (state, previews in 4 styles, security checks)" || { say "GUI PROBE FAILED"; tail -20 /tmp/guiprobe.txt | tee -a $R; exit 1; }
 echo '{"verb":"nope"}' | /usr/libexec/material-grub-gui-helper | grep -q '"event": "error"' && say "helper refuses an unknown request" || { say "helper did not refuse an unknown request"; exit 1; }
 
 say "== broken upgrade"

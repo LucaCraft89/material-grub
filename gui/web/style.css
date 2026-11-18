@@ -71,28 +71,31 @@ main { padding: 24px 28px 120px; min-width: 0; }
 .topbar h1 { flex: 1; min-width: 12ch; }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 540px); gap: 24px; align-items: start; }
 .layout.wide { grid-template-columns: minmax(0, 1fr); }
-.col { display: grid; gap: 20px; min-width: 0; }
+.col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; }
 .preview { position: sticky; top: 24px; }
 @media (max-width: 1180px) { .layout { grid-template-columns: minmax(0, 1fr); } .preview { position: static; order: -1; } }
 @media (max-width: 820px) {
-  .app { grid-template-columns: 1fr; }
-  .rail { position: fixed; z-index: 20; top: auto; bottom: 0; left: 0; right: 0; height: auto; flex-direction: row; padding: 8px; gap: 2px; justify-content: space-around; border-top: 1px solid var(--c-outline-variant); }
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: fixed; z-index: 20; top: auto; bottom: 0; left: 0; right: 0; height: auto; flex-direction: row; padding: 8px; gap: 2px; justify-content: flex-start; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; border-top: 1px solid var(--c-outline-variant); }
+  .rail::-webkit-scrollbar { display: none; }
   .rail .brand, .rail .spacer { display: none; }
-  .nav { flex-direction: column; gap: 2px; height: 56px; padding: 6px 4px; flex: 1; justify-content: center; border-radius: 16px; font-size: 0.7rem; }
+  .nav { flex-direction: column; gap: 2px; height: 56px; padding: 6px 10px; flex: 0 0 auto; min-width: 66px; justify-content: center; align-items: center; border-radius: 16px; font-size: 0.7rem; }
+  .nav span { white-space: nowrap; }
   .nav .badge { position: absolute; top: 2px; right: 10px; margin: 0; }
   main { padding: 16px 16px 130px; }
 }
 
 /* ---------------------------------------------------------------- surfaces */
-.card { background: var(--c-surface-container); border-radius: var(--r-l); padding: 20px 22px; animation: rise 0.5s var(--ease-emph-decel) both; }
+.card { background: var(--c-surface-container); border-radius: var(--r-l); padding: 20px 22px; }
 .card.high { background: var(--c-surface-container-high); }
 .card.tonal { background: var(--c-primary-container); color: var(--c-on-primary-container); }
 .card h2 + .muted, .card h3 + .muted { margin-top: 4px; }
 .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
 .card-head h2, .card-head h3 { flex: 1; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
-.view > * { animation: rise 0.5s var(--ease-emph-decel) both; }
-.view > *:nth-child(2) { animation-delay: 0.05s; } .view > *:nth-child(3) { animation-delay: 0.1s; } .view > *:nth-child(4) { animation-delay: 0.15s; }
+/* the slide-in plays when a page opens, not on every edit */
+.layout.enter .view > *, .layout.enter .preview { animation: rise 0.5s var(--ease-emph-decel) both; }
+.layout.enter .view > *:nth-child(2) { animation-delay: 0.05s; } .layout.enter .view > *:nth-child(3) { animation-delay: 0.1s; } .layout.enter .view > *:nth-child(4) { animation-delay: 0.15s; }
 .grid { display: grid; gap: 14px; }
 .grid.cols2 { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .grid.cols3 { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
@@ -178,7 +181,7 @@ input[type="range"] { accent-color: var(--c-primary); width: 100%; }
 .icon-cell img { width: 28px; height: 28px; object-fit: contain; }
 
 /* ---------------------------------------------------------------- entries list */
-.entries { display: grid; gap: 8px; position: relative; }
+.entries { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; position: relative; }
 .entry { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 8px; border-radius: 20px; background: var(--c-surface-container-high); cursor: pointer; border: 2px solid transparent; transition: background-color 0.25s, border-color 0.25s, border-radius 0.4s var(--ease-spring), box-shadow 0.25s; }
 .entry:hover { border-radius: 28px; }
 .entry[aria-selected="true"] { background: var(--c-secondary-container); color: var(--c-on-secondary-container); border-color: var(--c-primary); }

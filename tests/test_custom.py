@@ -114,6 +114,31 @@ class Custom(unittest.TestCase):
         self.bake({"entries": [{"match": {"key": "ubuntu"}, "icon": "file:mine.png"}]})
         self.assertNotEqual(self.scene("mg_cccccccccc").tobytes(), base.tobytes())
 
+    def test_a_distro_wide_name_does_not_rename_advanced_options(self):
+        import mgcustom
+        import mgoverrides
+        import mgscenes
+
+        ov, _, _ = mgoverrides.validate({"entries": [{"match": {"key": "fedora"}, "name": "Work laptop"}]})
+        ents = [
+            {"class": "mg_1", "key": "fedora", "kind": "kernel", "level": "top", "title": "Fedora"},
+            {
+                "class": "mg_2",
+                "key": "fedora",
+                "kind": "advanced",
+                "level": "top",
+                "title": "Advanced options for Fedora",
+            },
+            {"class": "mg_3", "key": "fedora", "kind": "rescue", "level": "top", "title": "Fedora rescue"},
+        ]
+        R = mgscenes.Renderer(PKG, 1080)
+        mgcustom.apply(R, ov, ents, PKG, "16x9", (1920, 1080), json.loads((PKG / "classes.json").read_text()))
+        self.assertEqual([R.title_for(e) for e in ents], ["Work laptop", "Advanced", "Rescue"])
+        ov, _, _ = mgoverrides.validate({"entries": [{"match": {"class": "mg_2"}, "name": "More kernels"}]})
+        ents2 = [dict(e, key="fedora") for e in ents]
+        mgcustom.apply(R, ov, ents2, PKG, "16x9", (1920, 1080), json.loads((PKG / "classes.json").read_text()))
+        self.assertEqual(R.title_for(ents2[1]), "More kernels")  # asked for this very entry: it is renamed
+
     def test_unreadable_icon_keeps_default(self):
         self.bake()
         base = self.scene("mg_cccccccccc")

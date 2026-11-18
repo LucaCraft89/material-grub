@@ -64,7 +64,8 @@ function matchFor(e, scope = "key") {
 const titleOf = (e) => S.srv.catalog[e.key]?.title || e.key;
 function entryLabel(e) {
   const r = effective(e);
-  return r?.name || (e.kind === "kernel" ? titleOf(e) : e.kind === "advanced" ? "Advanced options" : e.kind === "rescue" ? "Rescue" : titleOf(e));
+  const named = r?.name && !(["advanced", "rescue"].includes(e.kind) && r.match.key); // a distro-wide name is for the main entry
+  return (named && r.name) || (e.kind === "kernel" ? titleOf(e) : e.kind === "advanced" ? "Advanced options" : e.kind === "rescue" ? "Rescue" : titleOf(e));
 }
 
 // ---------------------------------------------------------------- boot
@@ -81,19 +82,19 @@ function go(v) {
   S.view = VIEWS.some((x) => x[0] === name) ? name : "overview";
   history.replaceState(null, "", "#" + S.view);
   if (S.view === "ventoy" && arg && VT.path !== decodeURIComponent(arg)) vtLoad(decodeURIComponent(arg));
-  render();
+  render(true);
   scrollTo({ top: 0 });
 }
 addEventListener("hashchange", () => go(location.hash.slice(1)));
 
 // ---------------------------------------------------------------- rendering
-function render() {
+function render(enter = false) {
   if (!S.srv) return;
   renderRail();
   renderTop();
   const layout = document.getElementById("layout");
   const wide = ["overview", "presets", "update", "logs", "ventoy"].includes(S.view);
-  layout.className = "layout" + (wide ? " wide" : "");
+  layout.className = "layout" + (wide ? " wide" : "") + (enter ? " enter" : "");
   const view = h("div", { class: "col view" });
   ({ overview: vOverview, style: vStyle, entries: vEntries, colours: vColours, ventoy: vVentoy, presets: vPresets, update: vUpdate, logs: vLogs })[S.view](view);
   layout.replaceChildren(view);
@@ -109,7 +110,7 @@ function renderRail() {
       h("button", { class: "nav", "aria-current": S.view === id ? "page" : false, onClick: () => go(id) }, icon(ic), h("span", {}, label), id === "entries" && S.draft.overrides.entries.length ? h("span", { class: "badge" }, S.draft.overrides.entries.length) : null),
     ),
     h("div", { class: "spacer" }),
-    h("button", { class: "nav", onClick: toggleTheme, "aria-label": "Switch between light and dark interface" }, icon(S.dark ? "sun" : "moon"), h("span", {}, S.dark ? "Light interface" : "Dark interface")),
+    h("button", { class: "nav", onClick: toggleTheme, "aria-label": "Switch between light and dark interface" }, icon(S.dark ? "sun" : "moon"), h("span", {}, S.dark ? "Light" : "Dark")),
   );
 }
 function toggleTheme() {
@@ -599,18 +600,19 @@ function runJob(title, start, after) {
   dlg.replaceChildren(sheet);
   dlg.addEventListener("cancel", (e) => { if (closeBtn.disabled) e.preventDefault(); }, { once: false });
   dlg.showModal();
+  let lastOk = "";
   const onEvent = (ev) => {
     S.log.push(ev);
     logEl.append(logLine(ev));
     logEl.scrollTop = logEl.scrollHeight;
     if (ev.event === "step") { stepEl.textContent = `Step ${ev.n} of ${ev.total}: ${ev.msg}`; wp.set(Math.max(0.04, (ev.n - 1) / ev.total)); }
     else if (ev.event === "progress" && ev.percent != null) wp.set(ev.percent / 100);
-    else if (ev.event === "ok") stepEl.textContent = ev.msg;
+    else if (ev.event === "ok") { stepEl.textContent = ev.msg; lastOk = ev.msg; }
     else if (ev.event === "error") { stepEl.textContent = ev.msg; stepEl.style.color = "var(--c-error)"; }
     else if (ev.event === "done") {
       wp.set(ev.ok ? 1 : null);
       if (!ev.ok) { wp.stop(); wp.svg.style.opacity = ".35"; verbose.checked = true; logEl.hidden = false; }
-      else stepEl.textContent = "All done. The new menu shows on the next boot.";
+      else stepEl.textContent = lastOk || "All done.";
       closeBtn.disabled = false;
       closeBtn.focus();
       if (ev.ok) after?.();
