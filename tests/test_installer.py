@@ -121,6 +121,32 @@ class InstallLog(unittest.TestCase):
                 del os.environ["MG_INSTALL_LOG"]
 
 
+class UninstallGui(unittest.TestCase):
+    def test_uninstall_removes_everything_the_gui_installer_writes(self):
+        tree = (ROOT / "packaging/common/install-gui-tree.sh").read_text()
+        un = (ROOT / "install/uninstall.sh").read_text()
+        import re
+
+        written = set(re.findall(r'"\$dest(/usr/[^"$ ]+)"', tree)) | {"/usr/share/material-grub-gui"}
+        wanted = {
+            "/usr/bin/material-grub-gui",
+            "/usr/libexec/material-grub-gui-helper",
+            "/usr/share/polkit-1/actions/org.material-grub.gui.policy",
+            "/usr/share/applications/material-grub-gui.desktop",
+            "/usr/share/material-grub-gui",
+        }
+        for path in wanted:
+            self.assertIn(path, un.split("rm -f", 1)[1] if "rm -f" in un else "", path)
+        for path in written:
+            if any(w.startswith(path + "/") for w in wanted):
+                continue  # a shared parent directory (polkit's actions folder), not ours to remove
+            if "material-grub" in path or "polkit" in path:
+                self.assertTrue(
+                    any(w == path or path.startswith(w + "/") for w in wanted), f"{path} is installed but not removed"
+                )
+        self.assertEqual(un.count("/usr/share/material-grub-gui"), 2)  # both the normal and the immutable branch
+
+
 class Seed(unittest.TestCase):
     def test_flags(self):
         i = make(["--seed", "#e95420"])
