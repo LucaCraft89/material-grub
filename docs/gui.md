@@ -10,7 +10,7 @@ An optional graphical editor for the theme. It is **not installed by default**, 
 - **Source install:** `sudo ./install.sh --with-gui` (needs the `gui/` folder of a checkout). `sudo ./install.sh --uninstall` removes it again.
 - **From a checkout without installing:** `python3 gui/material-grub-gui` (changes then go through `pkexec` on `gui/mghelper.py`).
 
-Start it with `material-grub-gui` (or *Material GRUB* in your applications menu). It opens in your default browser, at a link with a secret token that is printed in the terminal. Closing the tab stops it after two minutes; so does `Ctrl+C`.
+Start it with `material-grub gui` (or `material-grub-gui`, or *Material GRUB* in your applications menu). It opens in your default browser, at a link with a secret token that is printed in the terminal. Closing the tab stops it after two minutes; so does `Ctrl+C`.
 
 ## What it does
 
@@ -35,5 +35,5 @@ Every control has a `?` with a short explanation. The preview is drawn by the sa
 ## Troubleshooting
 
 - *"material-grub is not installed (or too old)"*: the GUI needs the theme package of the same release.
-- *No password prompt*: you need a polkit agent (every desktop has one). Over SSH use `sudo material-grub-apply` after editing `/etc/material-grub/overrides.json`.
+- *No password prompt*: you need a polkit agent (every desktop has one). Over SSH use `sudo material-grub apply` after editing `/etc/material-grub/overrides.json`.
 - *Hide or reorder had no effect*: see the limits in [customising.md](customising.md#overridesjson); `material-grub doctor` says when `grub.cfg` must be regenerated.

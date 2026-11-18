@@ -25,6 +25,8 @@ before=$(sha256sum $CFG | cut -d' ' -f1)
 
 say "== install"
 inst > /tmp/inst.log 2>&1 && say "package manager: ok" || { say "package manager: FAILED"; tail -30 /tmp/inst.log | tee -a $R; exit 1; }
+material-grub version | grep -q "^material-grub [0-9]" && say "material-grub version: ok" || { say "material-grub version FAILED"; exit 1; }
+material-grub help | grep -q "colour" && say "material-grub help: ok" || { say "material-grub help FAILED"; exit 1; }
 material-grub doctor > /tmp/doctor.txt 2>&1 && say "doctor: ok" || { say "doctor: FAILED"; cat /tmp/doctor.txt | tee -a $R; tail -40 /tmp/inst.log | tee -a $R; exit 1; }
 grep -q "classes applied" $CFG && say "grub.cfg annotated" || { say "grub.cfg NOT annotated"; exit 1; }
 [ -e /etc/material-grub.conf ] && say "config present"

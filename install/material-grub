@@ -1,12 +1,8 @@
 #!/bin/sh
-# material-grub: front end for the installed tools.   material-grub doctor | apply | status | preview
+# material-grub: the one command. `material-grub` alone opens a menu; `material-grub help` lists the subcommands
+# (doctor, apply, gui, preview, colour, presets, overrides, conf, ventoy, update, uninstall, version). The code is bin/cmd_cli.py.
 PKG=/usr/share/material-grub; PY=python3
 [ -f /var/lib/material-grub/env ] && . /var/lib/material-grub/env
 [ -n "$MATERIAL_PKG" ] && PKG=$MATERIAL_PKG; [ -n "$MATERIAL_PY" ] && PY=$MATERIAL_PY
-cmd=${1:-help}; [ $# -gt 0 ] && shift
-case $cmd in
-  doctor|status) exec "$PY" "$PKG/bin/material-grub-doctor" "$@" ;;
-  apply)         exec /usr/local/sbin/material-grub-apply "$@" ;;
-  preview)       exec "$PY" "$PKG/bin/material-grub-preview" "$@" ;;
-  *) echo "usage: material-grub doctor | apply | preview"; echo "  doctor   check the installation (paste the output into a bug report)"; echo "  apply    regenerate grub.cfg and re-apply the theme (needs root)"; echo "  preview  render the menu scenes as a web page, nothing is installed"; [ "$cmd" = help ] || exit 2 ;;
-esac
+MG_CLI_SELF=$0; export MG_CLI_SELF
+exec "$PY" "$PKG/bin/cmd_cli.py" "$@"

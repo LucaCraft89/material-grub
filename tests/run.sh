@@ -2,6 +2,7 @@
 # Fast checks that need no root, QEMU or network: sh -n tests/run.sh   (CI runs this plus the installer matrix and a boot test)
 set -eu
 cd "$(dirname "$0")/.."
+export MATERIAL_OVERRIDES=/nonexistent/material-grub/overrides.json   # the tests must not read the overrides of the machine they run on
 echo "== shell syntax"
 for f in install.sh install/*.sh install/material-grub install/material-grub-apply install/05_material install/15_material_menu install/90_material_system tests/run.sh packaging/common/*.sh tests/containers/*.sh; do sh -n "$f" && echo "ok $f"; done
 echo "== python syntax"
@@ -19,6 +20,7 @@ python3 tests/test_palette.py
 python3 tests/test_panel.py
 python3 tests/test_custom.py
 python3 tests/test_customise.py
+python3 tests/test_cli.py
 python3 tests/test_gui_server.py
 python3 tests/test_monitors.py
 python3 tests/test_tui.py

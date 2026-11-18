@@ -126,7 +126,7 @@ class Doctor:
             self.add(
                 WARN,
                 "overrides",
-                "the order or hidden entries changed since grub.cfg was generated: run sudo material-grub-apply",
+                "the order or hidden entries changed since grub.cfg was generated: run sudo material-grub apply",
             )
             return
         n = len(ov["entries"])
@@ -178,7 +178,7 @@ class Doctor:
                     self.add(
                         FAIL,
                         "resolution",
-                        f"the theme was built for aspect {have}, but GRUB_GFXMODE={gfx} needs {need} ({want}): run sudo material-grub-apply",
+                        f"the theme was built for aspect {have}, but GRUB_GFXMODE={gfx} needs {need} ({want}): run sudo material-grub apply",
                     )
                 else:
                     self.add(OK, "resolution", f"GRUB_GFXMODE={gfx} -> {want} theme")
@@ -200,7 +200,7 @@ class Doctor:
         self.add(
             OK if MARK in text else FAIL,
             "grub.cfg annotated",
-            f"{cfg}" + ("" if MARK in text else " has not been processed: run sudo material-grub-apply"),
+            f"{cfg}" + ("" if MARK in text else " has not been processed: run sudo material-grub apply"),
         )
         ok, msgs = mgsafe.check_script(cfg)
         self.add(OK if ok else FAIL, "grub.cfg valid", "passes the GRUB script check" if ok else "; ".join(msgs))
@@ -234,7 +234,7 @@ class Doctor:
             self.add(
                 FAIL,
                 "scenes",
-                f"{len(missing)} of {len(entries)} menu entries have no scene (first: {missing[0]}): run sudo material-grub-apply",
+                f"{len(missing)} of {len(entries)} menu entries have no scene (first: {missing[0]}): run sudo material-grub apply",
             )
         else:
             self.add(OK, "scenes", f"every one of the {len(entries)} menu entries has a scene")

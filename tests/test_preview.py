@@ -1,12 +1,16 @@
 """Preview tests: scenes rendered for a sample menu into a self-contained page, no root and nothing installed.
 Needs a built package (dist/material-grub). usage: python3 tests/test_preview.py"""
 
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+os.environ.setdefault(
+    "MATERIAL_OVERRIDES", "/nonexistent/material-grub/overrides.json"
+)  # never the overrides of the machine running the tests
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "dist/material-grub"
 BIN = ROOT / "install/bin"

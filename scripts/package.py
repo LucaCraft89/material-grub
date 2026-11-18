@@ -117,5 +117,8 @@ if __name__ == "__main__":
         ROOT / "vendor/materialyoucolor", PKG / "bin/materialyoucolor", ignore=shutil.ignore_patterns("__pycache__")
     )  # pure-Python colour science for mgpalette.py
     shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
+    shutil.copy(
+        ROOT / "install/ventoy_sticks.py", PKG / "bin/ventoy_sticks.py"
+    )  # `material-grub ventoy` finds the stick with it
     shutil.copy(ROOT / "VERSION", PKG / "VERSION")
     print("package at", PKG)

@@ -127,7 +127,7 @@ class Doctor(unittest.TestCase):
         self.assertIn("icons not found", self.doctor()[1])
         self.overrides({"order": [{"key": "windows11"}]})
         (self.state / "cfg-meta.json").write_text(json.dumps({"bls_at": 0, "layout": "000000000000"}))
-        self.assertIn("run sudo material-grub-apply", self.doctor()[1])
+        self.assertIn("run sudo material-grub apply", self.doctor()[1])
 
     def test_missing_scene(self):
         (self.theme / "icons/mg_aaaaaaaaaa.png").unlink()

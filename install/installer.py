@@ -1043,7 +1043,9 @@ class Installer:
         """--with-gui: copy the optional GUI (plain Python and web files, nothing is built) next to the theme. Needs root; the GUI never runs as root itself."""
         tree = HERE / "packaging/common/install-gui-tree.sh"
         if not tree.is_file() or not (HERE / "gui/mgserver.py").is_file():
-            self.warn("--with-gui: this copy has no gui/ folder (use a checkout of the repository, or your package manager's material-grub-gui package)")
+            self.warn(
+                "--with-gui: this copy has no gui/ folder (use a checkout of the repository, or your package manager's material-grub-gui package)"
+            )
             return
         if not self.root():
             self.warn("--with-gui needs root: run it with sudo")
@@ -1052,7 +1054,9 @@ class Installer:
         if self.run(["sh", tree, HERE, "/"]).returncode != 0:
             self.warn("the GUI could not be installed (the theme itself is fine)")
             return
-        self.ok("installed: start it with material-grub-gui (opens in your browser; changes ask for your password through polkit)")
+        self.ok(
+            "installed: start it with material-grub-gui (opens in your browser; changes ask for your password through polkit)"
+        )
 
     def write_seed(self):
         """--seed / --seed-mode and the TUI's colour answers go to overrides.json (the one place every tool reads), keeping the rest of the file."""

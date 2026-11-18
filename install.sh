@@ -10,7 +10,7 @@
 #   ./install.sh --ventoy [MOUNTPOINT]   # theme a Ventoy USB stick instead (no root needed; a TUI picks the stick when no path is given)
 #        --res A,B,C  themes for several screen sizes (the first is Ventoy's start mode)    --mode dynamic|snapshot  (default dynamic: follows the ISOs on the stick)
 #        ./install.sh --uninstall --ventoy MOUNTPOINT   removes it from the stick again
-#   Runtime options (STYLE, HINTS, COOKIE, LOGO) go to /etc/material-grub.conf and can be changed later without rebuilding: sudo material-grub-apply
+#   Runtime options (STYLE, HINTS, COOKIE, LOGO) go to /etc/material-grub.conf and can be changed later without rebuilding: sudo material-grub apply
 #   options: --no-deps  never touch the package manager     --stage-only  build only, do not touch GRUB
 #            --keep-build  keep the temporary build dir     --force  ignore the NixOS check
 #            --immutable  use the ostree/bootc layout (automatic when /run/ostree-booted exists)   --yes  do not ask for confirmation

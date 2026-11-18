@@ -256,7 +256,7 @@ function vEntries(v) {
     ),
     card("Entries",
       rows.length ? entryList(rows, ordered) : h("div", { class: "empty" }, "No boot entries known yet."),
-      S.srv.demo ? h("p", { class: "muted small" }, "These are sample entries: run sudo material-grub-apply once to let the theme read your real menu.") : null,
+      S.srv.demo ? h("p", { class: "muted small" }, "These are sample entries: run sudo material-grub apply once to let the theme read your real menu.") : null,
     ),
   );
   const e = S.srv.entries.find((x) => x.class === S.sel);
