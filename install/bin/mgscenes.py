@@ -53,7 +53,9 @@ def groups_of(keys, order=None):
     parts = {
         "linux": [k for k in keys if base_key(k) not in WIN | SYS],
         "windows": [k for k in keys if base_key(k) in WIN],
-        "system": sorted((k for k in keys if base_key(k) in SYS), key=lambda k: ("firmware", "reboot", "shutdown").index(base_key(k))),
+        "system": sorted(
+            (k for k in keys if base_key(k) in SYS), key=lambda k: ("firmware", "reboot", "shutdown").index(base_key(k))
+        ),
     }
     names = list(order or []) + [n for n in ("linux", "windows", "system") if n not in (order or [])]
     return [parts[n] for n in names if parts[n]]
@@ -95,7 +97,14 @@ class Renderer:
     # ---- fonts / glyphs ----
     def font(self, size, wght=500, wdth=100, rond=0, opsz=None):
         f = ImageFont.truetype(self.font_path, size)
-        want = {"optical": opsz or size * 0.75, "width": wdth, "weight": wght, "roundness": rond, "grade": 0, "slant": 0}
+        want = {
+            "optical": opsz or size * 0.75,
+            "width": wdth,
+            "weight": wght,
+            "roundness": rond,
+            "grade": 0,
+            "slant": 0,
+        }
         vals = []
         for ax in f.get_variation_axes():  # by name: works with any version of the font (GRAD removed in v5)
             n = ax["name"].decode() if isinstance(ax["name"], bytes) else ax["name"]
@@ -257,7 +266,11 @@ class Renderer:
         return []
 
     def title_for(self, e):
-        return e.get("name") or {"advanced": "Advanced", "rescue": "Rescue"}.get(e["kind"]) or self.titles.get(e["key"], e["key"])
+        return (
+            e.get("name")
+            or {"advanced": "Advanced", "rescue": "Rescue"}.get(e["kind"])
+            or self.titles.get(e["key"], e["key"])
+        )
 
     # ---- cookie (top-right) and key hints: drawn at config time, so they are runtime options ----
     def draw_cookie(self, canvas, p):
@@ -761,8 +774,12 @@ class Renderer:
             while tsz > u(60) and self.font(tsz, 800, 135, 60, 144).getlength(title) > pw * 0.62:
                 tsz -= u(6)
             d = ImageDraw.Draw(im)
-            d.text((cx, u(530) + yoff), title, font=self.font(tsz, 800, 135, 60, 144), fill=hexc(p["primary"]), anchor="mm")
-            d.text((cx, u(644) + yoff), sub, font=self.font(u(40), 420, 105), fill=hexc(p["onSurfaceVariant"]), anchor="mm")
+            d.text(
+                (cx, u(530) + yoff), title, font=self.font(tsz, 800, 135, 60, 144), fill=hexc(p["primary"]), anchor="mm"
+            )
+            d.text(
+                (cx, u(644) + yoff), sub, font=self.font(u(40), 420, 105), fill=hexc(p["onSurfaceVariant"]), anchor="mm"
+            )
         canvas = Image.new("RGBA", (W, H), hexc(p["surface"]) + (255,))
         canvas.alpha_composite(im)
         return canvas.convert("RGB")

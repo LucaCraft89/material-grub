@@ -15,7 +15,14 @@ PKG = ROOT / "dist/material-grub"
 BIN = ROOT / "install/bin"
 sys.path.insert(0, str(BIN))
 ENTRIES = [
-    {"class": "mg_aaaaaaaaaa", "key": "fedora", "kind": "kernel", "level": "top", "title": "Fedora Linux 6.1", "kver": "6.1"},
+    {
+        "class": "mg_aaaaaaaaaa",
+        "key": "fedora",
+        "kind": "kernel",
+        "level": "top",
+        "title": "Fedora Linux 6.1",
+        "kver": "6.1",
+    },
     {"class": "mg_bbbbbbbbbb", "key": "windows11", "kind": "plain", "level": "top", "title": "Windows Boot Manager"},
     {"class": "mg_cccccccccc", "key": "ubuntu", "kind": "kernel", "level": "top", "title": "Ubuntu"},
 ]
@@ -41,7 +48,9 @@ class Custom(unittest.TestCase):
         self.state = self.d / "state/entries.json"
         self.state.parent.mkdir()
         self.state.write_text(json.dumps(ENTRIES))
-        self.state.with_name("menu.json").write_text(json.dumps([{"level": "top", "items": [e["class"] for e in ENTRIES]}]))
+        self.state.with_name("menu.json").write_text(
+            json.dumps([{"level": "top", "items": [e["class"] for e in ENTRIES]}])
+        )
         (self.d / "mg.conf").write_text("STYLE=rail\n")
         self.ov = self.d / "etc/overrides.json"
         self.ov.parent.mkdir()

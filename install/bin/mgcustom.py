@@ -11,11 +11,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from PIL import Image
-
 import mgoverrides
 import mgpalette
 import mgscenes
+from PIL import Image
 
 MASK = 512  # the size of the glyph masks in the package (glyphs/<key>.png)
 
@@ -34,7 +33,17 @@ def load_image(path, size=1024):
                     im = shutil.which("magick") or shutil.which("convert")
                     if not im:
                         return None
-                    cmd = [im, "-background", "none", "-density", "300", str(path), "-resize", f"{size}x{size}", "PNG32:" + str(out)]
+                    cmd = [
+                        im,
+                        "-background",
+                        "none",
+                        "-density",
+                        "300",
+                        str(path),
+                        "-resize",
+                        f"{size}x{size}",
+                        "PNG32:" + str(out),
+                    ]
                 if subprocess.run(cmd, capture_output=True, timeout=60).returncode != 0:
                     return None
                 return Image.open(out).convert("RGBA").copy()
@@ -145,7 +154,9 @@ def apply(R, ov, entries, pkg, aspect, size, classes, icon_dir=None, tmp=None, l
         n += 1
         real = e["key"]
         pk = f"{real}~{n}"
-        R.pal[pk] = {"seed": rule["color"], **mgpalette.scheme(rule["color"], dark)} if "color" in rule else dict(R.pal[real])
+        R.pal[pk] = (
+            {"seed": rule["color"], **mgpalette.scheme(rule["color"], dark)} if "color" in rule else dict(R.pal[real])
+        )
         R.galias[pk] = real
         R.titles[pk] = R.titles.get(real, real)
         icon = rule.get("icon")

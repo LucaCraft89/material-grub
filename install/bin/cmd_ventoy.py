@@ -483,7 +483,15 @@ def main():
     for rel in all_files:
         name = Path(rel).name
         custom.append(
-            {"class": "mgu_" + mgrub.uid("ventoy", rel)[3:], "key": key_of(name, rules), "kind": "plain", "level": "top", "title": name, "label": name, "path": rel}
+            {
+                "class": "mgu_" + mgrub.uid("ventoy", rel)[3:],
+                "key": key_of(name, rules),
+                "kind": "plain",
+                "level": "top",
+                "title": name,
+                "label": name,
+                "path": rel,
+            }
         )
     keys = sorted({e["key"] for e in entries}) or ["iso"]
     if dynamic:
@@ -558,11 +566,11 @@ def main():
 
         c_ents = copy.deepcopy(custom)
         ov_tmp = tempfile.mkdtemp(prefix="mg-ventoy-overlay-")
-        overlay = mgcustom.apply(
-            R, ov, c_ents, PKG, aspect, Image.open(bgs[0]).size, classes, icon_dir=stick / ICONS, tmp=ov_tmp
-        )
+        mgcustom.apply(R, ov, c_ents, PKG, aspect, Image.open(bgs[0]).size, classes, icon_dir=stick / ICONS, tmp=ov_tmp)
         custom_done = [e for e in c_ents if e.get("orig_key")]
-        bgdir = R.bg_dir  # the overlay's: the baked panel of a key whose colour was not changed, a redrawn one otherwise
+        bgdir = (
+            R.bg_dir
+        )  # the overlay's: the baked panel of a key whose colour was not changed, a redrawn one otherwise
         raw_on = conf["RAW_NAME"] == "on"
 
         def rows_of(im):
@@ -594,9 +602,9 @@ def main():
 
         if fs:
             (tmp / "_hero").mkdir()
-            for k in keys + (
-                ["iso"] if "iso" not in keys else []
-            ) + [e["key"] for e in custom_done]:  # background + hero with a slightly smaller title (the file name is the main text here)
+            for k in (
+                keys + (["iso"] if "iso" not in keys else []) + [e["key"] for e in custom_done]
+            ):  # background + hero with a slightly smaller title (the file name is the main text here)
                 sc = Image.open(bgdir / f"{k}.png").convert("RGBA")
                 R.hero(sc, {"key": k, "kind": "plain", "title": ""}, R.pal[k], 124)
                 sc.save(tmp / "_hero" / f"{k}.png".replace("~", "_"))
@@ -703,7 +711,9 @@ def main():
     old_alias = state.get("menu_alias", [])
     user_alias = [m for m in vj.get("menu_alias", []) if m not in old_alias]
     if user_alias or menu_alias:
-        vj["menu_alias"] = user_alias + [m for m in menu_alias if m["image"] not in {u.get("image") for u in user_alias}]
+        vj["menu_alias"] = user_alias + [
+            m for m in menu_alias if m["image"] not in {u.get("image") for u in user_alias}
+        ]
     else:
         vj.pop("menu_alias", None)
     th = vj.get("theme", {})
@@ -727,7 +737,13 @@ def main():
     vj_path.write_text(json.dumps(vj, indent=1) + "\n")
     state_path.write_text(
         json.dumps(
-            {"menu_class": menu_class, "menu_alias": menu_alias, "theme_files": theme_files, "theme_dirs": theme_dirs, "prev_theme": prev},
+            {
+                "menu_class": menu_class,
+                "menu_alias": menu_alias,
+                "theme_files": theme_files,
+                "theme_dirs": theme_dirs,
+                "prev_theme": prev,
+            },
             indent=1,
         )
     )

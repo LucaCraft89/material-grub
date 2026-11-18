@@ -18,6 +18,7 @@
 #            --preview  render your boot entries with the chosen style as a web page; no root, nothing installed, no VM
 #            --dry-run  build in a scratch directory and show a diff of grub.cfg and /etc/default/grub plus the files it would write; changes nothing (needs sudo for the grub.cfg part)
 #            --seed '#RRGGBB'  one seed colour for every entry (single-colour theme); --seed-mode multi|single  switch back and forth without changing the colour
+#            --with-gui  also install the optional graphical editor (material-grub-gui; source installs, needs the gui/ folder; packages have their own material-grub-gui package)
 #            --progress json  machine-readable output for the GUI: one JSON object per line (step, info, ok, warn, error, progress, log, done); never asks anything
 #   The logic is install/installer.py (Python 3.8+, standard library only); this file finds a Python 3.8+ (installing one with the
 #   distribution's package manager when needed, which takes root) and hands over.
@@ -26,7 +27,7 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 
 # --help needs no Python
 for a in "$@"; do
-  case $a in -h|--help) sed -n 2,21p "$0" | sed 's/^# \{0,1\}//'; exit 0;; esac
+  case $a in -h|--help) sed -n 2,22p "$0" | sed 's/^# \{0,1\}//'; exit 0;; esac
 done
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }

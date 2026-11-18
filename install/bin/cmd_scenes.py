@@ -20,7 +20,6 @@ def arg(n, d=None):
 import os
 
 
-
 def main():
     global mgcustom
     try:
@@ -83,7 +82,9 @@ def entry_scene(R, overlay, e, groups, style, opts, menu, by_class):
     """The scene (PIL image) shown while entry `e` is selected: the same drawing for the real bake and for the GUI's live preview."""
     import mgscenes
 
-    if e["kind"] == "plain" and style == "rail":  # plain entries in the rail style are the class scene with their own slot lit
+    if (
+        e["kind"] == "plain" and style == "rail"
+    ):  # plain entries in the rail style are the class scene with their own slot lit
         return R.render_class(e["key"], overlay.icon(e["key"]), groups, "rail", opts, menu, rail_sel=e["key"])
     plain_hero = e["kind"] == "plain" and style not in mgscenes.LISTY
     src = overlay.icon(e["key"]) if plain_hero else overlay.bg(e["key"])
@@ -102,7 +103,9 @@ def bake(R, ov, overlay, entries, menu, classes, theme, style, opts):
     if not groups:
         sys.exit(0)
     done = 0
-    for k in dict.fromkeys(mgscenes.base_key(k) for k in keys):  # class scenes: used by plain entries (Windows, Firmware...) and as fallbacks
+    for k in dict.fromkeys(
+        mgscenes.base_key(k) for k in keys
+    ):  # class scenes: used by plain entries (Windows, Firmware...) and as fallbacks
         first = theme / "icons" / f"{classes[k][0]}.png"
         R.render_class(
             k,

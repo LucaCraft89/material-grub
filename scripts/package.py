@@ -73,7 +73,9 @@ if __name__ == "__main__":
     )  # most specific first; ties in a fixed order
     (PKG / "rules.json").write_text(json.dumps(rules))
     (PKG / "titles.json").write_text(json.dumps({k: t for k, t, *_ in C.D + C.X}))
-    (PKG / "subtitles.json").write_text(json.dumps({k: sub for k, _, sub, *_ in C.D + C.X}))  # the hero subtitle, for mgscenes.panel_scene
+    (PKG / "subtitles.json").write_text(
+        json.dumps({k: sub for k, _, sub, *_ in C.D + C.X})
+    )  # the hero subtitle, for mgscenes.panel_scene
     (PKG / "fonts").mkdir()
     shutil.copy(B.R.FONT, PKG / "fonts" / "GoogleSansFlex-VF.ttf")
     for n in ("OFL.txt", "TRADEMARKS.md"):
@@ -110,8 +112,10 @@ if __name__ == "__main__":
     )  # the Ventoy logo drawn in the cookie on a stick
     (PKG / "scheme.txt").write_text(B.R.SCHEME + "\n")
     (PKG / "palettes.json").write_text(json.dumps({k: v for k, v in B.R.PAL.items()}))
-    shutil.copytree(ROOT / "install/bin", PKG / "bin")
-    shutil.copytree(ROOT / "vendor/materialyoucolor", PKG / "bin/materialyoucolor")  # pure-Python colour science for mgpalette.py
+    shutil.copytree(ROOT / "install/bin", PKG / "bin", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(
+        ROOT / "vendor/materialyoucolor", PKG / "bin/materialyoucolor", ignore=shutil.ignore_patterns("__pycache__")
+    )  # pure-Python colour science for mgpalette.py
     shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
     shutil.copy(ROOT / "VERSION", PKG / "VERSION")
     print("package at", PKG)

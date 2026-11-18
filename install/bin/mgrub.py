@@ -156,7 +156,7 @@ def write_conf(path, updates):
 
     for k, v in updates.items():
         if not _conf_ok(k, str(v)):
-            raise ValueError("bad config: %s=%r" % (k, v))
+            raise ValueError(f"bad config: {k}={v!r}")
     path = Path(path)
     try:
         lines = path.read_text().splitlines()
@@ -164,9 +164,9 @@ def write_conf(path, updates):
     except OSError:
         lines, mode = [], 0o644
     for k, v in updates.items():
-        new = "%s=%s" % (k, v)
-        active = re.compile(r"^\s*%s\s*=" % k)
-        sample = re.compile(r"^#\s*%s\s*=" % k)
+        new = f"{k}={v}"
+        active = re.compile(rf"^\s*{k}\s*=")
+        sample = re.compile(rf"^#\s*{k}\s*=")
         for rx in (active, sample):
             hit = next((i for i, ln in enumerate(lines) if rx.match(ln)), None)
             if hit is not None:

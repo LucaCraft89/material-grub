@@ -12,13 +12,29 @@ import mgsafe
 import mgseeds
 
 DEMO = [  # shown when the machine has no entry state yet (not installed here, or a fresh checkout)
-    {"class": "mg_demo000001", "key": "fedora", "kind": "kernel", "level": "top", "title": "Fedora Linux (6.12.1)", "kver": "6.12.1", "os": "Fedora Linux"},
+    {
+        "class": "mg_demo000001",
+        "key": "fedora",
+        "kind": "kernel",
+        "level": "top",
+        "title": "Fedora Linux (6.12.1)",
+        "kver": "6.12.1",
+        "os": "Fedora Linux",
+    },
     {"class": "mg_demo000002", "key": "ubuntu", "kind": "kernel", "level": "top", "title": "Ubuntu", "os": "Ubuntu"},
     {"class": "mg_demo000003", "key": "windows11", "kind": "plain", "level": "top", "title": "Windows Boot Manager"},
     {"class": "mg_demo000004", "key": "firmware", "kind": "plain", "level": "top", "title": "UEFI Firmware Settings"},
 ]
 
-CONF_KEYS = ("STYLE", "COOKIE", "LOGO", "HINTS", "RAW_NAME", "COUNTDOWN", "TIMEOUT")  # what the GUI may change (SCHEME is baked at build time)
+CONF_KEYS = (
+    "STYLE",
+    "COOKIE",
+    "LOGO",
+    "HINTS",
+    "RAW_NAME",
+    "COUNTDOWN",
+    "TIMEOUT",
+)  # what the GUI may change (SCHEME is baked at build time)
 
 
 def _json(path, default):

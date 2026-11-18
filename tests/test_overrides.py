@@ -24,12 +24,23 @@ class Validate(unittest.TestCase):
                 "seed": {"mode": "single", "color": "#e95420"},
                 "groups": ["windows", "linux"],
                 "order": [{"key": "windows11"}, {"class": "mg_1a2b3c4d5e"}],
-                "entries": [{"match": {"key": "fedora"}, "name": " Mine ", "color": "#2e7d32", "icon": "file:logo.png", "hidden": False}],
+                "entries": [
+                    {
+                        "match": {"key": "fedora"},
+                        "name": " Mine ",
+                        "color": "#2e7d32",
+                        "icon": "file:logo.png",
+                        "hidden": False,
+                    }
+                ],
             }
         )
         self.assertEqual((e, w), ([], []))
         self.assertEqual(c["seed"]["color"], "#E95420")
-        self.assertEqual(c["entries"][0], {"match": {"key": "fedora"}, "name": "Mine", "color": "#2E7D32", "icon": "file:logo.png", "hidden": False})
+        self.assertEqual(
+            c["entries"][0],
+            {"match": {"key": "fedora"}, "name": "Mine", "color": "#2E7D32", "icon": "file:logo.png", "hidden": False},
+        )
 
     def test_bad_values_are_errors(self):
         bad = [
@@ -83,7 +94,13 @@ class Files(unittest.TestCase):
         self.assertIn("seed.mode", probs[0])
 
     def test_save_roundtrip_and_refusal(self):
-        ov.save({"seed": {"mode": "single", "color": "#112233"}, "entries": [{"match": {"title": "windows"}, "hidden": True}]}, self.p)
+        ov.save(
+            {
+                "seed": {"mode": "single", "color": "#112233"},
+                "entries": [{"match": {"title": "windows"}, "hidden": True}],
+            },
+            self.p,
+        )
         c, probs = ov.load(self.p)
         self.assertEqual((probs, c["seed"]["mode"], c["entries"][0]["hidden"]), ([], "single", True))
         before = self.p.read_text()
@@ -103,7 +120,12 @@ class Matching(unittest.TestCase):
 
     def test_rule_for_first_match_wins(self):
         o, _, _ = ov.validate(
-            {"entries": [{"match": {"title": "windows"}, "name": "Win"}, {"match": {"key": "windows11"}, "name": "Other"}]}
+            {
+                "entries": [
+                    {"match": {"title": "windows"}, "name": "Win"},
+                    {"match": {"key": "windows11"}, "name": "Other"},
+                ]
+            }
         )
         self.assertEqual(ov.rule_for(o, self.E[1])["name"], "Win")
         self.assertEqual(ov.rule_for(o, self.E[0]), {})

@@ -63,6 +63,8 @@ def xterm256(color):
     def d(a, bb):
         return sum((x - y) ** 2 for x, y in zip(a, bb))
 
-    if max(r, g, b) - min(r, g, b) < 24 and d((grey, grey, grey), (r, g, b)) < d(cube_c, (r, g, b)):  # only real greys use the ramp
+    if max(r, g, b) - min(r, g, b) < 24 and d((grey, grey, grey), (r, g, b)) < d(
+        cube_c, (r, g, b)
+    ):  # only real greys use the ramp
         return 232 + grey_i
     return 16 + 36 * ri + 6 * gi + bi

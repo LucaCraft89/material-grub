@@ -9,15 +9,19 @@ import tempfile
 import threading
 from pathlib import Path
 
+import cmd_scenes
 import mgcustom
 import mgoverrides
 import mgpalette
 import mgscenes
 from PIL import Image
 
-import cmd_scenes
-
-ASPECTS = {"16x9": 1920, "16x10": 1728, "21x9": 2560, "32x9": 3840}  # design width at 1080 high (scripts/build_theme.py)
+ASPECTS = {
+    "16x9": 1920,
+    "16x10": 1728,
+    "21x9": 2560,
+    "32x9": 3840,
+}  # design width at 1080 high (scripts/build_theme.py)
 
 
 class Previewer:
@@ -28,7 +32,9 @@ class Previewer:
         self.lock = threading.Lock()
         self.tmp = tempfile.TemporaryDirectory(prefix="mg-gui-preview-")
         self.classes = json.loads((self.pkg / "classes.json").read_text())
-        self.subs = json.loads((self.pkg / "subtitles.json").read_text()) if (self.pkg / "subtitles.json").is_file() else {}
+        self.subs = (
+            json.loads((self.pkg / "subtitles.json").read_text()) if (self.pkg / "subtitles.json").is_file() else {}
+        )
         self._pal = {}
 
     def close(self):
@@ -61,7 +67,9 @@ class Previewer:
             alt = self.palettes(dark, sch)
             if alt:
                 R.pal = copy.deepcopy(alt)
-            overlay = mgcustom.apply(R, ov, ents, self.pkg, aspect, size, self.classes, icon_dir=icon_dir, tmp=self.tmp.name, always=True)
+            overlay = mgcustom.apply(
+                R, ov, ents, self.pkg, aspect, size, self.classes, icon_dir=icon_dir, tmp=self.tmp.name, always=True
+            )
             by_class = {e["class"]: e for e in ents}
             e = by_class.get(cls) or next(iter(by_class.values()))
             keys = cmd_scenes.rail_keys(ents)

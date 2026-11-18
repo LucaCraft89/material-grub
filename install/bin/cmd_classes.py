@@ -86,7 +86,13 @@ BLS_MARK = "# material-grub: structured BLS entries"
 
 def group_of(key):
     base = key.split("~", 1)[0]
-    return "windows" if base in ("windows10", "windows11") else "system" if base in ("firmware", "reboot", "shutdown") else "linux"
+    return (
+        "windows"
+        if base in ("windows10", "windows11")
+        else "system"
+        if base in ("firmware", "reboot", "shutdown")
+        else "linux"
+    )
 
 
 def customise(text, cfg_entries, bls_at, ov, log=print):
@@ -98,7 +104,9 @@ def customise(text, cfg_entries, bls_at, ov, log=print):
     if not wants:
         return text, cfg_entries, bls_at
     if re.search(r'^\s*set\s+default\s*=\s*"?\d', text, re.M):
-        log("material-grub: overrides: grub.cfg selects its default entry by number, so entries are not hidden or reordered")
+        log(
+            "material-grub: overrides: grub.cfg selects its default entry by number, so entries are not hidden or reordered"
+        )
         return text, cfg_entries, bls_at
     by_class = {e["class"]: e for e in cfg_entries}
 
@@ -123,14 +131,21 @@ def customise(text, cfg_entries, bls_at, ov, log=print):
         if d is not None and not ge.guarded and ge.end is not None and mgoverrides.rule_for(ov, d).get("hidden"):
             cuts.append((ge, d))
     gone = set()
-    for ge, d in cuts:
+    for _ge, d in cuts:
         gone.add(d["class"])
         gone |= descendants_of(d["class"])
-    cuts = [(ge, d) for ge, d in cuts if not any(a in gone and a != d["class"] and d["class"] in descendants_of(a) for a in gone)]
+    cuts = [
+        (ge, d)
+        for ge, d in cuts
+        if not any(a in gone and a != d["class"] and d["class"] in descendants_of(a) for a in gone)
+    ]
     if cuts:
         out, last = [], 0
         for ge, d in sorted(cuts, key=lambda t: t[0].start):
-            out += [text[last : ge.start], "# material-grub: hidden by overrides.json: " + re.sub(r"\s+", " ", d["title"])]
+            out += [
+                text[last : ge.start],
+                "# material-grub: hidden by overrides.json: " + re.sub(r"\s+", " ", d["title"]),
+            ]
             last = ge.end
         out.append(text[last:])
         text = "".join(out)

@@ -3,12 +3,14 @@
 set -eu
 cd "$(dirname "$0")/.."
 echo "== shell syntax"
-for f in install.sh install/*.sh install/material-grub install/material-grub-apply install/05_material install/15_material_menu install/90_material_system tests/run.sh; do sh -n "$f" && echo "ok $f"; done
+for f in install.sh install/*.sh install/material-grub install/material-grub-apply install/05_material install/15_material_menu install/90_material_system tests/run.sh packaging/common/*.sh tests/containers/*.sh; do sh -n "$f" && echo "ok $f"; done
 echo "== python syntax"
-python3 -m py_compile scripts/*.py install/bin/material-grub-* install/bin/*.py install/*.py tests/*.py && echo ok
+python3 -m py_compile scripts/*.py install/bin/material-grub-* install/bin/*.py install/*.py tests/*.py gui/*.py gui/material-grub-gui && echo ok
+echo "== front end syntax"
+if command -v node >/dev/null 2>&1; then for f in gui/web/*.js; do node --check "$f" && echo "ok $f"; done; else echo "skip node (not installed)"; fi
 echo "== lint (when ruff / shellcheck are installed; CI always runs them)"
 if command -v ruff >/dev/null 2>&1; then ruff check . && ruff format --check . && echo "ok ruff"; else echo "skip ruff (not installed)"; fi
-if command -v shellcheck >/dev/null 2>&1; then shellcheck -x --severity=warning install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh && echo "ok shellcheck"; else echo "skip shellcheck (not installed)"; fi
+if command -v shellcheck >/dev/null 2>&1; then shellcheck -x --severity=warning install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh packaging/common/*.sh && echo "ok shellcheck"; else echo "skip shellcheck (not installed)"; fi
 echo "== unit tests"
 python3 tests/test_mgrub.py
 python3 tests/test_overrides.py

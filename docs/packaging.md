@@ -37,3 +37,7 @@ A plain `dnf upgrade`, `pacman -Syu` or `apt upgrade` installs the new sources a
 `/etc/default/grub` in `/var/backups/material-grub`, theme rendered into a new directory and swapped in, classes applied, validation,
 rollback on failure. `/etc/material-grub.conf` is never overwritten. The repositories that serve the updates are set up by the maintainer
 (COPR project, apt repository with a signing key; the AUR when registrations reopen).
+
+## The optional GUI package
+
+`material-grub-gui` is a second package built from the same source (`%package gui` in the spec, a second stanza in `debian/control`, `package_material-grub-gui()` in the PKGBUILD). It ships finished files (`packaging/common/install-gui-tree.sh`, nothing is built on the target machine), depends on `material-grub` of the same version, and the theme package never depends on it, recommends it or installs it. The CI package jobs check that: the theme alone has no `/usr/bin/material-grub-gui`, and installing the GUI package afterwards works and its helper refuses an unknown request.

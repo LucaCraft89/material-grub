@@ -377,7 +377,11 @@ class Custom(unittest.TestCase):
         (self.d / "ventoy/material-grub.conf").write_text(conf)
         if ov is not None:
             (self.d / "ventoy/material-grub-overrides.json").write_text(json.dumps(ov))
-        r = subprocess.run([sys.executable, str(TOOL), str(self.d), "--pkg", str(PKG), "--res", "1920x1080", *a], capture_output=True, text=True)
+        r = subprocess.run(
+            [sys.executable, str(TOOL), str(self.d), "--pkg", str(PKG), "--res", "1920x1080", *a],
+            capture_output=True,
+            text=True,
+        )
         self.assertEqual(r.returncode, 0, r.stderr)
         return r.stdout, json.loads(self.vj.read_text())
 
@@ -412,7 +416,10 @@ class Custom(unittest.TestCase):
 
         (self.d / "ventoy/material-grub-icons").mkdir()
         Image.new("RGBA", (64, 64), (20, 160, 20, 255)).save(self.d / "ventoy/material-grub-icons/logo.png")
-        ov = {"seed": {"mode": "single", "color": "#7E57C2"}, "entries": [{"match": {"title": "ubuntu"}, "icon": "file:logo.png"}]}
+        ov = {
+            "seed": {"mode": "single", "color": "#7E57C2"},
+            "entries": [{"match": {"title": "ubuntu"}, "icon": "file:logo.png"}],
+        }
         out, j = self.run_tool("STYLE=list\n", ov)
         self.assertEqual(j["menu_class"][0]["class"][:4], "mgu_")
         self.assertNotIn("cannot read", out)

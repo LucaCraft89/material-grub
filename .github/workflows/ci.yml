@@ -14,7 +14,8 @@ jobs:
       - run: pipx install ruff shellcheck-py
       - run: ruff check .
       - run: ruff format --check .
-      - run: shellcheck -x --severity=warning install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh
+      - run: shellcheck -x --severity=warning install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh packaging/common/*.sh
+      - run: for f in gui/web/*.js; do node --check "$f"; done      # the GUI front end has no build step: a syntax error would only show in the browser
 
   checks:
     name: Syntax and unit tests
@@ -25,6 +26,7 @@ jobs:
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
       - run: PATH="$PWD/.venv/bin:$PATH" sh tests/run.sh
+      - run: .venv/bin/python scripts/gen_gui_tokens.py && git diff --exit-code gui/web/tokens.css      # the GUI's colours are generated, never edited by hand
 
   requirements:
     name: Pinned requirements on Python ${{ matrix.python }}

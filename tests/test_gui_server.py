@@ -1,7 +1,6 @@
 """The GUI server over real HTTP on 127.0.0.1: authentication, Host/Origin checks, state, preview, uploads, presets and an apply job through the
 real helper (as a normal user, in a scratch root, with a fake material-grub-apply). Needs a built package + Pillow. usage: python3 tests/test_gui_server.py"""
 
-import base64
 import http.client
 import io
 import json
@@ -15,7 +14,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "dist/material-grub"
 ENTRIES = [
-    {"class": "mg_aaaaaaaaaa", "key": "fedora", "kind": "kernel", "level": "top", "title": "Fedora Linux 6.1", "kver": "6.1"},
+    {
+        "class": "mg_aaaaaaaaaa",
+        "key": "fedora",
+        "kind": "kernel",
+        "level": "top",
+        "title": "Fedora Linux 6.1",
+        "kver": "6.1",
+    },
     {"class": "mg_bbbbbbbbbb", "key": "windows11", "kind": "plain", "level": "top", "title": "Windows Boot Manager"},
 ]
 
@@ -130,8 +136,13 @@ class Server(unittest.TestCase):
         self.assertIn(d["overrides"]["seed"]["mode"], ("multi", "single"))  # the apply test may have written one first
 
     def test_preview_png_and_validation(self):
-        draft = {"conf": {"STYLE": "list"}, "overrides": {"entries": [{"match": {"key": "fedora"}, "color": "#E95420", "name": "Hi"}]}}
-        st, png, r = self.req("POST", "/api/preview", {"draft": draft, "class": "mg_aaaaaaaaaa", "scale": 0.25}, raw=True)
+        draft = {
+            "conf": {"STYLE": "list"},
+            "overrides": {"entries": [{"match": {"key": "fedora"}, "color": "#E95420", "name": "Hi"}]},
+        }
+        st, png, r = self.req(
+            "POST", "/api/preview", {"draft": draft, "class": "mg_aaaaaaaaaa", "scale": 0.25}, raw=True
+        )
         self.assertEqual((st, r.getheader("Content-Type")), (200, "image/png"))
         from PIL import Image
 
@@ -148,8 +159,20 @@ class Server(unittest.TestCase):
         self.assertEqual((st, d["name"]), (200, "mine.png"))
         st, png, r = self.req("GET", "/api/icon/mine.png", raw=True)
         self.assertEqual((st, r.getheader("Content-Type")), (200, "image/png"))
-        for name, body in (("../x.png", buf.getvalue()), ("a.exe", b"MZ"), ("bad.png", b"not a picture"), ("big.png", b"x" * (5 * 1024 * 1024)), ("e.svg", b"<html>")):
-            self.assertEqual(self.req("POST", "/api/icon?name=" + name, body, headers={"Content-Type": "application/octet-stream"})[0], 400, name)
+        for name, body in (
+            ("../x.png", buf.getvalue()),
+            ("a.exe", b"MZ"),
+            ("bad.png", b"not a picture"),
+            ("big.png", b"x" * (5 * 1024 * 1024)),
+            ("e.svg", b"<html>"),
+        ):
+            self.assertEqual(
+                self.req("POST", "/api/icon?name=" + name, body, headers={"Content-Type": "application/octet-stream"})[
+                    0
+                ],
+                400,
+                name,
+            )
 
     def test_presets_roundtrip(self):
         draft = {"conf": {"STYLE": "split"}, "overrides": {"seed": {"mode": "single", "color": "#7E57C2"}}}
@@ -161,13 +184,17 @@ class Server(unittest.TestCase):
         self.assertEqual((st, d["draft"]["overrides"]["seed"]["color"]), (200, "#7E57C2"))
         st, exp, _ = self.req("GET", "/api/presets/export/My%20look")
         self.assertEqual(self.req("POST", "/api/presets/import", dict(exp, name="Imported"))[0], 200)
-        self.assertEqual(self.req("POST", "/api/presets/import", {"preset": 1, "name": "x", "conf": {"EVIL": "1"}})[0], 400)
+        self.assertEqual(
+            self.req("POST", "/api/presets/import", {"preset": 1, "name": "x", "conf": {"EVIL": "1"}})[0], 400
+        )
         self.assertEqual(self.req("DELETE", "/api/presets/My%20look")[0], 200)
         self.assertEqual(self.req("POST", "/api/presets/load/My%20look", {})[0], 404)
 
     def events(self, jid):
         c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=60)
-        c.request("GET", f"/api/jobs/{jid}/events", headers={"Host": f"127.0.0.1:{self.port}", "X-MG-Token": self.app.token})
+        c.request(
+            "GET", f"/api/jobs/{jid}/events", headers={"Host": f"127.0.0.1:{self.port}", "X-MG-Token": self.app.token}
+        )
         r = c.getresponse()
         out = []
         for line in r.read().decode().splitlines():
@@ -176,7 +203,13 @@ class Server(unittest.TestCase):
         return out
 
     def test_apply_job_streams_events_and_writes_through_the_helper(self):
-        draft = {"conf": {"STYLE": "list", "HINTS": "off"}, "overrides": {"seed": {"mode": "single", "color": "#7E57C2"}, "entries": [{"match": {"key": "fedora"}, "name": "Mine"}]}}
+        draft = {
+            "conf": {"STYLE": "list", "HINTS": "off"},
+            "overrides": {
+                "seed": {"mode": "single", "color": "#7E57C2"},
+                "entries": [{"match": {"key": "fedora"}, "name": "Mine"}],
+            },
+        }
         st, d, _ = self.req("POST", "/api/apply", {"draft": draft})
         self.assertEqual(st, 200)
         ev = self.events(d["job"])
@@ -187,7 +220,9 @@ class Server(unittest.TestCase):
         self.assertTrue(any(e.get("text") == "applying the menu" for e in ev))
         root = self.t / "root"
         self.assertIn("STYLE=list", (root / "etc/material-grub.conf").read_text())
-        self.assertEqual(json.loads((root / "etc/material-grub/overrides.json").read_text())["seed"]["color"], "#7E57C2")
+        self.assertEqual(
+            json.loads((root / "etc/material-grub/overrides.json").read_text())["seed"]["color"], "#7E57C2"
+        )
 
     def test_apply_failure_restores_and_reports(self):
         root = self.t / "root"
@@ -225,9 +260,28 @@ class Server(unittest.TestCase):
 
         buf = io.BytesIO()
         Image.new("RGBA", (32, 32), (200, 0, 0, 255)).save(buf, "PNG")
-        self.assertEqual(self.req("POST", f"/api/ventoy/icon?path={d}&name=logo.png", buf.getvalue(), headers={"Content-Type": "image/png"})[0], 200)
-        self.assertEqual(self.req("POST", f"/api/ventoy/icon?path={d}&name=../x.png", buf.getvalue(), headers={"Content-Type": "image/png"})[0], 400)
-        draft = {"conf": {"STYLE": "list"}, "overrides": {"entries": [{"match": {"title": "Fedora"}, "name": "Mine", "icon": "file:logo.png"}]}}
+        self.assertEqual(
+            self.req(
+                "POST",
+                f"/api/ventoy/icon?path={d}&name=logo.png",
+                buf.getvalue(),
+                headers={"Content-Type": "image/png"},
+            )[0],
+            200,
+        )
+        self.assertEqual(
+            self.req(
+                "POST",
+                f"/api/ventoy/icon?path={d}&name=../x.png",
+                buf.getvalue(),
+                headers={"Content-Type": "image/png"},
+            )[0],
+            400,
+        )
+        draft = {
+            "conf": {"STYLE": "list"},
+            "overrides": {"entries": [{"match": {"title": "Fedora"}, "name": "Mine", "icon": "file:logo.png"}]},
+        }
         st, j, _ = self.req("POST", "/api/ventoy/apply", {"path": str(d), "draft": draft, "res": "1920x1080"})
         self.assertEqual(st, 200, j)
         ev = self.events(j["job"])
@@ -238,11 +292,21 @@ class Server(unittest.TestCase):
         self.assertIn("STYLE=list", (d / "ventoy/material-grub.conf").read_text())
         for bad in ({"conf": {"STYLE": "neon"}}, {"overrides": {"seed": {"mode": "x"}}}):
             self.assertEqual(self.req("POST", "/api/ventoy/apply", {"path": str(d), "draft": bad})[0], 400)
-        self.assertEqual(self.req("POST", "/api/ventoy/apply", {"path": str(d), "draft": draft, "res": "1920x1080; rm -rf /"})[0], 400)
+        self.assertEqual(
+            self.req("POST", "/api/ventoy/apply", {"path": str(d), "draft": draft, "res": "1920x1080; rm -rf /"})[0],
+            400,
+        )
 
     def test_apply_rejects_bad_drafts_before_any_helper_runs(self):
         self.assertEqual(self.req("POST", "/api/apply", {"draft": {"conf": {"STYLE": "neon"}}})[0], 400)
-        self.assertEqual(self.req("POST", "/api/apply", {"draft": {"overrides": {"entries": [{"match": {"key": "x"}, "icon": "file:../../etc/passwd"}]}}})[0], 400)
+        self.assertEqual(
+            self.req(
+                "POST",
+                "/api/apply",
+                {"draft": {"overrides": {"entries": [{"match": {"key": "x"}, "icon": "file:../../etc/passwd"}]}}},
+            )[0],
+            400,
+        )
 
 
 if __name__ == "__main__":

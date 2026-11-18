@@ -25,7 +25,11 @@ from pathlib import Path
 def find_modules():
     """The shared modules (mgrub, mgoverrides, ...): next to this file in a checkout, else in the installed package."""
     here = Path(__file__).resolve().parent
-    for c in (here.parent / "install/bin", Path("/usr/share/material-grub/bin"), Path("/var/lib/material-grub/pkg/bin")):
+    for c in (
+        here.parent / "install/bin",
+        Path("/usr/share/material-grub/bin"),
+        Path("/var/lib/material-grub/pkg/bin"),
+    ):
         if (c / "mgoverrides.py").is_file():
             return c
     return None
@@ -33,7 +37,15 @@ def find_modules():
 
 MODS = find_modules()
 if MODS is None:
-    print(json.dumps({"event": "error", "msg": "material-grub is not installed (or too old: it has no overrides support)", "code": 1}))
+    print(
+        json.dumps(
+            {
+                "event": "error",
+                "msg": "material-grub is not installed (or too old: it has no overrides support)",
+                "code": 1,
+            }
+        )
+    )
     sys.exit(1)
 sys.path.insert(0, str(MODS))
 import mgoverrides  # noqa: E402
@@ -71,7 +83,9 @@ def die(msg, code=1):
 def run(cmd, label):
     """Run a command, turning its output into log events. Returns its exit status."""
     emit("info", msg=label)
-    proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+    proc = subprocess.Popen(
+        cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace"
+    )
     with proc.stdout:
         for line in proc.stdout:
             if line.strip():
@@ -182,7 +196,10 @@ def verb_update(req):
     pkg_mgr = None
     for tool, cmd in (
         ("dnf", ["dnf", "-y", "upgrade", "--refresh", "material-grub", "material-grub-gui"]),
-        ("apt-get", ["sh", "-c", "apt-get update && apt-get install -y --only-upgrade material-grub material-grub-gui"]),
+        (
+            "apt-get",
+            ["sh", "-c", "apt-get update && apt-get install -y --only-upgrade material-grub material-grub-gui"],
+        ),
         ("pacman", ["pacman", "-Syu", "--noconfirm", "--needed", "material-grub", "material-grub-gui"]),
     ):
         if shutil.which(tool) and installed_by(tool):
@@ -200,7 +217,11 @@ def verb_update(req):
 
 
 def installed_by(tool):
-    q = {"dnf": ["rpm", "-q", "material-grub"], "apt-get": ["dpkg", "-s", "material-grub"], "pacman": ["pacman", "-Q", "material-grub"]}[tool]
+    q = {
+        "dnf": ["rpm", "-q", "material-grub"],
+        "apt-get": ["dpkg", "-s", "material-grub"],
+        "pacman": ["pacman", "-Q", "material-grub"],
+    }[tool]
     return shutil.which(q[0]) is not None and subprocess.run(q, capture_output=True).returncode == 0
 
 

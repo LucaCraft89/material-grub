@@ -41,7 +41,9 @@ class Entry:
         self.parent = None  # enclosing Entry or None
         self.line = 0
         self.start = 0  # offset of the `menuentry` / `submenu` word
-        self.guarded = False  # inside an if/while/for/case or a function body: the block cannot be moved or removed on its own
+        self.guarded = (
+            False  # inside an if/while/for/case or a function body: the block cannot be moved or removed on its own
+        )
 
     @property
     def end(self):

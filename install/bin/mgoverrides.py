@@ -126,7 +126,9 @@ def validate(data):
             if _icon_ok(rule["icon"]):
                 new["icon"] = rule["icon"]
             else:
-                errs.append(f"{w}.icon must be a catalog key or file:NAME with a picture extension ({', '.join(IMAGE_EXT)})")
+                errs.append(
+                    f"{w}.icon must be a catalog key or file:NAME with a picture extension ({', '.join(IMAGE_EXT)})"
+                )
         if "hidden" in rule:
             if isinstance(rule["hidden"], bool):
                 new["hidden"] = rule["hidden"]

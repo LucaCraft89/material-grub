@@ -467,11 +467,19 @@ def seed_step():
         return {"v": v, "label": label, "help": help}
 
     opts = [
-        opt(h, f"{n}  {h}", f"{n} ({h}). Material 3 turns this seed into every surface, container and accent colour of the theme.")
+        opt(
+            h,
+            f"{n}  {h}",
+            f"{n} ({h}). Material 3 turns this seed into every surface, container and accent colour of the theme.",
+        )
         for n, h in mgseeds.SEEDS
     ]
     opts.append(
-        opt("custom", "Type another colour...", "Enter any colour as #RRGGBB, for example #2E7D32. A grey makes the whole theme monochrome.")
+        opt(
+            "custom",
+            "Type another colour...",
+            "Enter any colour as #RRGGBB, for example #2E7D32. A grey makes the whole theme monochrome.",
+        )
     )
     return {
         "id": "SEED",
@@ -847,8 +855,7 @@ def run_curses(steps, presets, summary_screen=True):
                         put(
                             5 + (len(sw) + cols - 1) // cols + 1,
                             3,
-                            f"({'o' if cust else ' '}) "
-                            + (st.get("custom") or "Type another colour..."),
+                            f"({'o' if cust else ' '}) " + (st.get("custom") or "Type another colour..."),
                             curses.A_BOLD if cust else 0,
                             lw - 4,
                         )
@@ -890,7 +897,13 @@ def run_curses(steps, presets, summary_screen=True):
                         if roles:
                             for j, c in enumerate(roles):
                                 put(yy, cx + 2 + j * 6, "    ", pair(c))
-                            put(yy + 1, cx + 2, "primary / container / secondary / tertiary / surface", curses.A_DIM, cw - 4)
+                            put(
+                                yy + 1,
+                                cx + 2,
+                                "primary / container / secondary / tertiary / surface",
+                                curses.A_DIM,
+                                cw - 4,
+                            )
                             yy += 3
                     wire = WIRE.get(o["v"]) if st["id"] == "STYLE" else None
                     for line in wire or []:

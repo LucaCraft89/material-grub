@@ -26,7 +26,9 @@ def preset_dir(ov_path=None):
 
 def check_name(name):
     if not isinstance(name, str) or not NAME.match(name):
-        raise ValueError("a preset name is 1 to 40 letters, digits, spaces or _ . ( ) -, starting with a letter or digit")
+        raise ValueError(
+            "a preset name is 1 to 40 letters, digits, spaces or _ . ( ) -, starting with a letter or digit"
+        )
     return name
 
 
@@ -62,7 +64,7 @@ def validate(data):
     """(clean preset, errors). The overrides and every conf value are checked like when they are written."""
     errs = []
     if not isinstance(data, dict) or data.get("preset") != FORMAT:
-        return None, [f"not a preset file (expected \"preset\": {FORMAT})"]
+        return None, [f'not a preset file (expected "preset": {FORMAT})']
     try:
         check_name(data.get("name"))
     except ValueError as e:
@@ -93,7 +95,12 @@ def validate(data):
         clean_icons[n] = raw
     if errs:
         return None, errs
-    return {"name": data["name"], "conf": {k: str(v) for k, v in conf.items()}, "overrides": ov, "icons": clean_icons}, []
+    return {
+        "name": data["name"],
+        "conf": {k: str(v) for k, v in conf.items()},
+        "overrides": ov,
+        "icons": clean_icons,
+    }, []
 
 
 def save(name, ov_path=None, conf_path=None, data=None):
@@ -113,7 +120,15 @@ def listing(ov_path=None):
     for f in sorted(preset_dir(ov_path).glob("*.json")):
         try:
             d = json.loads(f.read_text())
-            out.append((d["name"], {"style": d.get("conf", {}).get("STYLE"), "entries": len(d.get("overrides", {}).get("entries", []))}))
+            out.append(
+                (
+                    d["name"],
+                    {
+                        "style": d.get("conf", {}).get("STYLE"),
+                        "entries": len(d.get("overrides", {}).get("entries", [])),
+                    },
+                )
+            )
         except (OSError, ValueError, KeyError):
             continue
     return out

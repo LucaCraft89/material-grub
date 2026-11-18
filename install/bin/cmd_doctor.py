@@ -123,7 +123,11 @@ class Doctor:
         except (OSError, ValueError):
             applied = None
         if applied is not None and applied != mgoverrides.layout_sha(ov):
-            self.add(WARN, "overrides", "the order or hidden entries changed since grub.cfg was generated: run sudo material-grub-apply")
+            self.add(
+                WARN,
+                "overrides",
+                "the order or hidden entries changed since grub.cfg was generated: run sudo material-grub-apply",
+            )
             return
         n = len(ov["entries"])
         mode = "single colour " + ov["seed"]["color"] if ov["seed"]["mode"] == "single" else "per-entry colours"

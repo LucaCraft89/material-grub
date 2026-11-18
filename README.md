@@ -79,6 +79,18 @@ Install options, all screenshots and what was tested: **[docs/ventoy.md](docs/ve
 
 Two screenshots of every style (rail, clean, list, split) in dark and light, the same for a Ventoy stick, the ultrawide layout and a rendered sample of all 54 supported distros: **[docs/gallery.md](docs/gallery.md)**. Using a Ventoy stick? See **[docs/ventoy.md](docs/ventoy.md)**.
 
+## Make it yours
+
+One colour for the whole theme, or a colour, name, icon and position per entry, hide entries you never use, windows first or linux first, your own PNG or SVG as an icon, presets to save a look. Everything is stored in `/etc/material-grub/overrides.json` and works without a rebuild:
+
+```sh
+sudo ./install.sh --seed '#7E57C2'      # one seed colour for every entry (the TUI offers 32 preset colours)
+```
+
+An **optional GUI** does all of it with a live preview, drag and drop and Ventoy support, in a Material 3 Expressive web UI that opens in your browser. It is a separate package (`material-grub-gui`, or `sudo ./install.sh --with-gui` from a checkout) and is never installed by default: **[docs/gui.md](docs/gui.md)**, [docs/customising.md](docs/customising.md).
+
+<img src="docs/screenshots/gui-entries.png" alt="The GUI: entries, per-entry editor and live preview">
+
 ## Options
 
 ```sh

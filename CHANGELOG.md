@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.0 (unreleased)
+
+An optional GUI, a one-colour theme and per-entry customisation.
+
+**New**
+- **GUI** (`material-grub-gui`, a separate optional package; `sudo ./install.sh --with-gui` for source installs; never installed by the theme or the TUI): a Material 3 Expressive web UI in your browser with a live preview, drag and drop ordering, per-entry name, colour, icon and visibility, Ventoy sticks, presets, health checks and one-click updates with a progress pop-up. It never runs as root: changes go through `pkexec` to a small helper that validates every request. See `docs/gui.md`.
+- **One colour for the whole theme:** pick one of 32 seed colours (or any `#RRGGBB`) and every entry uses its Material 3 palette. In the installer's TUI (new *Colours* and *Seed colour* steps, `--seed '#RRGGBB'`, `--seed-mode multi|single`) and in the GUI.
+- **`/etc/material-grub/overrides.json`:** colours, names and icons per entry (your own PNG, JPEG, SVG, ...), hidden entries, section and entry order (the real GRUB menu is reordered), validated strictly when written and leniently at boot (a bad file never breaks the menu). `material-grub doctor` checks it. See `docs/customising.md`.
+- **Ventoy:** the same overrides on the stick (`ventoy/material-grub-overrides.json`): per-ISO colour, icon and display name (`menu_class` and `menu_alias`), and the single-colour mode.
+- **Presets:** save the look under a name, move it to another machine as one JSON file.
+- `install.sh --progress json` (machine-readable progress for tools), a persistent install log in `/var/log/material-grub/install.log`, `material-grub doctor --status-json`.
+
+**Changed**
+- The scene renderer can redraw the build's panels at apply time (`Renderer.panel_scene`, pixel-identical for backgrounds), so custom colours need no rebuild; the colour science (`materialyoucolor`, pure Python part) is vendored for the installed tools.
+- `mgrub.write_conf` is the one atomic, validated writer of `/etc/material-grub.conf`.
+
 ## 0.6.0 (2026-11-18)
 
 Safety, maintainability and packaging. The installer's logic is now Python; the theme is still always built from source on your machine.

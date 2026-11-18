@@ -49,7 +49,9 @@ class Logic(unittest.TestCase):
         self.assertEqual([s["id"] for s in tui.live(steps, presets)], ["SEED_MODE", "SEED", "LOGO", "HINTS", "EXTRAS"])
         self.assertEqual(len(seed["options"]), 33)  # 32 colours and "type another"
         a = tui.answers(steps, presets)
-        self.assertEqual((a["SEED_MODE"], a["SEED"]), ("single", "#0B3D2E"))  # Forest, the project's own seed, is preselected
+        self.assertEqual(
+            (a["SEED_MODE"], a["SEED"]), ("single", "#0B3D2E")
+        )  # Forest, the project's own seed, is preselected
         self.assertIn("--seed #0B3D2E", tui.command_line(a))
         seed["cur"] = 32
         seed["custom"] = "#2e7d32"

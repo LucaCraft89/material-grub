@@ -155,7 +155,9 @@ class App:
         try:
             cmd = helper_command()
             job.add({"event": "info", "msg": "Asking the system for permission..."})
-            p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace")
+            p = subprocess.Popen(
+                cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace"
+            )
             err = []
             t = threading.Thread(target=lambda: err.extend(p.stderr.readlines()), daemon=True)
             t.start()
@@ -179,7 +181,15 @@ class App:
             if rc in (126, 127) or (rc != 0 and not any(e.get("event") == "error" for e in job.events)):
                 tail = " ".join(x.strip() for x in err[-3:])
                 refused = rc in (126, 127)
-                job.add({"event": "error", "msg": "The system did not allow it (the authentication was cancelled or refused)." if refused else f"The helper stopped with status {rc}. {tail}", "code": rc})
+                job.add(
+                    {
+                        "event": "error",
+                        "msg": "The system did not allow it (the authentication was cancelled or refused)."
+                        if refused
+                        else f"The helper stopped with status {rc}. {tail}",
+                        "code": rc,
+                    }
+                )
             for x in err:
                 if x.strip() and rc != 0:
                     job.add({"event": "log", "text": x.rstrip(), "level": "warn"})
@@ -331,10 +341,22 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 302,
                 b"",
                 "text/plain",
-                {"Location": "/" + ("#" + q["view"][0] if re.fullmatch(r"[a-z]{3,12}(:[A-Za-z0-9/_.%-]{1,200})?", q.get("view", [""])[0]) else ""), "Set-Cookie": f"mg={app.token}; HttpOnly; SameSite=Strict; Path=/"},
+                {
+                    "Location": "/"
+                    + (
+                        "#" + q["view"][0]
+                        if re.fullmatch(r"[a-z]{3,12}(:[A-Za-z0-9/_.%-]{1,200})?", q.get("view", [""])[0])
+                        else ""
+                    ),
+                    "Set-Cookie": f"mg={app.token}; HttpOnly; SameSite=Strict; Path=/",
+                },
             )
         if not self.cookie_ok():
-            return self.send(403, "<h1>Material GRUB</h1><p>Open the link printed in the terminal by <code>material-grub-gui</code>.</p>", "text/html; charset=utf-8")
+            return self.send(
+                403,
+                "<h1>Material GRUB</h1><p>Open the link printed in the terminal by <code>material-grub-gui</code>.</p>",
+                "text/html; charset=utf-8",
+            )
         html = (WEB / "index.html").read_text().replace("__MG_TOKEN__", app.token)
         return self.send(200, html, "text/html; charset=utf-8")
 
@@ -385,7 +407,16 @@ def api_preview(h, q, g):
         ents, menu = [e for e in ents], menu
     pv = h.app.previewer_()
     try:
-        png = pv.render(ents, menu, draft, req.get("class", ""), req.get("dark", True) is not False, req.get("scale", 0.5), req.get("aspect", "16x9"), icon_dir=h.app.staging)
+        png = pv.render(
+            ents,
+            menu,
+            draft,
+            req.get("class", ""),
+            req.get("dark", True) is not False,
+            req.get("scale", 0.5),
+            req.get("aspect", "16x9"),
+            icon_dir=h.app.staging,
+        )
     except (KeyError, StopIteration):
         return h.fail(400, "unknown entry")
     return h.send(200, png, "image/png")
@@ -394,7 +425,9 @@ def api_preview(h, q, g):
 def api_icon_upload(h, q, g):
     name = q.get("name", [""])[0]
     if not mgoverrides._icon_ok("file:" + name):
-        return h.fail(400, "the file name must be letters, digits, - _ . and end in .png .jpg .jpeg .svg .webp .gif or .bmp")
+        return h.fail(
+            400, "the file name must be letters, digits, - _ . and end in .png .jpg .jpeg .svg .webp .gif or .bmp"
+        )
     raw = h.body()
     if not raw or len(raw) > 4 * 1024 * 1024:
         return h.fail(400, "the picture must be between 1 byte and 4 MB")
@@ -476,10 +509,20 @@ def api_ventoy_state(h, q, g):
     rules = mgrub.load_rules(PKG)
     conf = mgrub.load_conf(str(stick / "ventoy/material-grub.conf"))
     ov, problems = mgoverrides.load(stick / cmd_ventoy.OVERRIDES)
-    files = [{"path": r, "name": Path(r).name, "key": cmd_ventoy.key_of(Path(r).name, rules)} for r in cmd_ventoy.scan(stick)]
+    files = [
+        {"path": r, "name": Path(r).name, "key": cmd_ventoy.key_of(Path(r).name, rules)} for r in cmd_ventoy.scan(stick)
+    ]
     icons_dir = stick / cmd_ventoy.ICONS
-    icons = sorted(f.name for f in icons_dir.iterdir() if f.suffix.lower() in mgoverrides.IMAGE_EXT) if icons_dir.is_dir() else []
-    themes = sorted(d.name[len("material_"):] for d in (stick / cmd_ventoy.THEMES).glob("material_*") if d.is_dir()) if (stick / cmd_ventoy.THEMES).is_dir() else []
+    icons = (
+        sorted(f.name for f in icons_dir.iterdir() if f.suffix.lower() in mgoverrides.IMAGE_EXT)
+        if icons_dir.is_dir()
+        else []
+    )
+    themes = (
+        sorted(d.name[len("material_") :] for d in (stick / cmd_ventoy.THEMES).glob("material_*") if d.is_dir())
+        if (stick / cmd_ventoy.THEMES).is_dir()
+        else []
+    )
     avail = sorted(p.name for p in (PKG / "res").iterdir()) if PKG and (PKG / "res").is_dir() else ["1920x1080"]
     return h.send(
         200,
@@ -567,7 +610,13 @@ def api_ventoy_apply(h, q, g):
         mgoverrides.save(draft["overrides"], stick / cmd_ventoy.OVERRIDES)
         emit({"event": "ok", "msg": "settings saved"})
         emit({"event": "step", "n": 2, "total": 3, "msg": "Drawing the theme and updating ventoy.json"})
-        p = subprocess.Popen([sys.executable, str(MODS / "material-grub-ventoy"), str(stick), "--pkg", str(PKG), "--res", res], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+        p = subprocess.Popen(
+            [sys.executable, str(MODS / "material-grub-ventoy"), str(stick), "--pkg", str(PKG), "--res", res],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+        )
         with p.stdout:
             for line in p.stdout:
                 if line.strip():
@@ -600,11 +649,22 @@ def api_apply(h, q, g):
 def api_update_check(h, q, g):
     cur = mgstate.installed_version(PKG) or "0"
     try:
-        r = urllib.request.Request(RELEASES, headers={"User-Agent": "material-grub-gui", "Accept": "application/vnd.github+json"})
+        r = urllib.request.Request(
+            RELEASES, headers={"User-Agent": "material-grub-gui", "Accept": "application/vnd.github+json"}
+        )
         with urllib.request.urlopen(r, timeout=8) as resp:
             data = json.loads(resp.read(1_000_000))
         latest = str(data.get("tag_name", "")).lstrip("v")
-        return h.send(200, {"current": cur, "latest": latest, "newer": version_tuple(latest) > version_tuple(cur), "url": data.get("html_url", ""), "notes": str(data.get("body", ""))[:4000]})
+        return h.send(
+            200,
+            {
+                "current": cur,
+                "latest": latest,
+                "newer": version_tuple(latest) > version_tuple(cur),
+                "url": data.get("html_url", ""),
+                "notes": str(data.get("body", ""))[:4000],
+            },
+        )
     except Exception as e:
         return h.send(200, {"current": cur, "error": f"could not reach GitHub ({type(e).__name__})"})
 

@@ -17,7 +17,9 @@ def mean_diff(a, b):
     return sum(i * c for i, c in enumerate(h)) / sum(h)
 
 
-@unittest.skipUnless((PKG / "subtitles.json").is_file() and (PKG / "scenes/16x9/bg").is_dir(), "no built package with subtitles.json")
+@unittest.skipUnless(
+    (PKG / "subtitles.json").is_file() and (PKG / "scenes/16x9/bg").is_dir(), "no built package with subtitles.json"
+)
 class PanelScene(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -35,7 +37,9 @@ class PanelScene(unittest.TestCase):
             bg = self.Image.open(PKG / f"scenes/16x9/bg/{key}.png").convert("RGB")
             self.assertEqual(mean_diff(bg, self.R.panel_scene(bg.size, key, hero=False)), 0, key)
 
-    def test_hero_scene_is_close(self):  # the glyph is resampled from a 512 px mask, the build rasterises the SVG at size
+    def test_hero_scene_is_close(
+        self,
+    ):  # the glyph is resampled from a 512 px mask, the build rasterises the SVG at size
         for key in ("fedora", "ubuntu", "arch"):
             ic = self.Image.open(PKG / f"scenes/16x9/icons/{self.classes[key][0]}.png").convert("RGB")
             mine = self.R.panel_scene(ic.size, key, self.titles[key], self.subs[key], hero=True)

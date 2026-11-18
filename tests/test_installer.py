@@ -146,7 +146,10 @@ class Seed(unittest.TestCase):
                 i.apply_answers({"SEED_MODE": "single", "SEED": "#7E57C2"})
                 i.write_seed()
                 ov, probs = mgoverrides.load(p)
-                self.assertEqual((probs, ov["seed"], ov["entries"][0]["name"]), ([], {"mode": "single", "color": "#7E57C2"}, "Keep me"))
+                self.assertEqual(
+                    (probs, ov["seed"], ov["entries"][0]["name"]),
+                    ([], {"mode": "single", "color": "#7E57C2"}, "Keep me"),
+                )
                 i.apply_answers({"SEED_MODE": "multi"})
                 i.seed = ""
                 i.write_seed()

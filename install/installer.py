@@ -148,6 +148,7 @@ class Installer:
         self.res = ""
         self.scheme = "dark"
         self.scheme_set = False
+        self.with_gui = False  # --with-gui: also install the optional GUI (source installs; packages have their own material-grub-gui package)
         self.seed_mode = ""  # "", "multi" or "single": empty leaves overrides.json alone
         self.seed = ""
         self.style = ""
@@ -186,7 +187,7 @@ class Installer:
         if self.logf and self.json:
             text = kw.get("text") or kw.get("msg") or ""
             if text:
-                self.logf.write("%s %s%s\n" % (time.strftime("%F %T"), "" if event == "log" else event + ": ", text))
+                self.logf.write(f"{time.strftime('%F %T')} {'' if event == 'log' else event + ': '}{text}\n")
                 self.logf.flush()
 
     def start_json(self):
@@ -284,6 +285,8 @@ class Installer:
                 self.scheme_set = True
                 if self.scheme not in ("light", "dark"):
                     self.usage_error("--scheme must be light or dark")
+            elif o == "--with-gui":
+                self.with_gui = True
             elif o == "--seed":
                 self.seed = need(o, "a colour like #2E7D32").upper()
                 if not re.fullmatch(r"#[0-9A-F]{6}", self.seed):
@@ -346,7 +349,13 @@ class Installer:
             return subprocess.run(cmd, **kw)
         # json mode: the child's output becomes 'log' events instead of leaking onto our stdout
         p = subprocess.Popen(
-            cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", **kw
+            cmd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            **kw,
         )
         with p.stdout:
             for line in p.stdout:
@@ -1030,6 +1039,21 @@ class Installer:
             "      Change the style, scheme or resolutions: run this installer again.   Undo: ./install.sh --uninstall --ventoy MOUNTPOINT"
         )
 
+    def install_gui(self):
+        """--with-gui: copy the optional GUI (plain Python and web files, nothing is built) next to the theme. Needs root; the GUI never runs as root itself."""
+        tree = HERE / "packaging/common/install-gui-tree.sh"
+        if not tree.is_file() or not (HERE / "gui/mgserver.py").is_file():
+            self.warn("--with-gui: this copy has no gui/ folder (use a checkout of the repository, or your package manager's material-grub-gui package)")
+            return
+        if not self.root():
+            self.warn("--with-gui needs root: run it with sudo")
+            return
+        self.step("Installing the optional GUI")
+        if self.run(["sh", tree, HERE, "/"]).returncode != 0:
+            self.warn("the GUI could not be installed (the theme itself is fine)")
+            return
+        self.ok("installed: start it with material-grub-gui (opens in your browser; changes ask for your password through polkit)")
+
     def write_seed(self):
         """--seed / --seed-mode and the TUI's colour answers go to overrides.json (the one place every tool reads), keeping the rest of the file."""
         if not self.seed_mode:
@@ -1039,7 +1063,9 @@ class Installer:
         ov, _ = mgoverrides.load()
         ov["seed"] = {"mode": self.seed_mode, "color": self.seed or ov["seed"]["color"]}
         mgoverrides.save(ov)
-        self.info(f"colours: {'one seed colour ' + ov['seed']['color'] if self.seed_mode == 'single' else 'every entry its own colour'} ({mgoverrides.path()})")
+        self.info(
+            f"colours: {'one seed colour ' + ov['seed']['color'] if self.seed_mode == 'single' else 'every entry its own colour'} ({mgoverrides.path()})"
+        )
 
     def grub_install(self):
         self.write_seed()
@@ -1068,7 +1094,9 @@ class Installer:
         if not (self.stage or self.dry or self.preview):  # those change nothing on the system, so they are not logged
             self.logf = open_log()
             if self.logf:
-                self.logf.write("%s ---- material-grub %s: %s\n" % (time.strftime("%F %T"), VERSION_TEXT(), " ".join(self.argv)))
+                self.logf.write(
+                    f"{time.strftime('%F %T')} ---- material-grub {VERSION_TEXT()}: {' '.join(self.argv)}\n"
+                )
                 if not self.json:
                     sys.stdout, sys.stderr = Tee(sys.stdout, self.logf), Tee(sys.stderr, self.logf)
         try:
@@ -1174,6 +1202,8 @@ class Installer:
                 self.ventoy_install()
                 return 0
             self.grub_install()
+            if self.with_gui:
+                self.install_gui()
             return 0
         finally:
             if self.build_dir:

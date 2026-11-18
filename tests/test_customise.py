@@ -59,7 +59,9 @@ class Customise(unittest.TestCase):
         t2, e2, _ = cmd_classes.customise(t, e, b, ov(groups=["windows", "linux"]))
         self.assertEqual(titles(t2)[:2], ["Windows Boot Manager", "Ubuntu"])
         self.assertEqual(sorted(titles(t2)), sorted(titles(t)))
-        self.assertEqual([x["title"] for x in e2 if x["level"] == "top" and not x.get("parent")][0], "Windows Boot Manager")
+        self.assertEqual(
+            [x["title"] for x in e2 if x["level"] == "top" and not x.get("parent")][0], "Windows Boot Manager"
+        )
         self.assertIn("### END /etc/grub.d/10_linux ###", t2)  # the text between the blocks stays
         self.assertEqual(len(e2), len(e))
 
@@ -85,7 +87,9 @@ class Customise(unittest.TestCase):
 
     def test_hiding_a_submenu_takes_its_children(self):
         t, e, b = self.prep()
-        t2, e2, _ = cmd_classes.customise(t, e, b, ov(entries=[{"match": {"title": "advanced options"}, "hidden": True}]))
+        t2, e2, _ = cmd_classes.customise(
+            t, e, b, ov(entries=[{"match": {"title": "advanced options"}, "hidden": True}])
+        )
         self.assertEqual(titles(t2), ["Ubuntu", "Debian GNU/Linux", "Windows Boot Manager", "UEFI Firmware Settings"])
         self.assertEqual(len(e2), len(e) - 2)
 
@@ -98,7 +102,7 @@ class Customise(unittest.TestCase):
         self.assertEqual(titles(t2)[-1], "UEFI Firmware Settings")
 
     def test_numeric_default_means_hands_off(self):
-        t, e, b = self.prep("set default=\"0\"\n" + CFG)
+        t, e, b = self.prep('set default="0"\n' + CFG)
         logs = []
         r = cmd_classes.customise(t, e, b, ov(groups=["windows"]), log=logs.append)
         self.assertEqual(r, (t, e, b))
@@ -118,7 +122,9 @@ class Customise(unittest.TestCase):
 
 class Guarded(unittest.TestCase):
     def test_guarded_flag(self):
-        sc = grubscript.scan("if true; then\n  menuentry 'a' { x }\nfi\nfunction f {\n  menuentry 'b' { x }\n}\nmenuentry 'c' { x }\n")
+        sc = grubscript.scan(
+            "if true; then\n  menuentry 'a' { x }\nfi\nfunction f {\n  menuentry 'b' { x }\n}\nmenuentry 'c' { x }\n"
+        )
         self.assertEqual([(e.title, e.guarded) for e in sc.entries], [("a", True), ("b", True), ("c", False)])
         e = sc.entries[2]
         self.assertEqual(sc.text[e.start : e.end], "menuentry 'c' { x }")

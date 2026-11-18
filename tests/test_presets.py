@@ -1,7 +1,6 @@
 """Presets: save the current look, validate, apply on a fresh system, hostile files. stdlib only. usage: python3 tests/test_presets.py"""
 
 import base64
-import json
 import sys
 import tempfile
 import unittest

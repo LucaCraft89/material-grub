@@ -30,7 +30,11 @@ def package():
 
 def modules_dir(pkg=None):
     """The directory with mgrub.py and friends: <pkg>/bin when installed, install/bin in a checkout."""
-    order = [REPO / "install/bin", (Path(pkg) / "bin") if pkg else None] if in_checkout() else [(Path(pkg) / "bin") if pkg else None]
+    order = (
+        [REPO / "install/bin", (Path(pkg) / "bin") if pkg else None]
+        if in_checkout()
+        else [(Path(pkg) / "bin") if pkg else None]
+    )
     for c in order:
         if c and (c / "mgrub.py").is_file():
             return c
@@ -43,7 +47,9 @@ def setup():
     mods = modules_dir(pkg)
     if mods is None:
         raise SystemExit("material-grub is not installed (no shared modules found); install it first")
-    extra = [str(REPO / "install")] if in_checkout() else []  # ventoy_sticks.py lives there in a checkout; the GUI package ships a copy next to the server
+    extra = (
+        [str(REPO / "install")] if in_checkout() else []
+    )  # ventoy_sticks.py lives there in a checkout; the GUI package ships a copy next to the server
     for p in (str(mods), str(HERE), *extra):
         if p not in sys.path:
             sys.path.insert(0, p)

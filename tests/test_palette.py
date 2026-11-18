@@ -13,7 +13,7 @@ sys.path.insert(0, str(ROOT / "install/bin"))
 import mgpalette  # noqa: E402
 
 SEEDS = ["#0B3D2E", "#294172", "#E95420", "#A80030", "#FFB300", "#808080", "#101010", "#FFFFFF", "#000000"]
-SEEDS += ["#%06X" % random.Random(7).randrange(1 << 24) for _ in range(40)]
+SEEDS += [f"#{random.Random(7).randrange(1 << 24):06X}" for _ in range(40)]
 
 
 class Palette(unittest.TestCase):
@@ -40,13 +40,13 @@ class Palette(unittest.TestCase):
         if not venv.exists():
             self.skipTest("no .venv with materialyoucolor")
         code = (
-            "import sys,json; sys.path.insert(0,%r); sys.path.insert(0,%r); import palettes;"
+            f"import sys,json; sys.path.insert(0,{str(ROOT / 'scripts')!r}); import palettes;"
             "out={}\n"
-            "for s in %r:\n"
+            f"for s in {SEEDS!r}:\n"
             "  for d in (True,False):\n"
             "    palettes.SCHEME='dark' if d else 'light'; out[s+str(d)]=palettes.scheme(s)\n"
             "print(json.dumps(out))"
-        ) % (str(ROOT / "scripts"), str(ROOT / "scripts"), SEEDS)
+        )
         import json
 
         r = subprocess.run([str(venv), "-c", code], capture_output=True, text=True)
