@@ -12,6 +12,7 @@ if command -v shellcheck >/dev/null 2>&1; then shellcheck -x --severity=warning 
 echo "== unit tests"
 python3 tests/test_mgrub.py
 python3 tests/test_overrides.py
+python3 tests/test_presets.py
 python3 tests/test_palette.py
 python3 tests/test_panel.py
 python3 tests/test_custom.py
