@@ -83,6 +83,19 @@ class Doctor(unittest.TestCase):
         self.assertIn("installed version", out)
         self.assertIn("every one of the 2 menu entries has a scene", out)
 
+    @unittest.skipIf(os.geteuid() == 0, "root can read everything")
+    def test_root_only_boot_is_a_warning_not_a_failure(self):
+        # Fedora makes /boot/grub2 0700: a normal user cannot look inside, which is not a broken install
+        d = self.r / "boot/grub2"
+        d.chmod(0o000)
+        try:
+            code, out = self.doctor()
+        finally:
+            d.chmod(0o755)
+        self.assertEqual(code, 0, out)
+        self.assertIn("root-only", out)
+        self.assertNotIn("[FAIL]", out)
+
     def test_status_json(self):
         env = {k: v for k, v in dict(os.environ, MG_SCRIPT_CHECK="").items() if k != "MATERIAL_PKG"}
         r = subprocess.run(
