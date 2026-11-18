@@ -389,6 +389,8 @@ class Renderer:
             return e["label"]
         if e["kind"] == "kernel" and e.get("level") == "adv" and e.get("kver"):
             return e["kver"]
+        if e.get("dup_where") and e.get("where"):  # two installs of one distro: the drive tells the rows apart
+            return f"{self.title_for(e)} ({e['where'].rsplit('/', 1)[-1]})"
         return self.title_for(e)
 
     @staticmethod

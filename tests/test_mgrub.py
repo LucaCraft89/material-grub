@@ -241,6 +241,16 @@ class DrivePill(unittest.TestCase):
         )
         self.assertEqual(mgscenes.Renderer.info_pills({"kind": "plain", "title": "W"}), [])
 
+    def test_list_label_names_the_drive_for_duplicates(self):
+        import mgscenes
+
+        r = mgscenes.Renderer.__new__(mgscenes.Renderer)
+        r.titles = {"ubuntu": "Ubuntu"}
+        e = {"kind": "kernel", "key": "ubuntu", "level": "top", "title": "x", "where": "/dev/sda5", "dup_where": True}
+        self.assertEqual(r.label_for(e), "Ubuntu (sda5)")
+        e.pop("dup_where")
+        self.assertEqual(r.label_for(e), "Ubuntu")
+
     def test_distinct_classes_per_drive(self):
         self.assertNotEqual(mgrub.uid("top", "Ubuntu (on /dev/sda5)"), mgrub.uid("top", "Ubuntu (on /dev/sdb5)"))
 

@@ -44,6 +44,16 @@ def main():
     bgs = sorted((pkg / "scenes" / aspect / "bg").glob("*.png"))
     R = mgscenes.Renderer(pkg, Image.open(bgs[0]).height if bgs else 1080)
     R.bg_dir = pkg / "scenes" / aspect / "bg"
+    seen = {}
+    for e in (
+        entries
+    ):  # the same distro twice on one menu level (os-prober installs on two drives): rows and chips name the drive
+        if e.get("where"):
+            seen.setdefault((e["key"], e.get("level", "top")), []).append(e)
+    for group in seen.values():
+        if len(group) > 1:
+            for e in group:
+                e["dup_where"] = True
     by_class = {e["class"]: e for e in entries if "class" in e}
     if style not in mgscenes.STYLES:
         print(f"material-grub: style '{style}' is not available yet, drawing 'rail'")

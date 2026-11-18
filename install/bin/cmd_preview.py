@@ -30,6 +30,7 @@ submenu 'Advanced options for Fedora Linux' --class fedora {
 }
 menuentry 'Windows Boot Manager (on /dev/nvme0n1p1)' --class windows --class os { true }
 menuentry 'Ubuntu 24.04.1 LTS (on /dev/sda5)' --class ubuntu --class gnu-linux --class os { true }
+menuentry 'Ubuntu 22.04.5 LTS (on /dev/nvme0n1p3)' --class ubuntu --class gnu-linux --class os { true }
 menuentry 'UEFI Firmware Settings' --class efi { true }
 menuentry 'Restart' --class restart { reboot }
 menuentry 'Shut down' --class shutdown { halt }
