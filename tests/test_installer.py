@@ -208,6 +208,23 @@ class Bootstrap(unittest.TestCase):
         self.assertIn("REACHED python3.9.real" if False else "REACHED python3.9", log)
 
 
+class FromPackage(unittest.TestCase):
+    def test_failure_never_fails_the_transaction(self):
+        import contextlib
+        import io
+
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            rc = installer.Installer(["--from-package", "--pkg", "/nonexistent", "--res", "1920x1080"]).main()
+        self.assertEqual(rc, 0)
+        if os.geteuid() != 0:
+            self.assertIn("could not finish", err.getvalue())
+
+    def test_flags(self):
+        i = make(["--from-package"])
+        self.assertEqual((i.from_package, i.yes, i.deps, i.tuimode), (True, True, False, "no"))
+
+
 class ShellStatic(unittest.TestCase):
     def test_bootstrap_is_posix_sh(self):
         for f in ("install.sh", "install/install.sh", "install/uninstall.sh"):

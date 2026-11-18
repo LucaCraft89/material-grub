@@ -102,6 +102,7 @@ class Installer:
         self.stage = False
         self.dry = False
         self.preview = False
+        self.from_package = False
         self.keep = False
         self.uninstall = False
         self.force = False
@@ -204,6 +205,10 @@ class Installer:
                 self.stage = True
             elif o == "--dry-run":
                 self.dry, self.deps = True, False
+            elif (
+                o == "--from-package"
+            ):  # run by a distribution package (postinst, %posttrans, pacman hook): never asks, never fails the transaction
+                self.from_package, self.yes, self.deps, self.tuimode = True, True, False, "no"
             elif o == "--preview":
                 self.preview, self.deps = True, False
             elif o == "--keep-build":
@@ -600,7 +605,7 @@ class Installer:
                 cmd = {
                     "dnf": ["dnf", "install", "-y"],
                     "apt-get": ["apt-get", "install", "-y"],
-                    "pacman": ["pacman", "-Sy", "--needed", "--noconfirm"],
+                    "pacman": ["pacman", "-Syu", "--needed", "--noconfirm"],
                 }.get(self.pm, [self.pm, "install", "-y"] if self.pm != "apk" else ["apk", "add"])
                 if self.pm == "zypper":
                     cmd = ["zypper", "--non-interactive", "install"]
@@ -905,6 +910,27 @@ class Installer:
     # ------------------------------------------------------------ main
     def main(self):
         self.parse()
+        if not self.from_package:
+            return self.run_all()
+        # packages: keep the user's scheme, pick the resolution like a plain run; a failure must not break the package transaction
+        conf = mgrub.load_conf()
+        if not self.scheme_set and Path("/etc/material-grub.conf").is_file():
+            self.scheme = conf["SCHEME"]
+        try:
+            rc = self.run_all()
+        except SystemExit as e:
+            rc = e.code if isinstance(e.code, int) else 1
+        if rc not in (0, None):
+            import mgsafe
+
+            reason = "the Material GRUB package could not finish its install or update"
+            mgsafe.report_failure(
+                reason,
+                [f"the installer exited with status {rc} (output above)", "your GRUB menu was left working as before"],
+            )
+        return 0
+
+    def run_all(self):
         self.check_system()
         self.questions()
         self.immutable_notice()

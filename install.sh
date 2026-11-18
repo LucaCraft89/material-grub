@@ -59,7 +59,7 @@ if [ -z "$PY" ]; then
     case $PM in
       dnf)          dnf install -y "$pkg" || true ;;
       apt-get)      DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" || true ;;
-      pacman)       pacman -Sy --needed --noconfirm "$pkg" || true ;;
+      pacman)       pacman -Syu --needed --noconfirm "$pkg" || true ;;
       zypper)       zypper --non-interactive install "$pkg" || true ;;
       apk)          apk add "$pkg" || true ;;
       xbps-install) xbps-install -Sy "$pkg" || true ;;
