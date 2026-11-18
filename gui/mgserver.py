@@ -309,7 +309,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 302,
                 b"",
                 "text/plain",
-                {"Location": "/", "Set-Cookie": f"mg={app.token}; HttpOnly; SameSite=Strict; Path=/"},
+                {"Location": "/" + ("#" + q["view"][0] if re.fullmatch(r"[a-z]{3,12}", q.get("view", [""])[0]) else ""), "Set-Cookie": f"mg={app.token}; HttpOnly; SameSite=Strict; Path=/"},
             )
         if not self.cookie_ok():
             return self.send(403, "<h1>Material GRUB</h1><p>Open the link printed in the terminal by <code>material-grub-gui</code>.</p>", "text/html; charset=utf-8")
@@ -408,6 +408,23 @@ def api_icon_get(h, q, g):
     out = io.BytesIO()
     im.save(out, "PNG")
     return h.send(200, out.getvalue(), "image/png")
+
+
+def api_palette(h, q, g):
+    import mgpalette
+
+    seed = q.get("seed", [""])[0]
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", seed):
+        return h.fail(400, "seed must look like #RRGGBB")
+    return h.send(200, {"dark": mgpalette.scheme(seed, True), "light": mgpalette.scheme(seed, False)})
+
+
+def api_glyph(h, q, g):
+    name = urllib.parse.unquote(g[0])
+    f = PKG / "glyphs" / f"{name}.png" if PKG and re.fullmatch(r"[a-z0-9_-]{1,40}", name) else None
+    if f is None or not f.is_file():
+        return h.fail(404, "no such icon")
+    return h.send(200, f.read_bytes(), "image/png", {"Cache-Control": "max-age=3600"})
 
 
 def api_apply(h, q, g):
@@ -516,6 +533,7 @@ ROUTES = {
     ("GET", "/api/state"): api_state,
     ("GET", "/api/status"): api_status,
     ("GET", "/api/ping"): api_ping,
+    ("GET", "/api/palette"): api_palette,
     ("POST", "/api/preview"): api_preview,
     ("POST", "/api/icon"): api_icon_upload,
     ("POST", "/api/apply"): api_apply,
@@ -526,6 +544,7 @@ ROUTES = {
 }
 PATTERNS = [
     (("GET", r"/api/icon/([^/]+)"), api_icon_get),
+    (("GET", r"/api/glyph/([^/]+)"), api_glyph),
     (("GET", r"/api/jobs/([0-9a-f]{12})/events"), api_job_events),
     (("POST", r"/api/presets/load/([^/]+)"), api_preset_load),
     (("GET", r"/api/presets/export/([^/]+)"), api_preset_export),

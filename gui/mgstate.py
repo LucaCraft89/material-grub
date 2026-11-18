@@ -35,8 +35,15 @@ def catalog(pkg):
     titles = _json(pkg / "titles.json", {})
     subs = _json(pkg / "subtitles.json", {})
     classes = _json(pkg / "classes.json", {})
+    pal = _json(pkg / "palettes.json", {})
     return {
-        k: {"title": t, "subtitle": subs.get(k, ""), "aliases": classes.get(k, [k]), "glyph": (pkg / "glyphs" / f"{k}.png").is_file()}
+        k: {
+            "title": t,
+            "subtitle": subs.get(k, ""),
+            "aliases": classes.get(k, [k]),
+            "glyph": (pkg / "glyphs" / f"{k}.png").is_file(),
+            "seed": pal.get(k, {}).get("seed"),
+        }
         for k, t in titles.items()
     }
 
