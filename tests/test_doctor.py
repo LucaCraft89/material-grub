@@ -83,6 +83,30 @@ class Doctor(unittest.TestCase):
         self.assertIn("installed version", out)
         self.assertIn("every one of the 2 menu entries has a scene", out)
 
+    def test_status_json(self):
+        env = {k: v for k, v in dict(os.environ, MG_SCRIPT_CHECK="").items() if k != "MATERIAL_PKG"}
+        r = subprocess.run(
+            [sys.executable, str(BIN / "material-grub-doctor"), "--root", str(self.r), "--status-json"],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        d = json.loads(r.stdout)
+        self.assertEqual((d["installed"], d["failed"]), (True, 0))
+        self.assertEqual((d["style"], d["scheme"]), ("rail", "dark"))
+        self.assertTrue(d["version"])
+        self.assertIsNone(d["last_error"])
+        self.assertTrue(any(c["check"] == "theme" for c in d["checks"]))
+        (self.theme / "theme.txt").unlink()
+        r = subprocess.run(
+            [sys.executable, str(BIN / "material-grub-doctor"), "--root", str(self.r), "--status-json"],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        d = json.loads(r.stdout)
+        self.assertEqual((d["installed"], d["failed"] > 0), (False, True))
+
     def test_missing_scene(self):
         (self.theme / "icons/mg_aaaaaaaaaa.png").unlink()
         code, out = self.doctor()

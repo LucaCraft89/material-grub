@@ -1,7 +1,8 @@
 """material-grub doctor: check the installation and print a report that can be pasted into a bug report. stdlib only.
 
-usage: material-grub doctor [--root DIR] [--json]       (also: material-grub-apply --status)
+usage: material-grub doctor [--root DIR] [--json | --status-json]       (also: material-grub-apply --status)
 Exit status: 0 when nothing failed (warnings are fine), 1 when something failed.
+--json: the list of checks. --status-json: one object for the GUI (installed, version, style, scheme, health, checks).
 --root DIR looks at an installation staged under DIR (tests, `install.sh --dest`); systemd is not asked then.
 """
 
@@ -25,6 +26,7 @@ class Doctor:
     def __init__(self, root=""):
         self.root = Path(root) if root else None
         self.rows = []
+        self.conf = {}
 
     def p(self, path):
         return (self.root / str(path).lstrip("/")) if self.root else Path(path)
@@ -255,9 +257,26 @@ class Doctor:
             self.add(FAIL, "last error", f"{f} exists but cannot be read")
 
     # ---------------------------------------------------------------- run
+    def summary(self):
+        """One object for the GUI, built from the rows of a finished run()."""
+        row = {w: (s, x) for s, w, x in self.rows}
+        ver = row.get("installed version", (None, ""))[1]
+        theme = row.get("theme", (None, ""))[0]
+        return {
+            "installed": "installed version" in row and theme == OK,
+            "version": ver or None,
+            "style": self.conf.get("STYLE"),
+            "scheme": self.conf.get("SCHEME"),
+            "config": self.conf,
+            "failed": sum(1 for r in self.rows if r[0] == FAIL),
+            "warnings": sum(1 for r in self.rows if r[0] == WARN),
+            "last_error": None if row.get("last error", (OK,))[0] == OK else row["last error"][1],
+            "checks": [{"status": s, "check": w, "detail": x} for s, w, x in self.rows],
+        }
+
     def run(self, here):
         gfx = self.system()
-        self.config()
+        self.conf = self.config()
         pkg = self.package(here)
         self.hooks()
         self.path_unit()
@@ -284,7 +303,9 @@ def main(argv=None):
     root = argv[argv.index("--root") + 1] if "--root" in argv else ""
     d = Doctor(root)
     ok = d.run(Path(__file__).resolve())
-    if "--json" in argv:
+    if "--status-json" in argv:
+        print(json.dumps(d.summary(), indent=1))
+    elif "--json" in argv:
         print(json.dumps([{"status": s, "check": w, "detail": x} for s, w, x in d.rows], indent=1))
     else:
         print(d.render())
