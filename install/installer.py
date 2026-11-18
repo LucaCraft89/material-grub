@@ -101,6 +101,7 @@ class Installer:
         self.deps = True
         self.stage = False
         self.dry = False
+        self.preview = False
         self.keep = False
         self.uninstall = False
         self.force = False
@@ -203,6 +204,8 @@ class Installer:
                 self.stage = True
             elif o == "--dry-run":
                 self.dry, self.deps = True, False
+            elif o == "--preview":
+                self.preview, self.deps = True, False
             elif o == "--keep-build":
                 self.keep = True
             elif o == "--uninstall":
@@ -285,7 +288,7 @@ class Installer:
                 "not running as root: fine for a Ventoy stick (dependencies must already be installed; use sudo to let the installer install them)"
             )
         elif not self.root():
-            if self.stage or self.dry:
+            if self.stage or self.dry or self.preview:
                 self.deps = False
                 self.warn("not running as root: skipping dependency installation (--stage-only / --dry-run)")
             else:
@@ -329,7 +332,7 @@ class Installer:
             return True
         if self.ventoy and (not self.stick or not self.res or not self.style or not self.scheme_set):
             return True
-        return not self.stage and (not self.res or not self.style or not self.scheme_set)
+        return not self.stage and not self.preview and (not self.res or not self.style or not self.scheme_set)
 
     def questions(self):
         if self.want_tui():
@@ -928,6 +931,19 @@ class Installer:
                 if self.imm:
                     cmd.append("--immutable")
                 return self.run(cmd + self.confset_args()).returncode
+            if self.preview:
+                self.step("Preview: rendering your menu (nothing is installed)")
+                cmd = [
+                    sys.executable,
+                    HERE / "install/bin/material-grub-preview",
+                    "--pkg",
+                    self.dist,
+                    "--res",
+                    self.build_res,
+                ]
+                if self.style:
+                    cmd += ["--style", self.style]
+                return self.run(cmd).returncode
             if self.stage:
                 self.keep = True
                 self.step("Stage-only: stopping before GRUB is touched")
