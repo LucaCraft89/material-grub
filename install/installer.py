@@ -69,6 +69,29 @@ PYTHON_PACKAGES = {
 STYLES = ("rail", "clean", "list", "split", "full")
 
 
+class LineEvents:
+    """File-like stand-in for sys.stdout/sys.stderr in --progress json mode: every printed line becomes a 'log' event."""
+
+    def __init__(self, emit, level):
+        self.emit, self.level, self.buf = emit, level, ""
+
+    def write(self, text):
+        self.buf += text
+        *lines, self.buf = self.buf.split("\n")
+        for ln in lines:
+            if ln.strip():
+                self.emit("log", text=ln.rstrip(), level=self.level)
+        return len(text)
+
+    def flush(self):
+        if self.buf.strip():
+            self.emit("log", text=self.buf.rstrip(), level=self.level)
+        self.buf = ""
+
+    def isatty(self):
+        return False
+
+
 class Installer:
     def __init__(self, argv):
         self.argv = argv
@@ -111,6 +134,20 @@ class Installer:
         self.pm = ""
         self.build_dir = None
         self.runtime_py = "python3"
+        self.json = False  # --progress json: one JSON object per line on stdout (for the GUI)
+        self.out = sys.stdout
+
+    # ------------------------------------------------------------ machine-readable progress
+    def emit(self, event, **kw):
+        """One line of JSON: {"event": step|info|ok|warn|error|progress|log|done, ...}. Only used with --progress json."""
+        if self.json:
+            self.out.write(json.dumps({"event": event, "t": round(time.time() - self.t0, 1), **kw}) + "\n")
+            self.out.flush()
+
+    def start_json(self):
+        self.json, self.yes, self.tuimode, self.tty = True, True, "no", False
+        self.B = self.D = self.M = self.Y = self.RD = self.G = self.Z = ""
+        sys.stdout, sys.stderr = LineEvents(self.emit, "info"), LineEvents(self.emit, "warn")
 
     # ------------------------------------------------------------ output helpers
     def elapsed(self):
@@ -119,20 +156,31 @@ class Installer:
 
     def step(self, msg):
         self.n += 1
+        if self.json:
+            return self.emit("step", n=self.n, total=self.total, msg=msg)
         print(
             f"\n{self.M}[{self.n}/{self.total}]{self.Z} {self.B}{msg}{self.Z}  {self.D}(total elapsed {self.elapsed()}){self.Z}"
         )
 
     def info(self, msg):
+        if self.json:
+            return self.emit("info", msg=msg)
         print(f"      {msg}")
 
     def ok(self, msg):
+        if self.json:
+            return self.emit("ok", msg=msg)
         print(f"      {self.G}ok{self.Z} {msg}")
 
     def warn(self, msg):
+        if self.json:
+            return self.emit("warn", msg=msg)
         print(f"{self.Y}warning:{self.Z} {msg}", file=sys.stderr)
 
     def die(self, msg, code=1):
+        if self.json:
+            self.emit("error", msg=msg, code=code)
+            sys.exit(code)
         print(f"{self.RD}error:{self.Z} {msg}", file=sys.stderr)
         sys.exit(code)
 
@@ -211,6 +259,10 @@ class Installer:
                 self.from_package, self.yes, self.deps, self.tuimode = True, True, False, "no"
             elif o == "--preview":
                 self.preview, self.deps = True, False
+            elif o == "--progress":
+                if need(o, "json") != "json":
+                    self.usage_error("--progress only knows json")
+                self.json = True
             elif o == "--keep-build":
                 self.keep = True
             elif o == "--uninstall":
@@ -235,14 +287,25 @@ class Installer:
         return os.geteuid() == 0
 
     def run(self, cmd, **kw):
-        return subprocess.run([str(c) for c in cmd], **kw)
+        cmd = [str(c) for c in cmd]
+        if not self.json or "capture_output" in kw or "stdout" in kw:
+            return subprocess.run(cmd, **kw)
+        # json mode: the child's output becomes 'log' events instead of leaking onto our stdout
+        p = subprocess.Popen(
+            cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", **kw
+        )
+        with p.stdout:
+            for line in p.stdout:
+                if line.strip():
+                    self.emit("log", text=line.rstrip(), level="info")
+        return subprocess.CompletedProcess(cmd, p.wait())
 
     def have(self, name):
         return shutil.which(name) is not None
 
     def wait_job(self, proc, log, label, total=0):
         """Wait for a background process, printing a heartbeat so the terminal never looks frozen."""
-        start, last = time.time(), 0.0
+        start, last, seen = time.time(), 0.0, 0
         while proc.poll() is None:
             now = time.time()
             e = int(now - start)
@@ -259,7 +322,25 @@ class Installer:
                 msg = f"{label}: {count}/{total} ({p}%)  {e // 60}m{e % 60:02d}s elapsed"
             else:
                 msg = f"{label} ... {e // 60}m{e % 60:02d}s elapsed"
-            if self.tty:
+            if self.json:
+                if now - last >= 2:
+                    self.emit(
+                        "progress",
+                        label=label,
+                        count=count if total > 0 else None,
+                        total=total or None,
+                        percent=p if total > 0 else None,
+                        elapsed=e,
+                    )
+                    last = now
+                try:  # the job's own log lines, for the verbose view
+                    lines = Path(log).read_text(errors="ignore").splitlines()
+                except OSError:
+                    lines = []
+                for ln in lines[seen:]:
+                    self.emit("log", text=ln, level="info")
+                seen = len(lines)
+            elif self.tty:
                 sys.stdout.write(f"\r      {msg}   ")
                 sys.stdout.flush()
             elif now - last >= 10:
@@ -910,6 +991,19 @@ class Installer:
     # ------------------------------------------------------------ main
     def main(self):
         self.parse()
+        if self.json:
+            self.start_json()
+            try:
+                rc = self.main_inner()
+            except SystemExit as e:
+                rc = e.code if isinstance(e.code, int) else 1
+            sys.stdout.flush()
+            sys.stderr.flush()
+            self.emit("done", rc=rc or 0, ok=not rc, elapsed=self.elapsed())
+            return rc or 0
+        return self.main_inner()
+
+    def main_inner(self):
         if not self.from_package:
             return self.run_all()
         # packages: keep the user's scheme, pick the resolution like a plain run; a failure must not break the package transaction

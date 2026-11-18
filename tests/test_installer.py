@@ -20,6 +20,77 @@ def make(argv):
     return i
 
 
+class ProgressJson(unittest.TestCase):
+    """--progress json: one JSON object per line on the real stdout; stray prints and child output become 'log' events."""
+
+    def run_json(self, body):
+        import contextlib
+        import io
+        import json
+
+        buf = io.StringIO()
+        real = sys.stdout, sys.stderr
+        try:
+            with contextlib.redirect_stdout(buf):
+                i = installer.Installer(["--progress", "json"])
+                i.parse()
+                i.start_json()
+                body(i)
+        finally:
+            sys.stdout, sys.stderr = real
+        return i, [json.loads(ln) for ln in buf.getvalue().splitlines()]
+
+    def test_flag_implies_non_interactive(self):
+        i = make(["--progress", "json"])
+        self.assertTrue(i.json)
+        i.start_json()
+        sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
+        self.assertEqual((i.yes, i.tuimode, i.tty), (True, "no", False))
+
+    def test_bad_value_is_a_usage_error(self):
+        with self.assertRaises(SystemExit):
+            make(["--progress", "xml"])
+
+    def test_events_and_stray_output(self):
+        def body(i):
+            i.step("Build")
+            i.info("hello")
+            i.ok("fine")
+            i.warn("careful")
+            print("a stray print")
+            print("to stderr", file=sys.stderr)
+            r = i.run([sys.executable, "-c", "print('from child')"])
+            self.assertEqual(r.returncode, 0)
+
+        _, ev = self.run_json(body)
+        kinds = [e["event"] for e in ev]
+        self.assertEqual(kinds[:4], ["step", "info", "ok", "warn"])
+        self.assertEqual(ev[0]["msg"], "Build")
+        logs = [(e["text"], e["level"]) for e in ev if e["event"] == "log"]
+        self.assertEqual(logs, [("a stray print", "info"), ("to stderr", "warn"), ("from child", "info")])
+
+    def test_die_emits_error_and_done(self):
+        import contextlib
+        import io
+        import json
+        import unittest.mock as m
+
+        buf = io.StringIO()
+        real = sys.stdout, sys.stderr
+        try:
+            with contextlib.redirect_stdout(buf):
+                i = installer.Installer(["--progress", "json"])
+                i.main_inner = lambda: i.die("boom", 3)
+                with m.patch.object(installer.Installer, "parse", lambda self: setattr(self, "json", True)):
+                    rc = i.main()
+        finally:
+            sys.stdout, sys.stderr = real
+        ev = [json.loads(ln) for ln in buf.getvalue().splitlines()]
+        self.assertEqual(rc, 3)
+        self.assertEqual([e["event"] for e in ev], ["error", "done"])
+        self.assertEqual((ev[-1]["rc"], ev[-1]["ok"]), (3, False))
+
+
 class Parse(unittest.TestCase):
     def test_defaults(self):
         i = make([])
