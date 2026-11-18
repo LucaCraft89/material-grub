@@ -33,7 +33,7 @@ class Logic(unittest.TestCase):
 
     def test_presets_skip_steps(self):
         steps = tui.build_steps({"RES": "1920x1080", "STYLE": "list", "SCHEME": "dark"}, MONS, False)
-        self.assertEqual([s["id"] for s in steps], ["SEED_MODE", "SEED", "LOGO", "HINTS", "EXTRAS"])
+        self.assertEqual([s["id"] for s in steps], ["SEED_MODE", "SEED", "LOGO", "HINTS", "EXTRAS", "GUI"])
         a = tui.answers(steps, {"RES": "1920x1080", "STYLE": "list", "SCHEME": "dark"})
         self.assertEqual((a["RES"], a["STYLE"], a["COOKIE"], a["LOGO"]), ("1920x1080", "list", "on", "on"))
         self.assertNotIn("SEED", a)  # the seed is only asked (and answered) for the single-colour mode
@@ -44,9 +44,11 @@ class Logic(unittest.TestCase):
         steps = tui.build_steps(presets, MONS, False)
         seed = next(s for s in steps if s["id"] == "SEED")
         mode = next(s for s in steps if s["id"] == "SEED_MODE")
-        self.assertEqual([s["id"] for s in tui.live(steps, presets)], ["SEED_MODE", "LOGO", "HINTS", "EXTRAS"])
+        self.assertEqual([s["id"] for s in tui.live(steps, presets)], ["SEED_MODE", "LOGO", "HINTS", "EXTRAS", "GUI"])
         mode["cur"] = 1
-        self.assertEqual([s["id"] for s in tui.live(steps, presets)], ["SEED_MODE", "SEED", "LOGO", "HINTS", "EXTRAS"])
+        self.assertEqual(
+            [s["id"] for s in tui.live(steps, presets)], ["SEED_MODE", "SEED", "LOGO", "HINTS", "EXTRAS", "GUI"]
+        )
         self.assertEqual(len(seed["options"]), 33)  # 32 colours and "type another"
         a = tui.answers(steps, presets)
         self.assertEqual(
@@ -70,6 +72,14 @@ class Logic(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     tui.write_out(f.name, {"SEED": bad})
             tui.write_out(f.name, {"SEED_MODE": "single", "SEED": "#0B3D2E"})
+
+    def test_gui_question_is_not_asked_on_immutable_systems_or_when_given(self):
+        self.assertNotIn("GUI", [s["id"] for s in tui.build_steps({}, MONS, True)])
+        steps = tui.build_steps({"GUI": "yes"}, MONS, False)
+        self.assertNotIn("GUI", [s["id"] for s in steps])
+        self.assertEqual(tui.answers(steps, {"GUI": "yes"})["GUI"], "yes")
+        self.assertIn("--with-gui", tui.command_line({"RES": "1920x1080", "GUI": "yes"}))
+        self.assertNotIn("--with-gui", tui.command_line({"RES": "1920x1080", "GUI": "no"}))
 
     def test_cookie_off_implies_no_logo(self):
         steps = tui.build_steps({}, MONS, True)
@@ -176,7 +186,7 @@ class Plain(unittest.TestCase):
             out = Path(d) / "o"
             r = subprocess.run(
                 [sys.executable, TUI, "--out", out, "--plain", "--monitors", mon],
-                input="2\n3\n2\n\n\n2\n\n\n12\ny\n",
+                input="2\n3\n2\n\n\n2\n\n\n12\n\ny\n",
                 capture_output=True,
                 text=True,
             )
@@ -188,7 +198,7 @@ class Plain(unittest.TestCase):
             self.assertIn("TIMEOUT='12'", t)
             r = subprocess.run(
                 [sys.executable, TUI, "--out", out, "--plain", "--monitors", mon],
-                input="\n\n\n\n\n\n\n\n\nn\n",
+                input="\n\n\n\n\n\n\n\n\n\nn\n",
                 capture_output=True,
                 text=True,
             )
@@ -294,6 +304,7 @@ class Curses(unittest.TestCase):
             DOWN,
             ENTER,  # hints: off
             ENTER,  # extras: keep
+            ENTER,  # graphical editor: no
             ENTER,
         ]  # summary: install
         code, screen, out = drive(keys)
@@ -303,6 +314,13 @@ class Curses(unittest.TestCase):
             self.assertIn(want, t)
         for text in ("Material GRUB installer", "Resolution", "(primary)", "Summary"):
             self.assertIn(text, screen)
+
+    def test_gui_question_yes(self):
+        keys = [DOWN, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER, DOWN, ENTER, ENTER]
+        # resolution, style rail, scheme dark, colours multi, logo, hints, extras, graphical editor: yes, summary: install
+        code, screen, out = drive(keys)
+        self.assertEqual(code, 0, screen[-600:])
+        self.assertIn("GUI='yes'", out.read_text())
 
     def test_single_seed_grid(self):
         RIGHT = b"\x1bOC"
@@ -319,6 +337,7 @@ class Curses(unittest.TestCase):
             ENTER,  # logo
             ENTER,  # hints
             ENTER,  # extras
+            ENTER,  # graphical editor: no
             ENTER,
         ]  # summary: install
         code, screen, out = drive(keys)
@@ -359,7 +378,7 @@ class Installer(
     @unittest.skipUnless((ROOT / "dist/material-grub/res").is_dir(), "no built package")
     def test_tui_to_settings(self):
         code, screen, _ = drive(
-            [DOWN, DOWN, ENTER, ENTER, ENTER, ENTER, DOWN, ENTER, ENTER, ENTER], cmd=self.CMD
+            [DOWN, DOWN, ENTER, ENTER, ENTER, ENTER, DOWN, ENTER, ENTER, ENTER, ENTER], cmd=self.CMD
         )  # style list, scheme dark, colours multi, logo both, hints off, extras keep, summary ok
         self.assertEqual(code, 0, screen[-400:])
         flat = " ".join(screen.split())

@@ -7,6 +7,7 @@ import math
 import os
 import subprocess
 from pathlib import Path
+from struct import error as struct_error
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -48,6 +49,34 @@ def base_key(k):
     return k.split("~", 1)[0]
 
 
+def machine_logo(pkg, size, src="/sys/firmware/acpi/bgrt/image"):
+    """The firmware (BGRT) logo as the theme shows it (a dark silhouette), for the PREVIEWS only: on a real menu GRUB draws it from machine-logo.png,
+    so it is never baked into a scene. None when the firmware has no usable logo. Uses the same code as the installer (bgrt-logo.py)."""
+    import importlib.util
+
+    for c in (Path(pkg) / "bin/bgrt-logo.py", Path(__file__).resolve().parents[2] / "scripts/bgrt-logo.py"):
+        if c.is_file():
+            break
+    else:
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location("bgrt_logo", c)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        w, h, px = mod.read_bmp(src)
+        res = mod.crop(mod.alpha_rows(w, h, px), w, h)
+        if res is None:
+            return None
+        n, _, rows = mod.fit_square(*res, size)
+    except (OSError, ValueError, ImportError, struct_error):
+        return None
+    mask = Image.new("L", (n, n))
+    mask.putdata([a for r in rows for a in r])
+    im = Image.new("RGBA", (n, n), (0x14, 0x14, 0x18, 255))
+    im.putalpha(mask)
+    return im
+
+
 def groups_of(keys, order=None):
     """The rail sections: Linux, Windows, System (firmware and power). `order` (names from mgoverrides.GROUPS) moves sections; those left out keep their place after."""
     parts = {
@@ -73,6 +102,7 @@ class Renderer:
         self.light = light if light is not None else (sch.exists() and sch.read_text().strip() == "light")
         self.font_path = str(font_path or self.pkg / "fonts/GoogleSansFlex-VF.ttf")
         self._g, self._nd, self._fb = {}, {}, {}
+        self.preview_logo = None  # PIL image of the firmware logo: only the previews set it (on a real menu GRUB draws machine-logo.png itself)
         self.logos = {}  # catalog key -> full-colour logo (PIL image on a white background): drawn on a white card instead of the glyph in a cookie (Ventoy: PNLug)
         self.galias = {}  # pseudo entry key -> glyph name (Ventoy's own menus borrow glyphs and palettes of catalog entries)
         self.hint_labels = [
@@ -280,6 +310,8 @@ class Renderer:
         canvas.alpha_composite(
             c, (int(W - u(150 - self.cookie_off[0]) - c.width / 2), int(u(140 + self.cookie_off[1]) - c.height / 2))
         )
+        if self.preview_logo is not None:
+            self.paste_c(canvas, self.preview_logo, W - u(150 - self.cookie_off[0]), u(140 + self.cookie_off[1]))
 
     def key_hints(self, p):
         u = self.u
@@ -489,6 +521,8 @@ class Renderer:
         if opts.get("cookie", True):
             ck = self.shape("cookie", u(230), p["primaryContainer"])
             canvas.alpha_composite(ck, (int(W - m - u(150) - ck.width / 2), int(t + u(140) - ck.height / 2)))
+            if self.preview_logo is not None:
+                self.paste_c(canvas, self.preview_logo, W - m - u(150), t + u(140))
         if opts.get("hints", True):
             hint = self.key_hints(p)
             canvas.alpha_composite(hint, ((W - hint.width) // 2, t + ph - cp - ch.height - u(12) - hint.height))

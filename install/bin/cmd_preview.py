@@ -165,7 +165,7 @@ def main(argv=None):
         if arg("--style"):
             text += f"\nSTYLE={arg('--style')}\n"
         conf.write_text(text)
-        env = dict(os.environ, MATERIAL_CONF=str(conf), MATERIAL_STATE_DIR=str(work / "state"))
+        env = dict(os.environ, MATERIAL_CONF=str(conf), MATERIAL_STATE_DIR=str(work / "state"), MG_PREVIEW_LOGO="1")
         theme = work / "theme"
         state = work / "state/entries.json"
 

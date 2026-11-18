@@ -109,4 +109,5 @@ def main():
     print(f"wrote {out} {w}x{h}")
 
 
-main()
+if __name__ == "__main__":
+    main()

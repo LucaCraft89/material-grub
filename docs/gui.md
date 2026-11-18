@@ -6,6 +6,8 @@ An optional graphical editor for the theme. It is **not installed by default**, 
 
 ## Get it
 
+- **The installer asks.** `./install.sh` in a terminal ends its questions with *Graphical editor: yes or no* (default no). Nothing is installed unless you say yes (or pass `--with-gui`).
+
 - **Packages** (the same repository as the theme): the separate package `material-grub-gui` (`sudo dnf install material-grub-gui`, `sudo apt install material-grub-gui`, `sudo pacman -S material-grub-gui`). It depends on the theme package and ships plain Python and web files, nothing is built.
 - **Source install:** `sudo ./install.sh --with-gui` (needs the `gui/` folder of a checkout). `sudo ./install.sh --uninstall` removes it again.
 - **From a checkout without installing:** `python3 gui/material-grub-gui` (changes then go through `pkexec` on `gui/mghelper.py`).

@@ -157,6 +157,15 @@ class Seed(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 make(bad)
 
+    def test_gui_answer_sets_the_flag(self):
+        i = make([])
+        self.assertFalse(i.with_gui)
+        i.apply_answers({"GUI": "no"})
+        self.assertFalse(i.with_gui)
+        i.apply_answers({"GUI": "yes"})
+        self.assertTrue(i.with_gui)
+        self.assertTrue(make(["--with-gui"]).with_gui)
+
     def test_answers_and_overrides_file(self):
         sys.path.insert(0, str(ROOT / "install/bin"))
         import mgoverrides

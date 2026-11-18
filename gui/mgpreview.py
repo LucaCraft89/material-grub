@@ -36,6 +36,7 @@ class Previewer:
             json.loads((self.pkg / "subtitles.json").read_text()) if (self.pkg / "subtitles.json").is_file() else {}
         )
         self._pal = {}
+        self._cache = {}
 
     def close(self):
         self.tmp.cleanup()
@@ -67,6 +68,13 @@ class Previewer:
             alt = self.palettes(dark, sch)
             if alt:
                 R.pal = copy.deepcopy(alt)
+            if conf.get("COOKIE", "on") == "on" and conf.get("LOGO", "on") == "on":
+                if "logo" not in self._cache:
+                    self._cache["logo"] = {}
+                lg = self._cache["logo"]
+                if H not in lg:
+                    lg[H] = mgscenes.machine_logo(self.pkg, round(120 * H / 1080))
+                R.preview_logo = lg[H]
             overlay = mgcustom.apply(
                 R, ov, ents, self.pkg, aspect, size, self.classes, icon_dir=icon_dir, tmp=self.tmp.name, always=True
             )

@@ -500,6 +500,10 @@ class Installer:
                 preset("STYLE", self.style)
             if self.scheme_set:
                 preset("SCHEME", self.scheme)
+            if self.with_gui or not (HERE / "gui/mgserver.py").is_file():
+                preset(
+                    "GUI", "yes" if self.with_gui else "no"
+                )  # given by a flag, or there is no gui/ folder to install from: not asked
             if self.seed_mode:
                 preset("SEED_MODE", self.seed_mode)
             if self.seed:
@@ -545,6 +549,8 @@ class Installer:
             self.style = a["STYLE"]
         if a.get("SCHEME"):
             self.scheme, self.scheme_set = a["SCHEME"], True
+        if a.get("GUI") == "yes":
+            self.with_gui = True
         if a.get("SEED_MODE"):
             self.seed_mode = a["SEED_MODE"]
         if a.get("SEED"):

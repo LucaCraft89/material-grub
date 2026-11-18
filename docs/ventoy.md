@@ -57,6 +57,10 @@ Without the UI:
 
 Options are saved on the stick in `/ventoy/material-grub.conf` (`STYLE`, `SCHEME`, `COOKIE`, `LOGO`, `HINTS`, `RAW_NAME`, `MODE`). To change the style, scheme or resolutions, run the installer again.
 
+## Customise single images (optional)
+
+Rename, recolour or re-icon single ISOs, or give the whole stick one colour: in the [GUI](gui.md) (the *Ventoy* page) or by hand in `ventoy/material-grub-overrides.json` on the stick (same format as [customising.md](customising.md#overridesjson); the match for a file is `{"title": "text of the file name"}`; pictures go in `ventoy/material-grub-icons/`). `material-grub ventoy` writes it to the stick again. A customised file gets its own scene, a `menu_class` rule (the shortest piece of its name that no other file has) and, with a name, a Ventoy `menu_alias`. Hiding and ordering do not apply (Ventoy sorts by name).
+
 ## What you see
 
 - **The scene** for the highlighted ISO: its distro's colour, logo and name, in the style you chose. The small muted line at the bottom is the raw file name exactly as Ventoy lists it (`RAW_NAME=off` hides it).

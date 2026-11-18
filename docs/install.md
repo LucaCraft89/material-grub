@@ -9,7 +9,8 @@ cd material-grub
 sudo ./install.sh
 ```
 
-Then reboot. That's it.
+In a terminal this opens the installer's questions (see below); answer them and the rest runs by itself. Then reboot. That's it.
+For everything after the install, see [usage.md](usage.md).
 
 > ⚠️ This modifies your bootloader configuration. The installer backs up `/etc/default/grub` and `grub.cfg` to
 > `/var/backups/material-grub`, and `sudo ./install.sh --uninstall` reverts everything. Know how to boot a live USB
@@ -32,13 +33,15 @@ Then reboot. That's it.
 sudo ./install.sh --res 1920x1200   # force a resolution instead of auto-detecting
 sudo ./install.sh --scheme light    # light variant instead of dark
 sudo ./install.sh --style list      # rail (default) | clean | list | split; also --no-hints, --no-cookie, --no-logo
+sudo ./install.sh --seed '#7E57C2'  # one seed colour for every entry (--seed-mode multi goes back to a colour per entry)
+sudo ./install.sh --with-gui        # also install the optional GUI (the TUI asks this itself)
 sudo ./install.sh --no-deps         # you installed the dependencies yourself
 sudo ./install.sh --stage-only      # install deps and build, but do not touch GRUB
 sudo ./install.sh --keep-build      # keep the temporary build directory
 sudo ./install.sh --uninstall       # remove the theme and hooks
 ```
 
-**Interactive installer (TUI).** Run in a terminal without `--yes`, `./install.sh` asks for whatever you did not give as a flag (resolution, style, colour scheme, cookie/logo, key hints, extras; on immutable systems also your consent). Left: the current question and a tab strip of the steps; right: a call-out explaining the highlighted option; the last tab is a summary with the equivalent non-interactive command. The resolution step proposes your **primary monitor** (X11 `xrandr`, then GNOME/KDE/wlroots Wayland tools run as your own user, then the DRM sysfs, then `GRUB_GFXMODE`) and lets you pick another detected screen or type `WxH`. GRUB draws on whichever output the firmware chooses, usually the primary one. `--no-tui` (or `--yes`, or no terminal) keeps the old fully automatic behaviour; `--tui` forces the questions. Without curses or with a dumb terminal it falls back to plain prompts. Status: the parsers are unit-tested on sample outputs and the TUI is driven through a pty at 80x24 in the tests; the GNOME (Mutter) parser has only been tested on a hand-written sample, and none of the desktop tools have been run on real multi-monitor setups here.
+**Interactive installer (TUI).** Run in a terminal without `--yes`, `./install.sh` asks for whatever you did not give as a flag (resolution, style, colour scheme, **one colour for everything or a colour per entry** (with 32 preset colours), cookie/logo, key hints, extras, and **whether to install the optional GUI** (default: no); on immutable systems also your consent). Left: the current question and a tab strip of the steps; right: a call-out explaining the highlighted option; the last tab is a summary with the equivalent non-interactive command. The resolution step proposes your **primary monitor** (X11 `xrandr`, then GNOME/KDE/wlroots Wayland tools run as your own user, then the DRM sysfs, then `GRUB_GFXMODE`) and lets you pick another detected screen or type `WxH`. GRUB draws on whichever output the firmware chooses, usually the primary one. `--no-tui` (or `--yes`, or no terminal) keeps the fully automatic behaviour that scripts and CI need (the GUI is then only installed with `--with-gui`); `--tui` forces the questions. Without curses or with a dumb terminal it falls back to plain prompts. Status: the parsers are unit-tested on sample outputs and the TUI is driven through a pty at 80x24 in the tests; the GNOME (Mutter) parser has only been tested on a hand-written sample, and none of the desktop tools have been run on real multi-monitor setups here.
 
 **Styles** (`STYLE` in `/etc/material-grub.conf`, change with `sudo material-grub apply`; the images are the same for all of them): `rail` is the full-screen design with an icon rail, `clean` is full screen with the previous and next entries peeking in above and below and label chips on the edges, `list` is a centred list of icon-in-shape plus name pill, `split` is the same list moved to the right with the selected entry's big logo and name on the left (separators between Linux, Windows and System included). `COOKIE`, `LOGO` and `HINTS` switch the top-right cookie, the firmware logo inside it and the key-hint pills.
 

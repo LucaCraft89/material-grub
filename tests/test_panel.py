@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "dist/material-grub"
 sys.path.insert(0, str(ROOT / "install/bin"))
+import mgscenes as mgscenes_mod  # noqa: E402
 
 
 def mean_diff(a, b):
@@ -52,6 +53,32 @@ class PanelScene(unittest.TestCase):
         p = mgpalette.scheme("#E95420", True)
         mine = self.R.panel_scene(bg.size, "fedora", hero=False, p=p)
         self.assertEqual(mine.getpixel((5, bg.height // 2)), tuple(int(p["surface"][i : i + 2], 16) for i in (1, 3, 5)))
+
+    def test_firmware_logo_is_drawn_in_the_cookie_of_previews_only(self):
+        import tempfile
+
+        from PIL import Image
+
+        bmp = Path(tempfile.mkdtemp()) / "bgrt.bmp"
+        im = Image.new("RGB", (80, 60), (255, 255, 255))
+        im.paste((0, 0, 0), (20, 15, 60, 45))
+        im.save(bmp, "BMP")
+        logo = mgscenes_mod.machine_logo(PKG, 120, src=str(bmp))
+        self.assertEqual(logo.size, (120, 120))
+        self.assertGreater(logo.getchannel("A").getpixel((60, 60)), 200)  # the silhouette is in the middle
+        self.assertIsNone(mgscenes_mod.machine_logo(PKG, 120, src="/nonexistent/bgrt"))  # no logo: nothing is drawn
+        p = self.R.pal["fedora"]
+        plain = self.Image.new("RGBA", (1920, 1080))
+        self.R.draw_cookie(plain, p)
+        with_logo = self.Image.new("RGBA", (1920, 1080))
+        self.R.preview_logo = logo
+        try:
+            self.R.draw_cookie(with_logo, p)
+        finally:
+            self.R.preview_logo = None
+        c = (1920 - 150, 140)
+        self.assertNotEqual(plain.getpixel(c), with_logo.getpixel(c))
+        self.assertEqual(plain.getpixel((5, 5)), with_logo.getpixel((5, 5)))
 
 
 if __name__ == "__main__":

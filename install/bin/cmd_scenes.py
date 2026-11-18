@@ -47,6 +47,10 @@ def main():
     scene_size = Image.open(bgs[0]).size if bgs else (1920, 1080)
     R = mgscenes.Renderer(pkg, scene_size[1])
     R.bg_dir = pkg / "scenes" / aspect / "bg"
+    if os.environ.get("MG_PREVIEW_LOGO") == "1" and conf["COOKIE"] == "on" and conf["LOGO"] == "on":
+        R.preview_logo = mgscenes.machine_logo(
+            pkg, round(120 * scene_size[1] / 1080)
+        )  # only the previews draw it: GRUB itself shows machine-logo.png
     ov, problems = mgoverrides.load()
     for pr in problems:
         print(f"material-grub: overrides: {pr}")

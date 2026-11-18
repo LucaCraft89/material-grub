@@ -112,7 +112,7 @@ recomputed whenever `grub.cfg` is regenerated, so an upgrade from 10 to 11 shows
 
 The theme is always built from source on your machine (there are no prebuilt downloads). Details and every option: [docs/install.md](docs/install.md)
 ([supported resolutions](docs/install.md#supported-resolutions), immutable systems: [docs/immutable.md](docs/immutable.md), packages: [docs/packaging.md](docs/packaging.md)),
-the `material-grub` command: [docs/cli.md](docs/cli.md), how it works and what GRUB cannot do: [docs/how-it-works.md](docs/how-it-works.md), customising: [docs/customising.md](docs/customising.md).
+the `material-grub` command: [docs/cli.md](docs/cli.md), **how to use it, start to finish: [docs/usage.md](docs/usage.md)**; how it works and what GRUB cannot do: [docs/how-it-works.md](docs/how-it-works.md), customising: [docs/customising.md](docs/customising.md).
 Does it work on your distro? [Tell us](https://github.com/LucaCraft89/material-grub/issues/new?template=works_on_distro.yml); confirmed systems: [docs/tested-on.md](docs/tested-on.md).
 
 ## Development

@@ -9,6 +9,8 @@ An optional GUI, a one-colour theme and per-entry customisation.
 - **One colour for the whole theme:** pick one of 32 seed colours (or any `#RRGGBB`) and every entry uses its Material 3 palette. In the installer's TUI (new *Colours* and *Seed colour* steps, `--seed '#RRGGBB'`, `--seed-mode multi|single`) and in the GUI.
 - **`/etc/material-grub/overrides.json`:** colours, names and icons per entry (your own PNG, JPEG, SVG, ...), hidden entries, section and entry order (the real GRUB menu is reordered), validated strictly when written and leniently at boot (a bad file never breaks the menu). `material-grub doctor` checks it. See `docs/customising.md`.
 - **Ventoy:** the same overrides on the stick (`ventoy/material-grub-overrides.json`): per-ISO colour, icon and display name (`menu_class` and `menu_alias`), and the single-colour mode.
+- The installer's TUI asks whether to install the optional GUI (default no; `--with-gui` answers it).
+- The firmware (BGRT) logo now shows in the cookie of the previews (the GUI's live preview and `material-grub preview`); on a real menu GRUB draws it from `machine-logo.png` as before.
 - **Presets:** save the look under a name, move it to another machine as one JSON file.
 - `install.sh --progress json` (machine-readable progress for tools), a persistent install log in `/var/log/material-grub/install.log`, `material-grub doctor --status-json`.
 
