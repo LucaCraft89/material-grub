@@ -45,27 +45,23 @@ class Cli(unittest.TestCase):
 
     def test_doctor_asks_sudo_when_boot_is_root_only(self):
         # Fedora's /boot/grub2 is 0700: in a terminal doctor re-runs itself under sudo, in a script it just warns
+        import contextlib
         import unittest.mock as mock
 
         import cmd_cli
 
-        with (
-            mock.patch.object(cmd_cli, "boot_root_only", return_value=True),
-            mock.patch.object(cmd_cli.sys.stdin, "isatty", return_value=True),
-            mock.patch.object(cmd_cli.shutil, "which", return_value="/usr/bin/sudo"),
-            mock.patch.object(cmd_cli, "elevate") as el,
-            mock.patch("cmd_doctor.main", return_value=0),
-        ):
-            cmd_cli.c_doctor(["--json"])
-            el.assert_called_once_with(["doctor", "--json"])
-        with (
-            mock.patch.object(cmd_cli, "boot_root_only", return_value=True),
-            mock.patch.object(cmd_cli.sys.stdin, "isatty", return_value=False),
-            mock.patch.object(cmd_cli, "elevate") as el,
-            mock.patch("cmd_doctor.main", return_value=0),
-        ):
-            cmd_cli.c_doctor([])
-            el.assert_not_called()
+        def run(tty):
+            with contextlib.ExitStack() as st:
+                st.enter_context(mock.patch.object(cmd_cli, "boot_root_only", return_value=True))
+                st.enter_context(mock.patch.object(cmd_cli.sys.stdin, "isatty", return_value=tty))
+                st.enter_context(mock.patch.object(cmd_cli.shutil, "which", return_value="/usr/bin/sudo"))
+                st.enter_context(mock.patch("cmd_doctor.main", return_value=0))
+                el = st.enter_context(mock.patch.object(cmd_cli, "elevate"))
+                cmd_cli.c_doctor(["--json"])
+                return el
+
+        run(True).assert_called_once_with(["doctor", "--json"])
+        run(False).assert_not_called()
 
     def test_help_version_unknown(self):
         rc, out = self.mg("help")
