@@ -5,12 +5,19 @@ PKG=${MATERIAL_PKG:-/usr/share/material-grub}
 . "${pkgdatadir:-/usr/share/grub}/grub-mkconfig_lib"
 [ -d "$PKG" ] || exit 0
 if [ -n "$MATERIAL_GRUBDIR" ]; then GDIR=$MATERIAL_GRUBDIR; elif [ -d /boot/grub2 ]; then GDIR=/boot/grub2; else GDIR=/boot/grub; fi
-THEMEDIR=$GDIR/themes/material
-MODE=$(python3 "$PKG/bin/material-grub-assemble" --mode "${GRUB_GFXMODE:-}" --pkg "$PKG" --out "$THEMEDIR" 2>/dev/null | tail -n1) || exit 0
+THEMEDIR=$GDIR/themes/material                       # where the theme is at boot; the paths in grub.cfg are computed from it
+BUILDDIR=${MATERIAL_BUILD_DIR:-$THEMEDIR}            # `install.sh --dry-run` builds somewhere else and changes nothing on the system
+MODE=$(python3 "$PKG/bin/material-grub-assemble" --mode "${GRUB_GFXMODE:-}" --pkg "$PKG" --out "$BUILDDIR" 2>/dev/null | tail -n1) || exit 0
 [ -n "$MODE" ] || exit 0
-# shellcheck disable=SC2154 # grub_probe comes from grub-mkconfig_lib
-prepare_grub_to_access_device "$(${grub_probe} --target=device "$THEMEDIR")"
-REL=$(make_system_path_relative_to_its_root "$THEMEDIR")
+if [ "$BUILDDIR" = "$THEMEDIR" ]; then
+  # shellcheck disable=SC2154 # grub_probe comes from grub-mkconfig_lib
+  prepare_grub_to_access_device "$(${grub_probe} --target=device "$THEMEDIR")"
+  REL=$(make_system_path_relative_to_its_root "$THEMEDIR")
+else
+  # shellcheck disable=SC2154 # grub_probe comes from grub-mkconfig_lib
+  prepare_grub_to_access_device "$(${grub_probe} --target=device "$GDIR")"
+  REL=$(make_system_path_relative_to_its_root "$GDIR"); REL=${REL%/}/themes/material
+fi
 # the theme is only loaded when its files are there at boot (a missing disk, a half-written directory): else GRUB shows its plain menu
 cat << EOF
 # --- Material 3 Expressive theme ($MODE) ---
@@ -25,7 +32,7 @@ if [ -f (\$root)$REL/theme.txt -a -d (\$root)$REL/icons ]; then
 loadfont (\$root)$REL/MG-Label.pf2
 loadfont (\$root)$REL/MG-Raw.pf2
 EOF
-[ -f "$THEMEDIR/unicode.pf2" ] && echo "loadfont (\$root)$REL/unicode.pf2"   # non-Latin fallback glyphs
+[ -f "$BUILDDIR/unicode.pf2" ] && echo "loadfont (\$root)$REL/unicode.pf2"   # non-Latin fallback glyphs
 cat << EOF
 set theme=(\$root)$REL/theme.txt
 export theme

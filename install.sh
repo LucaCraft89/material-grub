@@ -15,9 +15,10 @@
 #            --keep-build  keep the temporary build dir     --force  ignore the NixOS check
 #            --immutable  use the ostree/bootc layout (automatic when /run/ostree-booted exists)   --yes  do not ask for confirmation
 #            --pkg DIR  install a package built elsewhere   --dist-out DIR  with --stage-only: copy the built package to DIR
+#            --dry-run  build in a scratch directory and show a diff of grub.cfg and /etc/default/grub plus the files it would write; changes nothing (needs sudo for the grub.cfg part)
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
-VENTOY=0; STICK=""; VMODE=""; RES=""; SCHEME=dark; SCHEME_SET=0; STYLE=""; COOKIE=""; LOGO=""; HINTS=1; HINTS_SET=0; TUIMODE=auto; IMM=0; YES=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; KEEP=0; UNINSTALL=0; FORCE=0
+VENTOY=0; STICK=""; VMODE=""; RES=""; SCHEME=dark; SCHEME_SET=0; STYLE=""; COOKIE=""; LOGO=""; HINTS=1; HINTS_SET=0; TUIMODE=auto; IMM=0; YES=0; PREBUILT=""; DISTOUT=""; DEPS=1; STAGE=0; DRY=0; KEEP=0; UNINSTALL=0; FORCE=0
 while [ $# -gt 0 ]; do
   case $1 in
     --res) RES=${2:?--res needs WxH}; shift;;
@@ -28,8 +29,8 @@ while [ $# -gt 0 ]; do
     --scheme) SCHEME=${2:?--scheme needs light or dark}; SCHEME_SET=1; shift; case $SCHEME in light|dark) ;; *) echo "--scheme must be light or dark" >&2; exit 2;; esac;;
     --immutable) IMM=1;; --yes|-y) YES=1;; --pkg) PREBUILT=${2:?--pkg needs a directory}; shift;; --dist-out) DISTOUT=${2:?--dist-out needs a directory}; shift;;
     --no-hints) HINTS=0; HINTS_SET=1;;
-    --no-deps) DEPS=0;; --stage-only) STAGE=1;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
-    -h|--help) sed -n 2,19p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+    --no-deps) DEPS=0;; --stage-only) STAGE=1;; --dry-run) DRY=1; DEPS=0;; --keep-build) KEEP=1;; --uninstall) UNINSTALL=1;; --force) FORCE=1;;
+    -h|--help) sed -n 2,18p "$0" | sed 's/^# \{0,1\}//'; exit 0;;
     *) echo "unknown option: $1 (try --help)" >&2; exit 2;;
   esac; shift
 done
@@ -72,7 +73,7 @@ printf "\n${B}Material GRUB installer${Z}\n"
 step "Checking the system"
 if [ "$VENTOY" = 1 ] && [ "$(id -u)" -ne 0 ]; then DEPS=0; info "not running as root: fine for a Ventoy stick (dependencies must already be installed; use sudo to let the installer install them)"
 elif [ "$(id -u)" -ne 0 ]; then
-  if [ "$STAGE" = 1 ]; then DEPS=0; warn "not running as root: skipping dependency installation (--stage-only)"
+  if [ "$STAGE" = 1 ] || [ "$DRY" = 1 ]; then DEPS=0; warn "not running as root: skipping dependency installation (--stage-only / --dry-run)"
   else
     echo "Material GRUB changes system files (/etc/grub.d, /boot) and may install packages."
     echo "Please run the installer with sudo:"
@@ -275,6 +276,14 @@ else
   ok "rendered $(find dist/material-grub/scenes -name '*.png' | wc -l) scene images and $(ls dist/material-grub/res | wc -l) resolution bundles in $(elapsed)"
 fi
 
+if [ "$DRY" = 1 ]; then
+  [ "$VENTOY" = 0 ] || die "--dry-run shows a PC install; for a Ventoy stick use --stage-only and look at the stick afterwards."
+  step "Dry run: building a scratch install (nothing is written to the system)"
+  # shellcheck disable=SC2086 # CONFSETS is a list of --set KEY=value words
+  # shellcheck disable=SC2046
+  python3 "$HERE/install/bin/material-grub-dryrun" --pkg "$DIST" --res "$BUILD_RES" --installer "$HERE/install" $( [ "$IMM" = 1 ] && echo --immutable ) $CONFSETS
+  exit $?
+fi
 if [ "$STAGE" = 1 ]; then
   KEEP=1; step "Stage-only: stopping before GRUB is touched"
   if [ -n "$DISTOUT" ]; then mkdir -p "$DISTOUT/material-grub" && cp -a "$DIST/." "$DISTOUT/material-grub/" && ok "package copied to $DISTOUT/material-grub"; fi

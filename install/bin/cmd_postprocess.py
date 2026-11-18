@@ -1,7 +1,8 @@
 """Re-apply Material GRUB: annotate grub.cfg, refresh the BLS mirrors, bake the per-entry scenes. stdlib only.
 Every rewrite of grub.cfg goes through mgsafe.guarded: the result is validated, and the previous file is restored if it is not valid.
 usage: material-grub-postprocess [--pkg DIR] [--immutable --res WxH --timeout N] [--cfg FILE [--theme DIR]] [--force]
-  --cfg/--theme  work on this grub.cfg and theme directory instead of the system ones (tests, doctor)
+  --cfg/--theme  work on this grub.cfg and theme directory instead of the system ones (tests, dry run)
+  --mirrors DIR / --mirrorbase PATH / --backup DIR   where the BLS mirrors and the pristine copy go (dry run)
   --force     retry a grub.cfg that already failed validation (its sha256 is in /var/lib/material-grub/last-error)
 Exit status: 0 applied or nothing to do, 1 rolled back (the menu is as before; see the box on stderr)."""
 
@@ -24,7 +25,8 @@ def tool(pkg, name, *args):
 
 def apply_normal(cfg, pkg, theme, force):
     def classes():
-        return tool(pkg, "material-grub-classes", cfg, "--pkg", pkg)
+        extra = ["--mirrors", arg("--mirrors")] if arg("--mirrors") else []
+        return tool(pkg, "material-grub-classes", cfg, "--pkg", pkg, *extra)
 
     def scenes():
         # the scene renderer needs Pillow; without it the tool exits 0 and the theme keeps its class scenes
@@ -43,11 +45,13 @@ def apply_immutable(cfg, pkg, res, timeout, force):
     real = Path(cfg).resolve()
     gdir = real.parent
     boot_mount = os.path.ismount("/boot")
-    mbase = (str(gdir)[len("/boot") :] if boot_mount else str(gdir)) + "/material"
+    mbase = arg("--mirrorbase") or (str(gdir)[len("/boot") :] if boot_mount else str(gdir)) + "/material"
+    mirrors = arg("--mirrors") or gdir / "material"
+    backup = ["--backup", arg("--backup")] if arg("--backup") else []
     theme = gdir / "themes/material"
 
     def static():
-        return tool(pkg, "material-grub-static", cfg, "--mode", res, "--pkg", pkg, "--timeout", timeout)
+        return tool(pkg, "material-grub-static", cfg, "--mode", res, "--pkg", pkg, "--timeout", timeout, *backup)
 
     def classes():
         return tool(
@@ -57,7 +61,7 @@ def apply_immutable(cfg, pkg, res, timeout, force):
             "--pkg",
             pkg,
             "--mirrors",
-            gdir / "material",
+            mirrors,
             "--mirrorbase",
             mbase,
             "--fallback-all",
@@ -76,7 +80,7 @@ def main():
     force = "--force" in sys.argv or os.environ.get("MG_FORCE") == "1"
     results = []
     if "--immutable" in sys.argv:
-        for f in ("/boot/grub2/grub.cfg", "/boot/grub/grub.cfg"):
+        for f in [arg("--cfg")] if arg("--cfg") else ("/boot/grub2/grub.cfg", "/boot/grub/grub.cfg"):
             if Path(f).is_file():
                 results.append(apply_immutable(f, pkg, arg("--res", "1920x1080"), arg("--timeout", "5"), force))
     elif arg("--cfg"):

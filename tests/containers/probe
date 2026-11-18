@@ -1,0 +1,15 @@
+#!/bin/sh
+# Fake grub-probe: just enough for grub-mkconfig to run in a container that has no real disks.
+for a in "$@"; do case $a in
+ --target=device) echo /dev/sda2; exit;;
+ --target=fs) echo ext2; exit;;
+ --target=fs_uuid) echo 11111111-2222-3333-4444-555555555555; exit;;
+ --target=fs_label) exit;;
+ --target=partmap) echo msdos; exit;;
+ --target=abstraction) exit;;
+ --target=drive) echo "(hd0,msdos2)"; exit;;
+ --target=compatibility_hint) echo "(hd0,msdos2)"; exit;;
+ --target=hints_string) echo "--hint-bios=hd0,msdos2 --hint-efi=hd0,msdos2 --hint-baremetal=ahci0,msdos2"; exit;;
+ --target=bios_hints|--target=efi_hints|--target=baremetal_hints) echo "hd0,msdos2"; exit;;
+ --version|-V) echo "grub-probe (GRUB) 2.12"; exit;;
+esac; done
