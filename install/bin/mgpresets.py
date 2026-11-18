@@ -30,16 +30,13 @@ def check_name(name):
     return name
 
 
-def build(name, ov_path=None, conf_path=None):
-    """The preset dict for the current look. Pictures the overrides use are embedded."""
-    ov_path = Path(ov_path) if ov_path else mgoverrides.path()
-    ov, _ = mgoverrides.load(ov_path)
-    conf = mgrub.load_conf(conf_path)
+def make(name, conf, ov, icon_dir):
+    """The preset dict for a given look (runtime options `conf`, validated overrides `ov`). Pictures from `icon_dir` the overrides use are embedded."""
     icons = {}
     for r in ov["entries"]:
         ic = r.get("icon", "")
         if ic.startswith("file:"):
-            f = mgoverrides.icon_dir(ov_path) / ic[5:]
+            f = Path(icon_dir) / ic[5:]
             try:
                 if f.stat().st_size <= MAX_ICON:
                     icons[ic[5:]] = base64.b64encode(f.read_bytes()).decode()
@@ -48,10 +45,17 @@ def build(name, ov_path=None, conf_path=None):
     return {
         "preset": FORMAT,
         "name": check_name(name),
-        "conf": {k: conf[k] for k in CONF_KEYS},
+        "conf": {k: str(conf[k]) for k in CONF_KEYS if k in conf},
         "overrides": ov,
         "icons": icons,
     }
+
+
+def build(name, ov_path=None, conf_path=None):
+    """The preset dict for the look installed now."""
+    ov_path = Path(ov_path) if ov_path else mgoverrides.path()
+    ov, _ = mgoverrides.load(ov_path)
+    return make(name, mgrub.load_conf(conf_path), ov, mgoverrides.icon_dir(ov_path))
 
 
 def validate(data):
@@ -92,11 +96,11 @@ def validate(data):
     return {"name": data["name"], "conf": {k: str(v) for k, v in conf.items()}, "overrides": ov, "icons": clean_icons}, []
 
 
-def save(name, ov_path=None, conf_path=None):
-    """Store the current look as presets/<name>.json next to overrides.json."""
+def save(name, ov_path=None, conf_path=None, data=None):
+    """Store the current look (or the given preset dict `data`) as presets/<name>.json next to overrides.json."""
     d = preset_dir(ov_path)
     d.mkdir(parents=True, exist_ok=True)
-    data = build(name, ov_path, conf_path)
+    data = data or build(name, ov_path, conf_path)
     tmp = d / f".{name}.tmp"
     tmp.write_text(json.dumps(data, indent=1) + "\n")
     os.replace(tmp, d / f"{name}.json")

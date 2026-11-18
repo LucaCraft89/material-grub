@@ -5,6 +5,7 @@ needs no special cases: it already draws everything from a key. The panels the b
 palette changed the background and the class scene are redrawn here (Renderer.panel_scene, pixel-identical to the build) into a temporary overlay.
 """
 
+import hashlib
 import shutil
 import subprocess
 import tempfile
@@ -78,8 +79,10 @@ class LazyDir:
 
 
 class Overlay:
-    def __init__(self, R, pkg, aspect, size, classes, subtitles, tmp):
-        self.R, self.pkg, self.aspect, self.size = R, Path(pkg), aspect, size
+    def __init__(self, R, pkg, aspect, size, classes, subtitles, tmp, always=False):
+        """always: redraw every panel here instead of using the ones the build baked (the GUI preview draws at another size). Panels are cached
+        in `tmp` by their content, so a tmp dir that outlives the Overlay makes repeated previews cheap."""
+        self.R, self.pkg, self.aspect, self.size, self.always = R, Path(pkg), aspect, size, always
         self.classes, self.subs, self.tmp = classes, subtitles, Path(tmp)
         self.baked = {k: dict(v) for k, v in R.pal.items()}  # what the build drew
         (self.tmp / "bg").mkdir(parents=True, exist_ok=True)
@@ -89,18 +92,20 @@ class Overlay:
 
     def changed(self, key):
         """Does this key's palette differ from what the build drew for its catalog key?"""
-        return self.R.pal[key] != self.baked.get(mgscenes.base_key(key))
+        return self.always or self.R.pal[key] != self.baked.get(mgscenes.base_key(key))
+
+    def _file(self, kind, *parts):
+        name = hashlib.sha1(repr((kind, self.size, parts)).encode()).hexdigest()[:20] + ".png"
+        return self.tmp / ("bg" if kind == "bg" else "icons") / name
 
     def bg(self, key):
         base = mgscenes.base_key(key)
         if not self.changed(key):
             return self.pkg / "scenes" / self.aspect / "bg" / f"{base}.png"
-        ck = ("bg", tuple(sorted(self.R.pal[key].items())))
-        if ck not in self._made:
-            f = self.tmp / "bg" / f"{len(self._made)}.png"
+        f = self._file("bg", tuple(sorted(self.R.pal[key].items())))
+        if not f.exists():
             self.R.panel_scene(self.size, base, hero=False, p=self.R.pal[key]).save(f)
-            self._made[ck] = f
-        return self._made[ck]
+        return f
 
     def icon(self, key):
         """The class scene with the hero (rail style, plain entries)."""
@@ -108,15 +113,13 @@ class Overlay:
         if not self.changed(key) and key == base and key not in self.R.titles_changed:
             return self.pkg / "scenes" / self.aspect / "icons" / f"{self.classes[base][0]}.png"
         title = self.R.titles.get(key) or self.R.titles.get(base, base)
-        ck = ("icon", key, title, tuple(sorted(self.R.pal[key].items())))
-        if ck not in self._made:
-            f = self.tmp / "icons" / f"{len(self._made)}.png"
+        f = self._file("icon", base, title, tuple(sorted(self.R.pal[key].items())))
+        if not f.exists():
             self.R.panel_scene(self.size, base, title, self.subs.get(base, ""), hero=True, p=self.R.pal[key]).save(f)
-            self._made[ck] = f
-        return self._made[ck]
+        return f
 
 
-def apply(R, ov, entries, pkg, aspect, size, classes, icon_dir=None, tmp=None, log=print):
+def apply(R, ov, entries, pkg, aspect, size, classes, icon_dir=None, tmp=None, log=print, always=False):
     """Customise R and `entries` (dicts from entries.json, changed in place) according to `ov`. Returns the Overlay that locates the panels."""
     pkg = Path(pkg)
     subs = {}
@@ -128,7 +131,7 @@ def apply(R, ov, entries, pkg, aspect, size, classes, icon_dir=None, tmp=None, l
     dark = not R.light
     ov_seed = ov["seed"]
     ov_tmp = Path(tmp or tempfile.mkdtemp(prefix="mg-overlay-"))
-    ov_o = Overlay(R, pkg, aspect, size, classes, subs, ov_tmp)
+    ov_o = Overlay(R, pkg, aspect, size, classes, subs, ov_tmp, always)
     if ov_seed["mode"] == "single":
         pal = {"seed": ov_seed["color"], **mgpalette.scheme(ov_seed["color"], dark)}
         for k in list(R.pal):
