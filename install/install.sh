@@ -44,6 +44,7 @@ else
   if [ -n "$PYARG" ]; then install -d "$D/var/lib/material-grub"; echo "MATERIAL_PY=$PYARG" > "$D/var/lib/material-grub/env"; fi
 fi
 [ -e "$D/etc/material-grub.conf" ] || install -m644 "$HERE/material-grub.conf" "$D/etc/material-grub.conf"     # never overwrite the user's settings
+install -d "$D/etc/material-grub/icons"     # overrides.json (colours, names, order, hidden entries) and the pictures it points to
 for kv in $SETS; do      # explicit --set choices (installer flags / TUI): replace the sample line or the existing value, else append
   k=${kv%%=*}; v=${kv#*=}; f="$D/etc/material-grub.conf"
   if grep -q "^#\{0,1\}$k=" "$f"; then sed -i "s|^#\{0,1\}$k=.*|$k=$v|" "$f"; else echo "$k=$v" >> "$f"; fi

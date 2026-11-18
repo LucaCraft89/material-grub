@@ -318,7 +318,7 @@ def main():
         os.replace(tmp, cfg)
         state.parent.mkdir(parents=True, exist_ok=True)
         cfgstate.write_text(json.dumps(cfg_entries))
-        cfgmeta.write_text(json.dumps({"bls_at": bls_at}))
+        cfgmeta.write_text(json.dumps({"bls_at": bls_at, "layout": mgoverrides.layout_sha(ov)}))
         print(f"material-grub: annotated {len(cfg_entries)} grub.cfg entries")
     cfg_entries = json.loads(cfgstate.read_text()) if cfgstate.exists() else []
     try:

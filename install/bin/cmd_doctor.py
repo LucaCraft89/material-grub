@@ -14,6 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import mgoverrides
 import mgrub
 import mgsafe
 
@@ -96,6 +97,37 @@ class Doctor:
         else:
             self.add(OK, "config", f"{path} is valid (STYLE={conf['STYLE']}, SCHEME={conf['SCHEME']})")
         return conf
+
+    def overrides(self, pkg):
+        path = self.p(str(mgoverrides.path()) if not self.root else "/etc/material-grub/overrides.json")
+        if not path.is_file():
+            self.add(INFO, "overrides", "none (no custom colours, names, icons or order)")
+            return
+        ov, problems = mgoverrides.load(path)
+        if problems and ov == mgoverrides.DEFAULTS:
+            self.add(WARN, "overrides", "ignored, the defaults are used: " + "; ".join(problems))
+            return
+        missing = []
+        for r in ov["entries"]:
+            ic = r.get("icon", "")
+            if ic.startswith("file:") and not (path.parent / "icons" / ic[5:]).is_file():
+                missing.append(ic[5:])
+            elif ic and not ic.startswith("file:") and pkg and not (pkg / "glyphs" / f"{ic}.png").is_file():
+                missing.append(ic)
+        if missing:
+            self.add(WARN, "overrides", "icons not found, the default ones are used: " + ", ".join(missing))
+            return
+        meta = self.p("/var/lib/material-grub/cfg-meta.json") if self.root else mgsafe.state_dir() / "cfg-meta.json"
+        try:
+            applied = json.loads(meta.read_text()).get("layout")
+        except (OSError, ValueError):
+            applied = None
+        if applied is not None and applied != mgoverrides.layout_sha(ov):
+            self.add(WARN, "overrides", "the order or hidden entries changed since grub.cfg was generated: run sudo material-grub-apply")
+            return
+        n = len(ov["entries"])
+        mode = "single colour " + ov["seed"]["color"] if ov["seed"]["mode"] == "single" else "per-entry colours"
+        self.add(OK, "overrides", f"{path} is valid ({n} entr{'y' if n == 1 else 'ies'} customised, {mode})")
 
     def package(self, here):
         pkg = self.p(os.environ.get("MATERIAL_PKG") or "/usr/share/material-grub")
@@ -278,6 +310,7 @@ class Doctor:
         gfx = self.system()
         self.conf = self.config()
         pkg = self.package(here)
+        self.overrides(pkg)
         self.hooks()
         self.path_unit()
         if pkg:

@@ -173,6 +173,15 @@ def save(data, p=None):
         raise
 
 
+def layout_sha(ov):
+    """Fingerprint of what only a fresh grub.cfg can apply (hidden entries, their order and the section order). doctor compares it with the
+    one recorded when grub.cfg was last generated."""
+    import hashlib
+
+    hidden = [r["match"] for r in ov["entries"] if r.get("hidden")]
+    return hashlib.sha1(json.dumps([ov["groups"], ov["order"], hidden], sort_keys=True).encode()).hexdigest()[:12]
+
+
 def matches(m, e):
     """Does the match `m` (one of key/class/title) select the entry dict `e` (as in entries.json)?"""
     k, v = next(iter(m.items()))

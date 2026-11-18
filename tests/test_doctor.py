@@ -107,6 +107,28 @@ class Doctor(unittest.TestCase):
         d = json.loads(r.stdout)
         self.assertEqual((d["installed"], d["failed"] > 0), (False, True))
 
+    def overrides(self, data=None, raw=None):
+        d = self.r / "etc/material-grub"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "overrides.json").write_text(raw if raw is not None else json.dumps(data))
+
+    def test_overrides_valid_broken_and_stale(self):
+        code, out = self.doctor()
+        self.assertIn("none (no custom", out)
+        self.overrides({"entries": [{"match": {"key": "fedora"}, "name": "Mine"}]})
+        code, out = self.doctor()
+        self.assertEqual(code, 0, out)
+        self.assertIn("is valid (1 entry customised", out)
+        self.overrides(raw="{oops")
+        code, out = self.doctor()
+        self.assertEqual(code, 0, out)  # a warning, never a failure
+        self.assertIn("ignored, the defaults are used", out)
+        self.overrides({"entries": [{"match": {"key": "fedora"}, "icon": "file:gone.png"}]})
+        self.assertIn("icons not found", self.doctor()[1])
+        self.overrides({"order": [{"key": "windows11"}]})
+        (self.state / "cfg-meta.json").write_text(json.dumps({"bls_at": 0, "layout": "000000000000"}))
+        self.assertIn("run sudo material-grub-apply", self.doctor()[1])
+
     def test_missing_scene(self):
         (self.theme / "icons/mg_aaaaaaaaaa.png").unlink()
         code, out = self.doctor()
