@@ -89,7 +89,9 @@ sudo ./install.sh --seed '#7E57C2'      # one seed colour for every entry (the T
 
 An **optional GUI** does all of it with a live preview, drag and drop and Ventoy support, in a Material 3 Expressive web UI that opens in your browser. It is a separate package (`material-grub-gui`, or `sudo ./install.sh --with-gui` from a checkout) and is never installed by default: **[docs/gui.md](docs/gui.md)**, [docs/customising.md](docs/customising.md).
 
-<img src="docs/screenshots/gui-entries.png" alt="The GUI: entries, per-entry editor and live preview">
+<img src="docs/screenshots/gui/entries.png" alt="The GUI: entries, per-entry editor and live preview">
+
+More pictures (one colour, per-entry colours, Windows first, the GUI): **[docs/showcase.md](docs/showcase.md)**.
 
 ## Options
 

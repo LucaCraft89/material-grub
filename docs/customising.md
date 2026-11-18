@@ -29,6 +29,8 @@ Two layers, both applied without a rebuild (only the dark/light scheme and the r
 
 What cannot be done, and why: entries that GRUB creates inside an `if` block or a function (usually `UEFI Firmware Settings`) are left alone, because moving or removing a block from inside a construct could break the script. If `grub.cfg` chooses its default entry by number (`set default="0"`), hiding and reordering are skipped, because they would change which entry is the default. A bad overrides file never breaks the boot: it is reported by `doctor` and ignored.
 
+Pictures of each of these in real GRUB: [showcase.md](showcase.md).
+
 ## Presets
 
 A preset is the whole look (style, options, overrides, the pictures) saved under a name, in the GUI's *Presets* page, as a JSON file you can move to another machine. Dark/light and the resolution are not part of it.

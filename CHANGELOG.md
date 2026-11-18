@@ -14,6 +14,9 @@ An optional GUI, a one-colour theme and per-entry customisation.
 - **Presets:** save the look under a name, move it to another machine as one JSON file.
 - `install.sh --progress json` (machine-readable progress for tools), a persistent install log in `/var/log/material-grub/install.log`, `material-grub doctor --status-json`.
 
+**Fixed**
+- `list` style: the countdown bar overlapped the info chips under the list (found by the new QEMU feature tests); the chips now sit between the list and the countdown.
+
 **Changed**
 - **One command:** `material-grub` is the front end for everything: `doctor`, `apply`, `gui`, `preview`, `colour`, `presets`, `overrides`, `conf`, `ventoy`, `update`, `uninstall`, `version`, `help`; without a subcommand it opens a menu. Root-only subcommands re-run through `sudo`. The old command names keep working. See `docs/cli.md`.
 - The scene renderer can redraw the build's panels at apply time (`Renderer.panel_scene`, pixel-identical for backgrounds), so custom colours need no rebuild; the colour science (`materialyoucolor`, pure Python part) is vendored for the installed tools.

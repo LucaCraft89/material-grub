@@ -199,7 +199,7 @@ def apply_conf_to_theme(text, conf):
 
 
 def _list_layout(text):
-    """`list` centres the menu on the screen, so the countdown moves down between the list and the key hints (1080-high design: bar 868, label 884)."""
+    """`list` centres the menu on the screen, so the countdown moves down between the list and the key hints (1080-high design: info chips 846-892, bar 896, label 912, key hints from 960)."""
     m = re.search(r"(?ms)^# mg:begin countdown\n(.*?)^# mg:end countdown\n", text)
     if not m:
         return text
@@ -214,8 +214,8 @@ def _list_layout(text):
         return re.sub(r"^(\s*top = )-?\d+$", rf"\g<1>{v}", chunk, count=1, flags=re.M)
 
     parts = body.split("+ label {")
-    parts[0] = settop(parts[0], round(868 * f))
-    parts[1] = settop(parts[1], round(884 * f))
+    parts[0] = settop(parts[0], round(896 * f))
+    parts[1] = settop(parts[1], round(912 * f))
     return text[: m.start(1)] + "+ label {".join(parts) + text[m.end(1) :]
 
 

@@ -13,6 +13,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 WIN, SYS = {"windows10", "windows11"}, {"firmware", "reboot", "shutdown"}
 STYLES = ("rail", "clean", "list", "split")
+LIST_CHIPS = (
+    846,
+    46,
+)  # 1080-high design: top and height of the info chips under the list (mgrub._list_layout puts the countdown below them)
 LISTY = (
     "list",
     "split",
@@ -259,9 +263,9 @@ class Renderer:
         d.text((x, h // 2 + u(1)), text, font=f, fill=fg + (255,), anchor="lm")
         return im
 
-    def pill_row(self, items, p, W, y, canvas, cx=None, maxw=None):
-        """Info pills in a row centred on cx (default: the middle of the scene), dropping the last ones that do not fit in maxw."""
-        pills = [self.pill(*i[:1], p, *i[1:]) for i in items]
+    def pill_row(self, items, p, W, y, canvas, cx=None, maxw=None, h=None):
+        """Info pills in a row centred on cx (default: the middle of the scene), dropping the last ones that do not fit in maxw. h: pill height."""
+        pills = [self.pill(*i[:1], p, *i[1:], h=h) for i in items]
         g = self.u(14)
         maxw = maxw or W * 0.78
         while pills and sum(x.width for x in pills) + g * (len(pills) - 1) > maxw:
@@ -691,7 +695,9 @@ class Renderer:
                     self.info_pills(e), p, sc.width, u(818), sc, cx=round(sc.width * 0.25), maxw=sc.width * 0.42
                 )
             else:
-                self.pill_row(self.info_pills(e), p, sc.width, u(880), sc)
+                self.pill_row(
+                    self.info_pills(e), p, sc.width, u(LIST_CHIPS[0]), sc, h=u(LIST_CHIPS[1])
+                )  # between the list (ends at 840) and the countdown (896)
             return sc.convert("RGB")
         if e["kind"] != "plain":
             self.hero(sc, e, p)

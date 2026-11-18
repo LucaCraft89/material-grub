@@ -2,7 +2,9 @@
 
 An optional graphical editor for the theme. It is **not installed by default**, and the installer and its TUI never offer or install it. The TUI stays the way to install; the GUI is for changing the look afterwards.
 
-![light and dark](screenshots/gui-overview.png)
+![The GUI](screenshots/gui/entries.png)
+
+More screenshots: [showcase.md](showcase.md).
 
 ## Get it
 
