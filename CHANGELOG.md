@@ -15,7 +15,7 @@ Safety, maintainability and packaging. The installer's logic is now Python; the 
 **New**
 - `material-grub doctor` (also `material-grub-apply --status`): checks the theme, `grub.cfg`, a scene per entry, hooks, the path unit, the config and the last rollback; exit status 0/1; the bug template asks for its output.
 - `./install.sh --preview` and `material-grub preview`: your own boot entries rendered as a web page, no root and nothing installed.
-- The info chips show the drive (`/dev/sda5`) for os-prober entries, so two installs of one distro can be told apart (info chips in the rail, clean and split heroes; in the list rows the drive is appended to the name when the same distro appears twice on a menu level, e.g. `Ubuntu (sda5)`).
+- The info chips show the drive (`/dev/sda5`) for os-prober entries, so two installs of one distro can be told apart (info chips now in every style: under the hero in rail, clean and split, under the list in list; in the list rows the drive is appended to the name when the same distro appears twice on a menu level, e.g. `Ubuntu (sda5)`).
 - Packages (source only, the theme is built on install): `packaging/` has an Arch PKGBUILD, a Fedora spec and a Debian package, see `docs/packaging.md`.
 
 **Changed**

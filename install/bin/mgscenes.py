@@ -201,13 +201,15 @@ class Renderer:
         d.text((x, h // 2 + u(1)), text, font=f, fill=fg + (255,), anchor="lm")
         return im
 
-    def pill_row(self, items, p, W, y, canvas):
+    def pill_row(self, items, p, W, y, canvas, cx=None, maxw=None):
+        """Info pills in a row centred on cx (default: the middle of the scene), dropping the last ones that do not fit in maxw."""
         pills = [self.pill(*i[:1], p, *i[1:]) for i in items]
         g = self.u(14)
-        while pills and sum(x.width for x in pills) + g * (len(pills) - 1) > W * 0.78:
+        maxw = maxw or W * 0.78
+        while pills and sum(x.width for x in pills) + g * (len(pills) - 1) > maxw:
             pills.pop()
         tot = sum(x.width for x in pills) + g * (len(pills) - 1)
-        x = (W - tot) // 2
+        x = (cx if cx is not None else W // 2) - tot // 2
         for pl in pills:
             canvas.alpha_composite(pl, (x, y))
             x += pl.width + g
@@ -616,6 +618,14 @@ class Renderer:
                     sc, e["key"], p, opts, {"advanced": "gear", "rescue": "wrench"}.get(e["kind"]), self.title_for(e)
                 )
             self.draw_list(sc, p, items, sel, opts, self.split_x(sc.width) if style == "split" else None)
+            # the info pills of the selected entry: under the hero in split, under the list in list
+            u = self.u
+            if style == "split":
+                self.pill_row(
+                    self.info_pills(e), p, sc.width, u(818), sc, cx=round(sc.width * 0.25), maxw=sc.width * 0.42
+                )
+            else:
+                self.pill_row(self.info_pills(e), p, sc.width, u(880), sc)
             return sc.convert("RGB")
         if e["kind"] != "plain":
             self.hero(sc, e, p)
