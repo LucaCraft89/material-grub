@@ -92,6 +92,43 @@ class LineEvents:
         return False
 
 
+class Tee:
+    """Copies everything printed to the terminal into the install log too (colour codes stripped)."""
+
+    def __init__(self, real, logf):
+        self.real, self.logf, self.buf = real, logf, ""
+
+    def write(self, text):
+        self.real.write(text)
+        self.buf += text.replace("\r", "\n")
+        *lines, self.buf = self.buf.split("\n")
+        for ln in lines:
+            ln = re.sub(r"\x1b\[[0-9;]*m", "", ln).rstrip()
+            if ln.strip():
+                self.logf.write(time.strftime("%F %T ") + ln + "\n")
+        self.logf.flush()
+        return len(text)
+
+    def flush(self):
+        self.real.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.real, name)
+
+
+def open_log():
+    """The persistent install log: $MG_INSTALL_LOG, else /var/log/material-grub/install.log. None when it cannot be written
+    (no root, read-only /var): logging is never a reason to fail an install."""
+    path = Path(os.environ.get("MG_INSTALL_LOG", "/var/log/material-grub/install.log"))
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > 1_000_000:  # keep one old log, the file never grows without bound
+            os.replace(path, str(path) + ".1")
+        return open(path, "a", errors="replace")
+    except OSError:
+        return None
+
+
 class Installer:
     def __init__(self, argv):
         self.argv = argv
@@ -136,6 +173,7 @@ class Installer:
         self.runtime_py = "python3"
         self.json = False  # --progress json: one JSON object per line on stdout (for the GUI)
         self.out = sys.stdout
+        self.logf = None
 
     # ------------------------------------------------------------ machine-readable progress
     def emit(self, event, **kw):
@@ -143,6 +181,11 @@ class Installer:
         if self.json:
             self.out.write(json.dumps({"event": event, "t": round(time.time() - self.t0, 1), **kw}) + "\n")
             self.out.flush()
+        if self.logf and self.json:
+            text = kw.get("text") or kw.get("msg") or ""
+            if text:
+                self.logf.write("%s %s%s\n" % (time.strftime("%F %T"), "" if event == "log" else event + ": ", text))
+                self.logf.flush()
 
     def start_json(self):
         self.json, self.yes, self.tuimode, self.tty = True, True, "no", False
@@ -991,6 +1034,19 @@ class Installer:
     # ------------------------------------------------------------ main
     def main(self):
         self.parse()
+        if not (self.stage or self.dry or self.preview):  # those change nothing on the system, so they are not logged
+            self.logf = open_log()
+            if self.logf:
+                self.logf.write("%s ---- material-grub %s: %s\n" % (time.strftime("%F %T"), VERSION_TEXT(), " ".join(self.argv)))
+                if not self.json:
+                    sys.stdout, sys.stderr = Tee(sys.stdout, self.logf), Tee(sys.stderr, self.logf)
+        try:
+            return self.main_json()
+        finally:
+            if self.logf:
+                self.logf.close()
+
+    def main_json(self):
         if self.json:
             self.start_json()
             try:
@@ -1086,6 +1142,13 @@ class Installer:
                     self.info(f"build directory kept: {self.build_dir}")
                 else:
                     shutil.rmtree(self.build_dir, ignore_errors=True)
+
+
+def VERSION_TEXT():
+    try:
+        return (HERE / "VERSION").read_text().strip()
+    except OSError:
+        return "?"
 
 
 def main(argv=None):

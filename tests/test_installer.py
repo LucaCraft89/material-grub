@@ -91,6 +91,36 @@ class ProgressJson(unittest.TestCase):
         self.assertEqual((ev[-1]["rc"], ev[-1]["ok"]), (3, False))
 
 
+class InstallLog(unittest.TestCase):
+    def test_tee_strips_colour_and_logs_lines(self):
+        import io
+
+        f = io.StringIO()
+        real = io.StringIO()
+        t = installer.Tee(real, f)
+        t.write("\033[1mhello\033[0m\nsecond\rthird\n")
+        self.assertEqual(real.getvalue(), "\033[1mhello\033[0m\nsecond\rthird\n")
+        lines = [ln[20:] for ln in f.getvalue().splitlines()]
+        self.assertEqual(lines, ["hello", "second", "third"])
+
+    def test_log_written_and_rotated_and_unwritable_is_ignored(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "sub" / "install.log"
+            os.environ["MG_INSTALL_LOG"] = str(p)
+            try:
+                f = installer.open_log()
+                f.write("x\n")
+                f.close()
+                self.assertEqual(p.read_text(), "x\n")
+                p.write_text("y" * 1_000_001)
+                installer.open_log().close()
+                self.assertTrue(Path(str(p) + ".1").exists())
+                os.environ["MG_INSTALL_LOG"] = "/proc/nope/install.log"
+                self.assertIsNone(installer.open_log())
+            finally:
+                del os.environ["MG_INSTALL_LOG"]
+
+
 class Parse(unittest.TestCase):
     def test_defaults(self):
         i = make([])
