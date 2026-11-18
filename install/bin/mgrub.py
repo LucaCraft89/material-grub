@@ -136,6 +136,56 @@ def load_conf(path=None):
     return c
 
 
+def _conf_ok(key, value):
+    """Strict check for write_conf (load_conf is lenient on purpose; a writer must not store junk)."""
+    if key not in CONF_DEFAULTS:
+        return False
+    if key == "TIMEOUT":
+        return value == "" or value.isdigit()
+    if key in CONF_CHOICES:
+        return value in CONF_CHOICES[key]
+    return value in ("on", "off")
+
+
+def write_conf(path, updates):
+    """Set KEY=value in the conf file, atomically (temp file in the same directory, then rename).
+    Replaces the first active or commented-out sample line of a key (keeps the comments), else appends.
+    Raises ValueError for an unknown key or a bad value, before anything is written."""
+    import os
+    import tempfile
+
+    for k, v in updates.items():
+        if not _conf_ok(k, str(v)):
+            raise ValueError("bad config: %s=%r" % (k, v))
+    path = Path(path)
+    try:
+        lines = path.read_text().splitlines()
+        mode = path.stat().st_mode & 0o7777
+    except OSError:
+        lines, mode = [], 0o644
+    for k, v in updates.items():
+        new = "%s=%s" % (k, v)
+        active = re.compile(r"^\s*%s\s*=" % k)
+        sample = re.compile(r"^#\s*%s\s*=" % k)
+        for rx in (active, sample):
+            hit = next((i for i, ln in enumerate(lines) if rx.match(ln)), None)
+            if hit is not None:
+                lines[hit] = new
+                break
+        else:
+            lines.append(new)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".mgconf.")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write("\n".join(lines) + "\n")
+        os.chmod(tmp, mode)
+        os.replace(tmp, str(path))
+    except BaseException:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
 def apply_conf_to_theme(text, conf):
     """Drop the '# mg:begin NAME' .. '# mg:end NAME' blocks of theme.txt that the config switches off (no cookie also means no logo in it)."""
     for key, name in (("RAW_NAME", "raw"), ("COUNTDOWN", "countdown"), ("LOGO", "logo")):
