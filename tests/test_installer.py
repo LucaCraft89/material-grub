@@ -121,6 +121,40 @@ class InstallLog(unittest.TestCase):
                 del os.environ["MG_INSTALL_LOG"]
 
 
+class Seed(unittest.TestCase):
+    def test_flags(self):
+        i = make(["--seed", "#e95420"])
+        self.assertEqual((i.seed_mode, i.seed), ("single", "#E95420"))
+        i = make(["--seed-mode", "multi"])
+        self.assertEqual((i.seed_mode, i.seed), ("multi", ""))
+        for bad in (["--seed", "red"], ["--seed", "#12345"], ["--seed-mode", "rainbow"]):
+            with self.assertRaises(SystemExit):
+                make(bad)
+
+    def test_answers_and_overrides_file(self):
+        sys.path.insert(0, str(ROOT / "install/bin"))
+        import mgoverrides
+
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "etc/material-grub/overrides.json"
+            mgoverrides.save({"entries": [{"match": {"key": "fedora"}, "name": "Keep me"}]}, p)
+            os.environ["MATERIAL_OVERRIDES"] = str(p)
+            try:
+                i = make([])
+                i.write_seed()  # nothing asked: the file is left alone
+                self.assertEqual(mgoverrides.load(p)[0]["seed"]["mode"], "multi")
+                i.apply_answers({"SEED_MODE": "single", "SEED": "#7E57C2"})
+                i.write_seed()
+                ov, probs = mgoverrides.load(p)
+                self.assertEqual((probs, ov["seed"], ov["entries"][0]["name"]), ([], {"mode": "single", "color": "#7E57C2"}, "Keep me"))
+                i.apply_answers({"SEED_MODE": "multi"})
+                i.seed = ""
+                i.write_seed()
+                self.assertEqual(mgoverrides.load(p)[0]["seed"], {"mode": "multi", "color": "#7E57C2"})
+            finally:
+                del os.environ["MATERIAL_OVERRIDES"]
+
+
 class Parse(unittest.TestCase):
     def test_defaults(self):
         i = make([])

@@ -148,6 +148,8 @@ class Installer:
         self.res = ""
         self.scheme = "dark"
         self.scheme_set = False
+        self.seed_mode = ""  # "", "multi" or "single": empty leaves overrides.json alone
+        self.seed = ""
         self.style = ""
         self.cookie = ""
         self.logo = ""
@@ -282,6 +284,15 @@ class Installer:
                 self.scheme_set = True
                 if self.scheme not in ("light", "dark"):
                     self.usage_error("--scheme must be light or dark")
+            elif o == "--seed":
+                self.seed = need(o, "a colour like #2E7D32").upper()
+                if not re.fullmatch(r"#[0-9A-F]{6}", self.seed):
+                    self.usage_error("--seed must look like #RRGGBB")
+                self.seed_mode = "single"
+            elif o == "--seed-mode":
+                self.seed_mode = need(o, "multi or single")
+                if self.seed_mode not in ("multi", "single"):
+                    self.usage_error("--seed-mode must be multi or single")
             elif o == "--immutable":
                 self.imm = True
             elif o in ("--yes", "-y"):
@@ -480,6 +491,10 @@ class Installer:
                 preset("STYLE", self.style)
             if self.scheme_set:
                 preset("SCHEME", self.scheme)
+            if self.seed_mode:
+                preset("SEED_MODE", self.seed_mode)
+            if self.seed:
+                preset("SEED", self.seed)
             if self.cookie:
                 preset("COOKIE", self.cookie)
             if self.logo:
@@ -521,6 +536,10 @@ class Installer:
             self.style = a["STYLE"]
         if a.get("SCHEME"):
             self.scheme, self.scheme_set = a["SCHEME"], True
+        if a.get("SEED_MODE"):
+            self.seed_mode = a["SEED_MODE"]
+        if a.get("SEED"):
+            self.seed = a["SEED"]
         if a.get("COOKIE"):
             self.cookie = a["COOKIE"]
         if a.get("LOGO"):
@@ -1011,7 +1030,19 @@ class Installer:
             "      Change the style, scheme or resolutions: run this installer again.   Undo: ./install.sh --uninstall --ventoy MOUNTPOINT"
         )
 
+    def write_seed(self):
+        """--seed / --seed-mode and the TUI's colour answers go to overrides.json (the one place every tool reads), keeping the rest of the file."""
+        if not self.seed_mode:
+            return
+        import mgoverrides
+
+        ov, _ = mgoverrides.load()
+        ov["seed"] = {"mode": self.seed_mode, "color": self.seed or ov["seed"]["color"]}
+        mgoverrides.save(ov)
+        self.info(f"colours: {'one seed colour ' + ov['seed']['color'] if self.seed_mode == 'single' else 'every entry its own colour'} ({mgoverrides.path()})")
+
     def grub_install(self):
+        self.write_seed()
         step_cmd = ["sh", HERE / "install/install.sh", "--res", self.res, "--pkg", self.dist]
         if self.imm:
             step_cmd.append("--immutable")
@@ -1110,6 +1141,14 @@ class Installer:
                 return self.run(cmd + self.confset_args()).returncode
             if self.preview:
                 self.step("Preview: rendering your menu (nothing is installed)")
+                if self.seed_mode:  # show the colours that were asked for without touching /etc
+                    import mgoverrides
+
+                    ov, _ = mgoverrides.load()
+                    ov["seed"] = {"mode": self.seed_mode, "color": self.seed or ov["seed"]["color"]}
+                    tmpf = Path(self.build_dir) / "overrides.json"
+                    mgoverrides.save(ov, tmpf)
+                    os.environ["MATERIAL_OVERRIDES"] = str(tmpf)
                 cmd = [
                     sys.executable,
                     HERE / "install/bin/material-grub-preview",

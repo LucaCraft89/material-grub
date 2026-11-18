@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "bin"))
 
 import mgrub  # noqa: E402
+import mgseeds  # noqa: E402
 
 BUILTIN = mgrub.RESOLUTIONS
 RES_RE = re.compile(r"^[0-9]{3,5}x[0-9]{3,5}$")
@@ -362,6 +363,27 @@ def build_steps(presets, monitors, immutable, sticks=None):
     )
     steps.append(
         {
+            "id": "SEED_MODE",
+            "title": "Colours",
+            "type": "choice",
+            "cur": 0,
+            "options": [
+                opt(
+                    "multi",
+                    "Every entry its own colour",
+                    "The default: each distro keeps the colour of its brand (Fedora blue, Ubuntu orange, Debian red, ...), so you can tell the entries apart at a glance.",
+                ),
+                opt(
+                    "single",
+                    "One colour for the whole theme",
+                    "Every entry uses the same Material 3 palette, made from one seed colour you pick next. A calmer look, and it matches your desktop if you pick the same seed.",
+                ),
+            ],
+        }
+    )
+    steps.append(seed_step())
+    steps.append(
+        {
             "id": "LOGO",
             "title": "Cookie and firmware logo",
             "type": "choice",
@@ -440,6 +462,41 @@ def build_steps(presets, monitors, immutable, sticks=None):
     return keep_open(steps, presets)
 
 
+def seed_step():
+    def opt(v, label, help):
+        return {"v": v, "label": label, "help": help}
+
+    opts = [
+        opt(h, f"{n}  {h}", f"{n} ({h}). Material 3 turns this seed into every surface, container and accent colour of the theme.")
+        for n, h in mgseeds.SEEDS
+    ]
+    opts.append(
+        opt("custom", "Type another colour...", "Enter any colour as #RRGGBB, for example #2E7D32. A grey makes the whole theme monochrome.")
+    )
+    return {
+        "id": "SEED",
+        "title": "Seed colour",
+        "type": "choice",
+        "grid": True,
+        "when": ("SEED_MODE", "single"),
+        "cur": next(i for i, (_, h) in enumerate(mgseeds.SEEDS) if h == mgseeds.DEFAULT),
+        "options": opts,
+    }
+
+
+def active(st, steps, presets):
+    """A step with a `when` (id, value) is only asked when that earlier answer has the value."""
+    w = st.get("when")
+    if not w:
+        return True
+    ref = next((x for x in steps if x["id"] == w[0]), None)
+    return (value(ref) if ref else presets.get(w[0])) == w[1]
+
+
+def live(steps, presets):
+    return [st for st in steps if active(st, steps, presets)]
+
+
 def keep_open(steps, presets):
     """Drop the steps the installer flags already answered."""
     keep = []
@@ -487,7 +544,9 @@ def label(st):
 
 def answers(steps, presets):
     a = {k: v for k, v in presets.items()}
-    for st in steps:
+    if "SEED" in a and a.get("SEED_MODE") != "single":
+        a.pop("SEED")
+    for st in live(steps, presets):
         v = value(st)
         if st["id"] == "LOGO":
             a["COOKIE"] = "off" if v == "none" else "on"
@@ -503,6 +562,8 @@ def answers(steps, presets):
             a["STICK"] = v if v != "custom" else st.get("custom", "")
         elif st["id"] == "RES":
             a["RES"] = v if v != "custom" else st.get("custom", "1920x1080")
+        elif st["id"] == "SEED":
+            a["SEED"] = (v if v != "custom" else st.get("custom", mgseeds.DEFAULT)).upper()
         else:
             a[st["id"]] = v
     if a.get("COOKIE") == "off":
@@ -524,6 +585,8 @@ CHECK = {
     "TARGET": re.compile(r"^(grub|ventoy)$"),
     "MODE": re.compile(r"^(dynamic|snapshot)$"),
     "STICK": re.compile(r"^(dev:/dev/[A-Za-z0-9/_.-]+|/[^'\x00-\x1f]*)$"),
+    "SEED_MODE": re.compile(r"^(multi|single)$"),
+    "SEED": re.compile(r"^#[0-9A-Fa-f]{6}$"),
     "RESX": re.compile(r"^([0-9]{3,5}x[0-9]{3,5}(,[0-9]{3,5}x[0-9]{3,5})*)?$"),
 }
 
@@ -564,6 +627,7 @@ def command_line(a):
         f"--res {a['RES']}" if "RES" in a else "",
         f"--style {a['STYLE']}" if "STYLE" in a else "",
         f"--scheme {a['SCHEME']}" if "SCHEME" in a else "",
+        f"--seed {a['SEED']}" if a.get("SEED_MODE") == "single" and a.get("SEED") else "",
     ]
     if a.get("COOKIE") == "off":
         c.append("--no-cookie")
@@ -576,6 +640,8 @@ def command_line(a):
 
 def summary_lines(steps, a):
     out = [f"{st['title']:<26} {label(st)}" for st in steps]
+    if a.get("SEED") and a.get("SEED_MODE") == "single" and mgseeds.name_of(a["SEED"]) is None:
+        out = [ln.replace("Type another colour...", a["SEED"]) for ln in out]
     if "RES" in a and snap(a["RES"]) != a["RES"]:
         out.append(f"(theme used for {a['RES']}: {snap(a['RES'])}, the closest built-in size)")
     return out
@@ -585,7 +651,9 @@ def summary_lines(steps, a):
 def run_plain(steps, presets, inp=input, out=print, final=True):
     out("Material GRUB installer: answer the questions (Enter keeps the default shown in [ ]).")
     i = 0
-    while i < len(steps):
+    all_steps = steps
+    while i < len(live(all_steps, presets)):
+        steps = live(all_steps, presets)
         st = steps[i]
         out(f"\n[{i + 1}/{len(steps)}] {st['title']}")
         if st["type"] == "choice":
@@ -604,14 +672,27 @@ def run_plain(steps, presets, inp=input, out=print, final=True):
             if st["options"][st["cur"]]["v"] == "custom":
                 while True:
                     r = inp(
-                        "  mount point of the Ventoy stick: " if st["id"] == "STICK" else "  resolution WxH: "
+                        "  mount point of the Ventoy stick: "
+                        if st["id"] == "STICK"
+                        else "  colour #RRGGBB: "
+                        if st["id"] == "SEED"
+                        else "  resolution WxH: "
                     ).strip()
-                    if st["id"] == "STICK" and stick_ok(r) or st["id"] != "STICK" and RES_RE.match(r):
+                    if (
+                        st["id"] == "STICK"
+                        and stick_ok(r)
+                        or st["id"] == "SEED"
+                        and mgseeds.HEX.match(r)
+                        or st["id"] not in ("STICK", "SEED")
+                        and RES_RE.match(r)
+                    ):
                         st["custom"] = r
                         break
                     out(
                         "  expected the mount point of a Ventoy data partition"
                         if st["id"] == "STICK"
+                        else "  expected a colour like #2E7D32"
+                        if st["id"] == "SEED"
                         else "  expected WxH, for example 2560x1440"
                     )
         else:
@@ -627,8 +708,9 @@ def run_plain(steps, presets, inp=input, out=print, final=True):
                             break
         i += 1
     if not final:
-        return answers(steps, presets)
-    a = answers(steps, presets)
+        return answers(all_steps, presets)
+    a = answers(all_steps, presets)
+    steps = live(all_steps, presets)
     out("\nSummary:")
     [out("  " + l) for l in summary_lines(steps, a)]
     out("Equivalent command: " + command_line(a))
@@ -641,11 +723,33 @@ def run_plain(steps, presets, inp=input, out=print, final=True):
 def run_curses(steps, presets, summary_screen=True):
     import curses
 
+    steps_all = list(steps)
+
     def main(scr):
         curses.curs_set(0)
         scr.keypad(True)
         i = 0
         msg = ""
+        pairs = {}
+
+        def pair(color):
+            """A curses colour pair for '#RRGGBB' (0 when the terminal has no colours)."""
+            if color not in pairs:
+                try:
+                    if len(pairs) >= 200 or not curses.has_colors():
+                        pairs[color] = 0
+                    else:
+                        idx = mgseeds.xterm256(color) if curses.COLORS >= 256 else nearest8(color)
+                        curses.init_pair(len(pairs) + 1, idx, idx)
+                        pairs[color] = len(pairs) + 1
+                except curses.error:
+                    pairs[color] = 0
+            return curses.color_pair(pairs[color])
+
+        try:
+            curses.start_color()
+        except curses.error:
+            pass
 
         def box(y, x, h, w, title=""):
             scr.addstr(y, x, "+" + "-" * (w - 2) + "+")
@@ -683,6 +787,8 @@ def run_curses(steps, presets, summary_screen=True):
                     buf += chr(k)
 
         while True:
+            steps[:] = live(steps_all, presets)
+            i = min(i, len(steps))
             h, w = scr.getmaxyx()
             scr.erase()
             if h < 24 or w < 80:
@@ -701,6 +807,8 @@ def run_curses(steps, presets, summary_screen=True):
                     "RES": "Res",
                     "STYLE": "Style",
                     "SCHEME": "Scheme",
+                    "SEED_MODE": "Colours",
+                    "SEED": "Seed",
                     "LOGO": "Logo",
                     "HINTS": "Hints",
                     "EXTRAS": "Extras",
@@ -726,7 +834,26 @@ def run_curses(steps, presets, summary_screen=True):
                 if not summary:
                     st = steps[i]
                     put(3, 2, f"{i + 1}/{n}  {st['title']}", curses.A_BOLD)
-                    if st["type"] == "choice":
+                    if st["type"] == "choice" and st.get("grid"):
+                        cols = 8
+                        sw = [o for o in st["options"] if o["v"] != "custom"]
+                        for j, o in enumerate(sw):
+                            cy, cx0 = 5 + j // cols, 3 + (j % cols) * 4
+                            sel = j == st["cur"]
+                            put(cy, cx0, "[" if sel else " ", curses.A_BOLD)
+                            put(cy, cx0 + 1, "  ", pair(o["v"]))
+                            put(cy, cx0 + 3, "]" if sel else " ", curses.A_BOLD)
+                        cust = st["cur"] >= len(sw)
+                        put(
+                            5 + (len(sw) + cols - 1) // cols + 1,
+                            3,
+                            f"({'o' if cust else ' '}) "
+                            + (st.get("custom") or "Type another colour..."),
+                            curses.A_BOLD if cust else 0,
+                            lw - 4,
+                        )
+                        o = st["options"][st["cur"]]
+                    elif st["type"] == "choice":
                         for j, o in enumerate(st["options"]):
                             put(
                                 5 + j,
@@ -757,6 +884,14 @@ def run_curses(steps, presets, summary_screen=True):
                     cx, cw = lw + 2, w - lw - 4
                     box(3, cx, h - 7, cw, ctitle)
                     yy = 4
+                    if st.get("grid"):
+                        seed = o["v"] if o["v"] != "custom" else st.get("custom", "")
+                        roles = seed_preview(seed, answers(steps, presets).get("SCHEME") != "light") if seed else None
+                        if roles:
+                            for j, c in enumerate(roles):
+                                put(yy, cx + 2 + j * 6, "    ", pair(c))
+                            put(yy + 1, cx + 2, "primary / container / secondary / tertiary / surface", curses.A_DIM, cw - 4)
+                            yy += 3
                     wire = WIRE.get(o["v"]) if st["id"] == "STYLE" else None
                     for line in wire or []:
                         put(yy, cx + 2, line, 0, cw - 4)
@@ -806,7 +941,27 @@ def run_curses(steps, presets, summary_screen=True):
                 continue
             st = steps[i]
             key = k
-            if st["type"] == "choice":
+            if st["type"] == "choice" and st.get("grid"):
+                n_sw = len(st["options"]) - 1
+                if key in (curses.KEY_UP, ord("k")):
+                    st["cur"] = st["cur"] - 8 if st["cur"] >= 8 else st["cur"]
+                    if st["cur"] >= n_sw:
+                        st["cur"] = n_sw - 1
+                elif key in (curses.KEY_DOWN, ord("j")):
+                    st["cur"] = st["cur"] + 8 if st["cur"] + 8 < n_sw else (n_sw if st["cur"] < n_sw else st["cur"])
+                elif key in (curses.KEY_RIGHT, ord("l")):
+                    st["cur"] = min(st["cur"] + 1, n_sw) if st["cur"] < n_sw else st["cur"]
+                elif key in (curses.KEY_LEFT, ord("h")) and st["cur"] > 0:
+                    st["cur"] -= 1
+                    key = 0  # moved inside the grid: not a "back"
+                elif key in (10, 13, curses.KEY_ENTER):
+                    if st["options"][st["cur"]]["v"] == "custom":
+                        r = edit("Colour #RRGGBB:", lambda b: bool(mgseeds.HEX.match(b)), st.get("custom", "#"))
+                        if r is None:
+                            continue
+                        st["custom"] = r
+                    i += 1
+            elif st["type"] == "choice":
                 if key in (curses.KEY_UP, ord("k")):
                     st["cur"] = (st["cur"] - 1) % len(st["options"])
                 elif key in (curses.KEY_DOWN, ord("j")):
@@ -848,6 +1003,23 @@ def run_curses(steps, presets, summary_screen=True):
                 i -= 1
 
     return curses.wrapper(main)
+
+
+def nearest8(color):
+    """The nearest of the 8 basic terminal colours (0-7) for '#RRGGBB'."""
+    r, g, b = (int(color[i : i + 2], 16) > 127 for i in (1, 3, 5))
+    return (1 if r else 0) | (2 if g else 0) | (4 if b else 0)
+
+
+def seed_preview(seed, dark=True):
+    """Five role colours of the Material palette of `seed` for the preview strip, or None when the colour science is not available."""
+    try:
+        import mgpalette
+
+        p = mgpalette.scheme(seed, dark)
+        return [p[k] for k in ("primary", "primaryContainer", "secondary", "tertiary", "surface")]
+    except Exception:
+        return None
 
 
 def main(argv):
@@ -901,6 +1073,8 @@ def main(argv):
             sticks = ventoy_sticks.detect()
         except Exception:
             sticks = []
+    if "SEED" in presets and "SEED_MODE" not in presets:
+        presets["SEED_MODE"] = "single"
     steps = build_steps(presets, mons, "--immutable" in argv, sticks)
     defaults(steps, presets)
     if "COOKIE" in presets and "LOGO" not in presets:
