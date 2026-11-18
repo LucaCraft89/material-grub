@@ -1,5 +1,5 @@
 """The GUI server over real HTTP on 127.0.0.1: authentication, Host/Origin checks, state, preview, uploads, presets and an apply job through the
-real helper (as a normal user, in a scratch root, with a fake material-grub-apply). Needs a built package + Pillow. usage: python3 tests/test_gui_server.py"""
+real helper (as a normal user, in a scratch root, with a fake `material-grub apply`). Needs a built package + Pillow. usage: python3 tests/test_gui_server.py"""
 
 import http.client
 import io

@@ -118,7 +118,7 @@ jobs:
 
   gui:
     # The GUI in a real browser (Chrome, driven by Playwright): every page, the live preview, drag and drop, edits, Apply through the real helper (scratch root,
-    # fake material-grub-apply), a failing Apply, Ventoy, the update page, phone width, dark and light, and the browser-side security. Screenshots are artifacts.
+    # fake `material-grub apply`), a failing Apply, Ventoy, the update page, phone width, dark and light, and the browser-side security. Screenshots are artifacts.
     name: GUI in Chrome (end to end)
     runs-on: ubuntu-latest
     steps:

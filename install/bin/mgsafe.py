@@ -1,6 +1,6 @@
 """Safety net for rewriting grub.cfg (stdlib only): validate the result, roll back on failure, tell the user.
 
-Used by cmd_postprocess (the installer, `material-grub-apply`, the systemd path unit and the immutable path).
+Used by cmd_postprocess (the installer, `material-grub apply`, the systemd path unit and the immutable path).
   check_script(cfg)         structural check with the scanner + grub-script-check when available
   theme_problems(theme)     what is missing from a theme directory
   guarded(cfg, steps, ...)  snapshot cfg, run the steps, validate, restore the snapshot if anything is wrong
@@ -189,7 +189,7 @@ def guarded(cfg, steps, theme=None, pkg=None, force=False, interactive=None):
     last = read_last_error()
     if last and last.get("input_sha256") == sha and not force:
         print(
-            f"material-grub: skipping {cfg}: it already failed validation (see {state_dir() / LAST_ERROR}); run `material-grub-apply` to retry",
+            f"material-grub: skipping {cfg}: it already failed validation (see {state_dir() / LAST_ERROR}); run `sudo material-grub apply` to retry",
             file=sys.stderr,
         )
         return "skipped"

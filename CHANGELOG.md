@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.1 (unreleased)
+
+One command.
+
+**Changed**
+- `material-grub` is the only command that is installed (now in `/usr/local/bin`, so every user finds it). `material-grub apply` replaces `material-grub-apply`, and `material-grub gui` replaces `material-grub-gui`; `doctor`, `preview`, `ventoy` and the rest were already subcommands. An update removes the old `material-grub-apply` and the GUI package's `/usr/bin/material-grub-gui`. The kernel and pacman hooks and the GUI's helper call `material-grub apply`. What remains outside `/usr/share/material-grub` are files GRUB and polkit need at fixed paths (`/usr/libexec/material-grub-postprocess`, `/usr/libexec/material-grub-gui-helper`), not commands.
+
 ## 0.7.0 (2026-11-18)
 
 An optional GUI, a one-colour theme and per-entry customisation.

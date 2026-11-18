@@ -1,5 +1,5 @@
 """The GUI in a real browser (Playwright + Chrome/Chromium), end to end: every page, the live preview, drag and drop, per-entry edits, one colour, presets,
-Apply (through the real privileged helper in a scratch root, with a fake material-grub-apply), a failing Apply, Ventoy, the update page, the responsive
+Apply (through the real privileged helper in a scratch root, with a fake `material-grub apply`), a failing Apply, Ventoy, the update page, the responsive
 layout, dark and light, and the browser-side security. Saves screenshots to build/gui-shots/.
 usage: python3 tests/gui_e2e.py      Needs: pip install playwright, a Chrome or Chromium (GUI_BROWSER=/path overrides), dist/material-grub, Pillow."""
 

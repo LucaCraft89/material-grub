@@ -3,7 +3,7 @@
 # (post_install / post_upgrade), so nothing prebuilt is ever downloaded. Not published on the AUR yet.
 pkgbase=material-grub
 pkgname=('material-grub' 'material-grub-gui')
-pkgver=0.7.0
+pkgver=0.7.1
 pkgrel=1
 pkgdesc='Material 3 Expressive GRUB theme, built from source on your machine'
 arch=('any')

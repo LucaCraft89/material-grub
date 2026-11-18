@@ -1,4 +1,4 @@
-"""Starts the INSTALLED GUI (material-grub-gui, from the package) in a distro container and talks to it like a browser would: the token, the state,
+"""Starts the INSTALLED GUI (`material-grub gui`, from the package) in a distro container and talks to it like a browser would: the token, the state,
 a live preview PNG for every style, the security checks. stdlib only. usage: python3 gui_probe.py"""
 
 import json
@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 
 proc = subprocess.Popen(
-    ["material-grub-gui", "--no-browser", "--idle", "0"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    ["material-grub", "gui", "--no-browser", "--idle", "0"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
 )
 url = None
 t = time.time()

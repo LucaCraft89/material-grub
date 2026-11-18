@@ -1,6 +1,6 @@
 """material-grub doctor: check the installation and print a report that can be pasted into a bug report. stdlib only.
 
-usage: material-grub doctor [--root DIR] [--json | --status-json]       (also: material-grub-apply --status)
+usage: material-grub doctor [--root DIR] [--json | --status-json]       (also: material-grub apply --status)
 Exit status: 0 when nothing failed (warnings are fine), 1 when something failed.
 --json: the list of checks. --status-json: one object for the GUI (installed, version, style, scheme, health, checks).
 --root DIR looks at an installation staged under DIR (tests, `install.sh --dest`); systemd is not asked then.
@@ -243,7 +243,7 @@ class Doctor:
         immutable = (self.p("/var/lib/material-grub/env").is_file()) and "MG_IMMUTABLE=1" in self.p(
             "/var/lib/material-grub/env"
         ).read_text()
-        want = [("/usr/local/sbin/material-grub-apply", True)]
+        want = [("/usr/local/bin/material-grub", True)]
         if immutable:
             want.append(("/var/lib/material-grub/postprocess", True))
         else:

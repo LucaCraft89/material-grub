@@ -92,25 +92,63 @@ def c_doctor(argv):
     return cmd_doctor.main(argv)
 
 
+def env_file():
+    """/var/lib/material-grub/env: shell-style KEY=VALUE lines written by the installer (MG_IMMUTABLE, MATERIAL_PY, ...)."""
+    out = {}
+    try:
+        for line in Path("/var/lib/material-grub/env").read_text().splitlines():
+            k, sep, v = line.partition("=")
+            if sep and k.strip().isidentifier():
+                out[k.strip()] = v.strip().strip("'\"")
+    except OSError:
+        pass
+    return out
+
+
 def c_apply(argv):
+    """Regenerate grub.cfg and re-apply the theme: grub-mkconfig, then the post-processing (validate, roll back on error), under the same lock as the path unit."""
+    if argv[:1] == ["--status"]:
+        return c_doctor([])
     elevate(["apply", *argv], ["/boot"])
-    apply = shutil.which("material-grub-apply") or "/usr/local/sbin/material-grub-apply"
-    if not Path(apply).is_file():
-        sys.exit("material-grub: not installed (material-grub-apply is missing)")
-    return run([apply, *argv])
+    env = dict(os.environ, MG_FORCE="1")
+    if env_file().get("MG_IMMUTABLE") == "1":
+        return run(["sh", "/var/lib/material-grub/postprocess"], env=env)
+    mk = shutil.which("grub2-mkconfig") or shutil.which("grub-mkconfig")
+    if not mk:
+        sys.exit("material-grub: grub-mkconfig not found")
+    cfg = "/boot/grub2/grub.cfg" if Path("/boot/grub2/grub.cfg").is_file() else "/boot/grub/grub.cfg"
+    post = "/usr/libexec/material-grub-postprocess"
+    if not Path(post).is_file():
+        sys.exit("material-grub: not installed (" + post + " is missing)")
+    script = '"$1" -o "$2" && ' + post
+    if shutil.which(
+        "flock"
+    ):  # the same lock as the path unit: no run may restore an old snapshot over the file written here
+        return run(
+            ["flock", "/run/material-grub.lock", "sh", "-c", script, "sh", mk, cfg], env=dict(env, MG_LOCKED="1")
+        )
+    return run(["sh", "-c", script, "sh", mk, cfg], env=env)
 
 
 def c_preview(argv):
     return tool("material-grub-preview", *argv)
 
 
+def gui_launcher():
+    """The optional GUI's launcher: installed under /usr/share/material-grub-gui (it is not a command of its own), or the checkout's gui/ folder."""
+    for c in (Path("/usr/share/material-grub-gui/material-grub-gui"), HERE.parent.parent / "gui/material-grub-gui"):
+        if c.is_file():
+            return c
+    return None
+
+
 def c_gui(argv):
-    gui = shutil.which("material-grub-gui")
-    if not gui:
+    gui = gui_launcher()
+    if gui is None:
         say("The GUI is not installed. It is optional: install the package `material-grub-gui`,")
         say("or from a checkout of the repository:  sudo ./install.sh --with-gui")
         return 1
-    os.execv(gui, [gui, *argv])
+    os.execv(sys.executable, [sys.executable, str(gui), *argv])
 
 
 def seed_from(word):

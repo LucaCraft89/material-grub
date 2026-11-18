@@ -7,4 +7,4 @@ Target = usr/lib/modules/*/vmlinuz
 [Action]
 Description = Re-applying the Material GRUB theme after a kernel change...
 When = PostTransaction
-Exec = /bin/sh -c 'command -v material-grub-apply >/dev/null && /usr/local/sbin/material-grub-apply || true'
+Exec = /bin/sh -c '[ -x /usr/local/bin/material-grub ] && /usr/local/bin/material-grub apply || true'
