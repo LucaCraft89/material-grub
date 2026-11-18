@@ -1,7 +1,7 @@
 # Builds from source: the RPM ships the sources; the theme is rendered on the target machine in %posttrans
 # (install.sh --from-package), so nothing prebuilt is downloaded. COPR builds this spec from the tagged tarball.
 Name:           material-grub
-Version:        0.5.0
+Version:        0.6.0
 Release:        1%{?dist}
 Summary:        Material 3 Expressive GRUB theme, built from source on your machine
 License:        MIT
@@ -43,5 +43,8 @@ if [ $1 -eq 0 ]; then sh /usr/share/material-grub-src/install/uninstall.sh || :;
 %{_datadir}/material-grub-src
 
 %changelog
+* Wed Nov 18 2026 LucaCraft89 <noreply@users.noreply.github.com> - 0.6.0-1
+- Release 0.6.0.
+
 * Wed Nov 18 2026 LucaCraft89 <noreply@users.noreply.github.com> - 0.5.0-1
 - Packaging.

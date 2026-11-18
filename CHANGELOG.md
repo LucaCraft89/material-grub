@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.6.0)
+## 0.6.0 (2026-11-18)
 
 Safety, maintainability and packaging. The installer's logic is now Python; the theme is still always built from source on your machine.
 
