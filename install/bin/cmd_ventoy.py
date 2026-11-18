@@ -11,8 +11,10 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
+import mgoverrides
 import mgrub
 
 
@@ -63,6 +65,8 @@ HINTS = [
 ]  # every key on Ventoy 1.1.18's own bar: L:Language F1:Help F2:Browse F3:TreeView F4:Localboot F5:Tools F6:ExMenu
 THEMES = "ventoy/themes"
 STATE = "ventoy/material-grub-state.json"
+OVERRIDES = "ventoy/material-grub-overrides.json"  # the stick's own overrides.json (same format; match "title" = text of the file name)
+ICONS = "ventoy/material-grub-icons"  # pictures the overrides on the stick point to
 
 
 def scan(stick):
@@ -381,6 +385,10 @@ def uninstall():
     vj["menu_class"] = [m for m in vj.get("menu_class", []) if m not in mine]
     if not vj["menu_class"]:
         vj.pop("menu_class")
+    mine_alias = state.get("menu_alias", [])
+    vj["menu_alias"] = [m for m in vj.get("menu_alias", []) if m not in mine_alias]
+    if not vj["menu_alias"]:
+        vj.pop("menu_alias")
     th = vj.get("theme", {})
     ours = state.get("theme_files", [])
     files = th.get("file")
@@ -451,7 +459,11 @@ def main():
     )
     if _pn and "pnlug" in classes:
         LOGOS["pnlug"] = Image.open(_pn).convert("RGB")
-    files = [] if dynamic else scan(stick)
+    ov, ov_problems = mgoverrides.load(stick / OVERRIDES)
+    for pr in ov_problems:
+        print(f"material-grub-ventoy: overrides: {pr}")
+    all_files = scan(stick)
+    files = [] if dynamic else all_files
     for rel in files:
         name = Path(rel).name
         k = key_of(name, rules)
@@ -465,6 +477,13 @@ def main():
                 "label": name,
                 "path": rel,
             }
+        )
+    # files the user customised (colour, icon, name): each gets its own class and scene, whatever the mode
+    custom = []
+    for rel in all_files:
+        name = Path(rel).name
+        custom.append(
+            {"class": "mgu_" + mgrub.uid("ventoy", rel)[3:], "key": key_of(name, rules), "kind": "plain", "level": "top", "title": name, "label": name, "path": rel}
         )
     keys = sorted({e["key"] for e in entries}) or ["iso"]
     if dynamic:
@@ -531,10 +550,19 @@ def main():
             logo_png(tmp / "machine-logo.png", int((rdir / "logo_size").read_text().strip()), arg("--logo"))
         bgs = sorted((PKG / "scenes" / aspect / "bg").glob("*.png"))
         R = mgscenes.Renderer(PKG, Image.open(bgs[0]).height)
-        R.bg_dir = PKG / "scenes" / aspect / "bg"
         R.hint_labels = HINTS
-        bgdir = PKG / "scenes" / aspect / "bg"
         R.logos = LOGOS
+        import copy
+
+        import mgcustom
+
+        c_ents = copy.deepcopy(custom)
+        ov_tmp = tempfile.mkdtemp(prefix="mg-ventoy-overlay-")
+        overlay = mgcustom.apply(
+            R, ov, c_ents, PKG, aspect, Image.open(bgs[0]).size, classes, icon_dir=stick / ICONS, tmp=ov_tmp
+        )
+        custom_done = [e for e in c_ents if e.get("orig_key")]
+        bgdir = R.bg_dir  # the overlay's: the baked panel of a key whose colour was not changed, a redrawn one otherwise
         raw_on = conf["RAW_NAME"] == "on"
 
         def rows_of(im):
@@ -568,10 +596,10 @@ def main():
             (tmp / "_hero").mkdir()
             for k in keys + (
                 ["iso"] if "iso" not in keys else []
-            ):  # background + hero with a slightly smaller title (the file name is the main text here)
+            ) + [e["key"] for e in custom_done]:  # background + hero with a slightly smaller title (the file name is the main text here)
                 sc = Image.open(bgdir / f"{k}.png").convert("RGBA")
                 R.hero(sc, {"key": k, "kind": "plain", "title": ""}, R.pal[k], 124)
-                sc.save(tmp / "_hero" / f"{k}.png")
+                sc.save(tmp / "_hero" / f"{k}.png".replace("~", "_"))
 
         def finish_iso(im, k):
             """ISO picker scene: a hole where the file-name pill is (the raw-name label shows through it) and the distro logo and a disc icon at the start of the pill."""
@@ -591,7 +619,7 @@ def main():
 
         def class_scene(k):
             if fs:  # background + hero, the cookie, two scroll arrows on the left; no rail, no neighbours, no key hints
-                sc = Image.open(tmp / "_hero" / f"{k}.png").convert("RGBA")
+                sc = Image.open(tmp / "_hero" / f"{k}.png".replace("~", "_")).convert("RGBA")
                 R.decorate(sc, R.pal[k], dict(opts, hints=False))
                 R.draw_arrows(sc, R.pal[k])
                 return finish_iso(sc, k)
@@ -602,6 +630,8 @@ def main():
 
         for k in keys:
             class_scene(k).save(tmp / "icons" / f"mg_{k}.png")
+        for e in custom_done:  # one scene per customised file
+            class_scene(e["key"]).save(tmp / "icons" / f"{e['class']}.png")
         generic = (
             Image.open(tmp / "icons" / "mg_iso.png") if "iso" in keys else class_scene("iso")
         )  # Ventoy's own classes (vtoyiso, vtoywim, ...) and every file the rules do not recognise
@@ -621,7 +651,7 @@ def main():
                 R.pal[pk] = R.pal[pal]
                 R.titles[pk] = title
                 R.galias[pk] = glyph
-                bg = PKG / "scenes" / aspect / "bg" / f"{pal}.png"
+                bg = bgdir / f"{pal}.png"
                 if fs:
                     img = punch(carded(R.render_list_hero(pk, bg, opts)), rows_of(Image.open(bg)))
                 else:
@@ -632,6 +662,7 @@ def main():
                 im = R.render_entry(e, bgdir / f"{e['key']}.png", groups, "list", opts, menu, by_class)
                 im.save(tmp / "icons" / f"{e['class']}.png")
         shutil.rmtree(tmp / "_hero", ignore_errors=True)
+        shutil.rmtree(ov_tmp, ignore_errors=True)
         shutil.rmtree(out, ignore_errors=True)
         os.replace(tmp, out)
         theme_dirs.append(rel_dir)
@@ -644,10 +675,21 @@ def main():
     old_mine = state.get("menu_class", [])
     user_mc = [m for m in vj.get("menu_class", []) if m not in old_mine]
     names = sorted({Path(e["path"]).name for e in entries})
+    names_all = sorted({Path(e["path"]).name for e in custom})
+    menu_class, menu_alias = [], []
+    for e in custom_done:  # customised files first: Ventoy takes the first rule that matches
+        name = Path(e["path"]).name
+        key = pick_key(name, [o for o in names_all if o != name])
+        if key is None:
+            print(f"material-grub-ventoy: warning: no unique key for {name}; its customisation is skipped")
+            continue
+        menu_class.append({"key": key, "class": e["class"]})
+        if e.get("name"):
+            menu_alias.append({"image": "/" + e["path"], "alias": e["name"]})
     if dynamic:
-        menu_class = pnlug_rules() + dynamic_rules(classes, titles)
+        menu_class += pnlug_rules() + dynamic_rules(classes, titles)
     else:
-        menu_class = pnlug_rules()  # also for files added after the install
+        menu_class += pnlug_rules()  # also for files added after the install
     for e in [] if dynamic else entries:
         name = Path(e["path"]).name
         key = pick_key(name, [o for o in names if o != name])
@@ -658,6 +700,12 @@ def main():
     seen = set()
     menu_class = [m for m in menu_class if not (m["key"] in seen or seen.add(m["key"]))]
     vj["menu_class"] = user_mc + menu_class  # the user's own rules come first and win
+    old_alias = state.get("menu_alias", [])
+    user_alias = [m for m in vj.get("menu_alias", []) if m not in old_alias]
+    if user_alias or menu_alias:
+        vj["menu_alias"] = user_alias + [m for m in menu_alias if m["image"] not in {u.get("image") for u in user_alias}]
+    else:
+        vj.pop("menu_alias", None)
     th = vj.get("theme", {})
     ours = state.get("theme_files", [])
     cur = th.get("file")
@@ -679,7 +727,7 @@ def main():
     vj_path.write_text(json.dumps(vj, indent=1) + "\n")
     state_path.write_text(
         json.dumps(
-            {"menu_class": menu_class, "theme_files": theme_files, "theme_dirs": theme_dirs, "prev_theme": prev},
+            {"menu_class": menu_class, "menu_alias": menu_alias, "theme_files": theme_files, "theme_dirs": theme_dirs, "prev_theme": prev},
             indent=1,
         )
     )
