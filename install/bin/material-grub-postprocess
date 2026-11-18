@@ -1,0 +1,10 @@
+#!/usr/bin/env python3
+"""Executable name kept for the installed path; the code is in cmd_postprocess.py."""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from cmd_postprocess import main
+
+if __name__ == "__main__":
+    sys.exit(main())

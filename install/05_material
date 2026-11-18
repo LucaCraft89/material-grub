@@ -11,6 +11,7 @@ MODE=$(python3 "$PKG/bin/material-grub-assemble" --mode "${GRUB_GFXMODE:-}" --pk
 # shellcheck disable=SC2154 # grub_probe comes from grub-mkconfig_lib
 prepare_grub_to_access_device "$(${grub_probe} --target=device "$THEMEDIR")"
 REL=$(make_system_path_relative_to_its_root "$THEMEDIR")
+# the theme is only loaded when its files are there at boot (a missing disk, a half-written directory): else GRUB shows its plain menu
 cat << EOF
 # --- Material 3 Expressive theme ($MODE) ---
 set gfxmode=$MODE,auto
@@ -20,6 +21,7 @@ insmod gfxterm
 insmod gfxmenu
 insmod png
 terminal_output gfxterm
+if [ -f (\$root)$REL/theme.txt -a -d (\$root)$REL/icons ]; then
 loadfont (\$root)$REL/MG-Label.pf2
 loadfont (\$root)$REL/MG-Raw.pf2
 EOF
@@ -27,4 +29,5 @@ EOF
 cat << EOF
 set theme=(\$root)$REL/theme.txt
 export theme
+fi
 EOF

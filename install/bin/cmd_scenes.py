@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import mgrub
+import mgsafe
 
 
 def arg(n, d=None):
@@ -28,7 +29,7 @@ def main():
         sys.exit(0)
     pkg = Path(arg("--pkg", "/usr/share/material-grub"))
     theme = Path(arg("--theme"))
-    state = Path(arg("--state", "/var/lib/material-grub/entries.json"))
+    state = Path(arg("--state", str(mgsafe.state_dir() / "entries.json")))
     entries = json.loads(state.read_text()) if state.exists() else []
     menu = json.loads(state.with_name("menu.json").read_text()) if state.with_name("menu.json").exists() else []
     classes = json.loads((pkg / "classes.json").read_text())

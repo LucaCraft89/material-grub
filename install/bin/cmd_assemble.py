@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import mgrub
+import mgsafe
 
 
 def arg(n, d=None):
@@ -73,6 +74,19 @@ def main():
             check=False,
             stdout=subprocess.DEVNULL,
         )
-    shutil.rmtree(out, ignore_errors=True)
-    os.replace(tmp, out)
+    problems = mgsafe.theme_problems(tmp, pkg)
+    if problems:  # keep the theme that is installed now; the half-built one is dropped
+        shutil.rmtree(tmp, ignore_errors=True)
+        sys.exit("material-grub-assemble: the new theme is incomplete, keeping the old one: " + "; ".join(problems))
+    old = out.with_name(out.name + ".old")  # swap with the old directory kept until the new one is in place
+    shutil.rmtree(old, ignore_errors=True)
+    if out.exists():
+        os.rename(out, old)
+    try:
+        os.replace(tmp, out)
+    except OSError:
+        if old.exists():
+            os.rename(old, out)
+        raise
+    shutil.rmtree(old, ignore_errors=True)
     print(best)

@@ -62,14 +62,14 @@ if [ -z "$D" ] && [ $RUN = 1 ]; then
   else echo "NOTE: no systemd: re-run the installer after kernel/boot-entry changes."; fi
   if [ "$IMM" = 1 ]; then
     echo "    - modifying the static grub.cfg (an untouched copy is kept in /var/backups/material-grub), naming entries, rendering scenes"
-    sh "$ST/postprocess"
+    MG_FORCE=1 sh "$ST/postprocess"
   else
     CFG=/boot/grub2/grub.cfg; [ -f "$CFG" ] || CFG=/boot/grub/grub.cfg
     MK=$(command -v grub2-mkconfig || command -v grub-mkconfig) || { echo "grub-mkconfig not found"; exit 1; }
     echo "    - regenerating $CFG (this can take up to a minute)"
     "$MK" -o "$CFG"
     echo "    - naming entries, building the Advanced options structure, rendering per-entry scenes"
-    /usr/libexec/material-grub-postprocess
+    MG_FORCE=1 /usr/libexec/material-grub-postprocess
   fi
 fi
 echo "installed${D:+ to $D}"

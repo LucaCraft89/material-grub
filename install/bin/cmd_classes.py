@@ -19,6 +19,7 @@ from pathlib import Path
 
 import grubscript
 import mgrub
+import mgsafe
 
 
 def arg(n, d=None):
@@ -166,7 +167,7 @@ def main():
     blsbase = arg("--blsbase", "/loader" if os.path.ismount("/boot") else "/boot/loader")
     mirrors = Path(arg("--mirrors", str(loader)))
     mbase = arg("--mirrorbase", blsbase)
-    state = Path(arg("--state", "/var/lib/material-grub/entries.json"))
+    state = Path(arg("--state", str(mgsafe.state_dir() / "entries.json")))
     cfgstate = state.with_name("cfg-entries.json")
     cfgmeta = state.with_name("cfg-meta.json")
     rules = mgrub.load_rules(pkg)

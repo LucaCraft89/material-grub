@@ -110,10 +110,12 @@ insmod gfxterm
 insmod gfxmenu
 insmod png
 terminal_output gfxterm
+if [ -f $prefix/themes/material/theme.txt -a -d $prefix/themes/material/icons ]; then
 loadfont $prefix/themes/material/MG-Label.pf2
 loadfont $prefix/themes/material/MG-Raw.pf2
 {UNI}set theme=$prefix/themes/material/theme.txt
 export theme
+fi
 set timeout_style=menu
 set timeout={timeout}
 unset menu_hide_ok
