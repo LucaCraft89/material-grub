@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.6.0 (2026-11-18)
+
+Safety, maintainability and packaging. The installer's logic is now Python; the theme is still always built from source on your machine.
+
+**Safety**
+- Every rewrite of `grub.cfg` is validated (`grub-script-check` plus a structure check) and rolled back when wrong. The failure is shown in a terminal box, the journal and (without a terminal) with `wall`; `/var/lib/material-grub/last-error` keeps the reason for `material-grub doctor`. A file that failed is not retried on identical input.
+- A real GRUB-script parser (`install/bin/grubscript.py`) replaces the regex handling of `menuentry`/`submenu`: quotes, escapes, `}` and `{` in titles, multi-line headers, nested submenus. Golden tests use real `grub-mkconfig` output from Debian, Ubuntu, Arch and Fedora.
+- The generated `grub.cfg` loads the theme only when `theme.txt` and `icons/` exist at boot; otherwise GRUB shows its plain menu.
+- The theme directory is swapped in with the old one kept until the new one is in place; an incomplete new theme is dropped.
+- `grub-mkconfig` and the post-processing run under one lock (a stale run could restore an old snapshot over a fresh `grub.cfg`).
+- `./install.sh --dry-run`: diff of `grub.cfg` and `/etc/default/grub` plus the list of files, nothing is changed.
+
+**New**
+- `material-grub doctor` (also `material-grub-apply --status`): checks the theme, `grub.cfg`, a scene per entry, hooks, the path unit, the config and the last rollback; exit status 0/1; the bug template asks for its output.
+- `./install.sh --preview` and `material-grub preview`: your own boot entries rendered as a web page, no root and nothing installed.
+- The info chips show the drive (`/dev/sda5`) for os-prober entries, so two installs of one distro can be told apart (info chips now in every style: under the hero in rail, clean and split, under the list in list; in the list rows the drive is appended to the name when the same distro appears twice on a menu level, e.g. `Ubuntu (sda5)`).
+- Packages (source only, the theme is built on install): `packaging/` has an Arch PKGBUILD, a Fedora spec and a Debian package, see `docs/packaging.md`.
+
+**Changed**
+- `install.sh` is a short POSIX sh bootstrap that finds or installs Python 3.8+ and runs `install/installer.py`. RHEL 8 family (python3 is 3.6) installs `python3.12` and builds with it.
+- Build requirements are pinned with hashes (`requirements.in` -> `requirements.txt`, `make update-requirements`); the build needs Python 3.9+.
+- Resolutions and the generic-alias set live in one place (`install/bin/resolutions.json`, `mgrub.py`).
+- Ruff and shellcheck run in CI; the tools are importable modules (`install/bin/cmd_*.py`) behind the old executable names.
+- Ventoy name matching: `arch`, `kali`, `mint` and `tails` only match with a separator after them (no more `archive`, `kalimba`, `mintchoc`).
+- README shortened; installer details, immutable systems, how it works and customising moved to `docs/`.
+
 ## 0.5.0 (2026-11-17)
 
 Ventoy support, a fourth style for the PC, and the Pordenone Linux User Group scene.

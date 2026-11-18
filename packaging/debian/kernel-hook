@@ -1,0 +1,5 @@
+#!/bin/sh
+# /etc/kernel/postinst.d and postrm.d: a kernel was added or removed. Re-applies the theme through the same safety nets; never fails the kernel package.
+command -v material-grub-apply >/dev/null 2>&1 || exit 0
+/usr/local/sbin/material-grub-apply >/dev/null 2>&1 || true
+exit 0

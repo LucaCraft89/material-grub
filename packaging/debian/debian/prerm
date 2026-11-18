@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+case "$1" in
+  remove) sh /usr/share/material-grub-src/install/uninstall.sh || true ;;
+esac
+#DEBHELPER#
+exit 0

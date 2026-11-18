@@ -1,19 +1,20 @@
 #!/bin/sh
-# usage: sudo ./install.sh [--res WxH] [--dest DIR] [--no-run] [--immutable] [--set KEY=value]...   (DESTDIR-style staging with --dest)
+# usage: sudo ./install.sh [--res WxH] [--dest DIR] [--no-run] [--immutable] [--py PYTHON] [--set KEY=value]...   (DESTDIR-style staging with --dest)
+#   --py: the Python the installed tools run with (recorded as MATERIAL_PY in /var/lib/material-grub/env); default python3
 #   --set: write KEY=value into /etc/material-grub.conf (STYLE, HINTS, COOKIE, LOGO, ...); the file itself is otherwise never overwritten
 #   --immutable: ostree/bootc layout. Nothing goes under /usr: package, venv and the postprocess script live in /var/lib/material-grub,
 #                hooks are applied directly to the static grub.cfg instead of through grub-mkconfig.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd); PKG=$HERE/../dist/material-grub
-D=""; RES=""; RUN=1; PKGARG=""; IMM=0; SETS=""
-while [ $# -gt 0 ]; do case $1 in --dest) D=$2; shift;; --res) RES=$2; shift;; --pkg) PKGARG=$2; shift;; --no-run) RUN=0;; --immutable) IMM=1;; --set) SETS="$SETS $2"; shift;; esac; shift; done
+D=""; RES=""; RUN=1; PKGARG=""; IMM=0; SETS=""; PYARG=""
+while [ $# -gt 0 ]; do case $1 in --dest) D=$2; shift;; --res) RES=$2; shift;; --pkg) PKGARG=$2; shift;; --no-run) RUN=0;; --immutable) IMM=1;; --py) PYARG=$2; shift;; --set) SETS="$SETS $2"; shift;; esac; shift; done
 [ -n "$PKGARG" ] && PKG=$PKGARG
 [ -d "$PKG" ] || { echo "run scripts/package.py first"; exit 1; }
 
 if [ "$IMM" = 1 ]; then
-  ST="$D/var/lib/material-grub"; DEST="$ST/pkg"; PY=python3
+  ST="$D/var/lib/material-grub"; DEST="$ST/pkg"; PY=${PYARG:-python3}
   install -d "$ST" "$D/etc/systemd/system"
-  if ! python3 -c "import PIL" 2>/dev/null; then
+  if ! "$PY" -c "import PIL" 2>/dev/null; then
     echo "    - python3 Pillow is not installed and /usr is read-only: creating a venv in $ST/venv (pip, needs network)"
     python3 -m venv "$ST/venv" && "$ST/venv/bin/pip" install --disable-pip-version-check pillow >/dev/null || { echo "could not create the Pillow venv"; exit 1; }
     PY=$ST/venv/bin/python3
@@ -21,7 +22,7 @@ if [ "$IMM" = 1 ]; then
   echo "    - copying the theme package to $DEST (immutable layout: nothing is written under /usr)"
   rm -rf "$DEST"; install -d "$DEST"; cp -a "$PKG/." "$DEST/"; chmod +x "$DEST/bin/"*
   install -m755 "$HERE/postprocess.sh" "$ST/postprocess"
-  install -d "$D/usr/local/sbin"; install -m755 "$HERE/material-grub-apply" "$D/usr/local/sbin/material-grub-apply"
+  install -d "$D/usr/local/sbin"; install -m755 "$HERE/material-grub-apply" "$D/usr/local/sbin/material-grub-apply"; install -m755 "$HERE/material-grub" "$D/usr/local/sbin/material-grub"
   TO=5; [ -f /etc/default/grub ] && TO=$(sed -n 's/^GRUB_TIMEOUT=\([0-9]\{1,\}\).*/\1/p' /etc/default/grub | head -n1); TO=${TO:-5}
   { echo "MATERIAL_PKG=$DEST"; echo "MATERIAL_PY=$PY"; echo "MG_IMMUTABLE=1"; echo "MG_RES=${RES:-1920x1080}"; echo "MG_TIMEOUT=$TO"; } > "$ST/env"
   install -m644 "$HERE"/systemd/immutable/* "$D/etc/systemd/system/"
@@ -34,11 +35,13 @@ else
   chmod +x "$D/usr/share/material-grub/bin/"*
   echo "    - installing GRUB hooks (05_material, 15_material_menu, 90_material_system) and the systemd path unit"
   install -m755 "$HERE/postprocess.sh" "$D/usr/libexec/material-grub-postprocess"
-  install -d "$D/usr/local/sbin"; install -m755 "$HERE/material-grub-apply" "$D/usr/local/sbin/material-grub-apply"
+  install -d "$D/usr/local/sbin"; install -m755 "$HERE/material-grub-apply" "$D/usr/local/sbin/material-grub-apply"; install -m755 "$HERE/material-grub" "$D/usr/local/sbin/material-grub"
   install -m755 "$HERE/05_material" "$D/etc/grub.d/05_material"
   install -m755 "$HERE/15_material_menu" "$D/etc/grub.d/15_material_menu"
   install -m755 "$HERE/90_material_system" "$D/etc/grub.d/90_material_system"
   install -m644 "$HERE"/systemd/material-grub.* "$D/etc/systemd/system/"
+  rm -f "$D/var/lib/material-grub/env"
+  if [ -n "$PYARG" ]; then install -d "$D/var/lib/material-grub"; echo "MATERIAL_PY=$PYARG" > "$D/var/lib/material-grub/env"; fi
 fi
 [ -e "$D/etc/material-grub.conf" ] || install -m644 "$HERE/material-grub.conf" "$D/etc/material-grub.conf"     # never overwrite the user's settings
 for kv in $SETS; do      # explicit --set choices (installer flags / TUI): replace the sample line or the existing value, else append
@@ -62,14 +65,19 @@ if [ -z "$D" ] && [ $RUN = 1 ]; then
   else echo "NOTE: no systemd: re-run the installer after kernel/boot-entry changes."; fi
   if [ "$IMM" = 1 ]; then
     echo "    - modifying the static grub.cfg (an untouched copy is kept in /var/backups/material-grub), naming entries, rendering scenes"
-    sh "$ST/postprocess"
+    MG_FORCE=1 sh "$ST/postprocess"
   else
     CFG=/boot/grub2/grub.cfg; [ -f "$CFG" ] || CFG=/boot/grub/grub.cfg
     MK=$(command -v grub2-mkconfig || command -v grub-mkconfig) || { echo "grub-mkconfig not found"; exit 1; }
     echo "    - regenerating $CFG (this can take up to a minute)"
-    "$MK" -o "$CFG"
     echo "    - naming entries, building the Advanced options structure, rendering per-entry scenes"
-    /usr/libexec/material-grub-postprocess
+    # grub-mkconfig and the post-processing run under the same lock as the systemd path unit's runs: a run that started earlier must not
+    # restore its old snapshot over the grub.cfg written here
+    if command -v flock >/dev/null; then
+      MG_FORCE=1 MG_LOCKED=1 flock /run/material-grub.lock sh -c '"$1" -o "$2" && /usr/libexec/material-grub-postprocess' sh "$MK" "$CFG"
+    else
+      "$MK" -o "$CFG" && MG_FORCE=1 /usr/libexec/material-grub-postprocess
+    fi
   fi
 fi
 echo "installed${D:+ to $D}"

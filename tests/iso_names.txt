@@ -147,3 +147,20 @@ systemrescue-11.00-amd64.iso	iso
 memtest86-usb.img	iso
 hirens-bootcd.iso	iso
 TinyCore-current.iso	iso
+# Names that merely contain a distro word as part of another word: they must NOT match (iso = the grey disc scene). A Ventoy key is a plain substring,
+# so "search-..." still hits "arch-" and cannot be fixed on this side.
+archive-2024.iso	iso
+mintchoc-recipes.iso	iso
+kalimba-music.iso	iso
+tailsman.iso	iso
+nixie-clock-firmware.iso	iso
+pupil-training-video.iso	iso
+Winter-Wallpapers.iso	iso
+window-manager-live.iso	iso
+Winamp-skins.iso	iso
+osx-icons.iso	iso
+gnuplot-docs.iso	iso
+linuxtips.iso	iso
+popular-music.iso	iso
+backup-2026-01-01.iso	iso
+data.iso	iso

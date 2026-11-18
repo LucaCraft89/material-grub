@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: material-grub
+Source: https://github.com/LucaCraft89/material-grub
+
+Files: *
+Copyright: LucaCraft89
+License: MIT
+ See /usr/share/material-grub-src/LICENSE and THIRD_PARTY.md for the licenses of the bundled fonts and icons.

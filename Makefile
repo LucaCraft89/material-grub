@@ -2,9 +2,11 @@ PY   ?= .venv/bin/python
 SCHEME ?= dark
 RES  ?= 1920x1080
 
-.PHONY: venv package screenshots install uninstall clean
+.PHONY: update-requirements venv package screenshots install uninstall clean
+update-requirements: ## rewrite requirements.txt (pins + hashes) from requirements.in; needs network
+	python3 scripts/update_requirements.py
 venv:            ## create the build virtualenv
-	python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+	python3 -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
 package:         ## render scenes + per-resolution bundles into dist/material-grub (a few minutes)
 	$(PY) scripts/package.py --scheme $(SCHEME)
 screenshots:     ## boot the theme in QEMU/OVMF and write docs/screenshots/*.png

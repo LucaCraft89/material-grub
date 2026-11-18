@@ -5,67 +5,148 @@
   gen_distro_table.py --check    CI: fail if the committed tables differ from the catalog or an image is missing/extra (PNG bytes are never compared:
                                  Pillow/FreeType versions render slightly different pixels)
 Tables live between <!-- distros:begin --> and <!-- distros:end --> in docs/distros.md (full table) and docs/gallery.md (compact grid); the README only links to them."""
-import re, sys
+
+import re
+import sys
 from pathlib import Path
+
 ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(ROOT / "scripts")); sys.path.insert(0, str(ROOT / "install/bin"))
+sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "install/bin"))
 import catalog as C
+import mgrub
+
 REQ = "https://github.com/LucaCraft89/material-grub/issues/new?template=distro_request.yml"
-IMG = ROOT / "docs/distros"; DOCS = ROOT / "docs/distros.md"; GALLERY = ROOT / "docs/gallery.md"
+IMG = ROOT / "docs/distros"
+DOCS = ROOT / "docs/distros.md"
+GALLERY = ROOT / "docs/gallery.md"
 BEGIN, END = "<!-- distros:begin -->", "<!-- distros:end -->"
-GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}
+GENERIC = mgrub.GENERIC
 SRC = {"chosen": "chosen", "si": "brand colour (Simple Icons)", "proposed": "proposed"}
+
 
 def full_table():
     rows = ["| Sample | Name | Key | Seed colour | Also matches (entry names / classes) |", "|---|---|---|---|---|"]
-    for k, title, sub, g, seed, src, al in C.D:
+    for k, title, _sub, _g, seed, src, al in C.D:
         names = ", ".join(f"`{a}`" for a in al if a not in GENERIC) or "-"
-        rows.append(f"| <img src=\"distros/{k}.png\" width=\"240\" alt=\"{title}\"> | {title} | `{k}` | `{seed}` ({SRC[src]}) | {names} |")
-    return "\n".join(rows) + f"\n\nYour distro is not listed? [Request it]({REQ}) (the entry only needs a name, a logo and a colour).\n"
+        rows.append(
+            f'| <img src="distros/{k}.png" width="240" alt="{title}"> | {title} | `{k}` | `{seed}` ({SRC[src]}) | {names} |'
+        )
+    return (
+        "\n".join(rows)
+        + f"\n\nYour distro is not listed? [Request it]({REQ}) (the entry only needs a name, a logo and a colour).\n"
+    )
+
 
 def grid(cols=4):
-    cells = [f"<td align=\"center\"><img src=\"distros/{k}.png\" width=\"200\" alt=\"{t}\"><br><sub>{t}</sub></td>" for k, t, *_ in C.D]
-    rows = ["<tr>" + "".join(cells[i:i + cols]) + "</tr>" for i in range(0, len(cells), cols)]
-    return (f"<p>All {len(C.D)} supported distros and system entries, rendered from the theme code:</p>\n\n<table>\n" + "\n".join(rows) +
-            f"\n</table>\n\nFull table with the matched names: [distros.md](distros.md). Not listed? [Request your distro]({REQ}).\n")
+    cells = [
+        f'<td align="center"><img src="distros/{k}.png" width="200" alt="{t}"><br><sub>{t}</sub></td>'
+        for k, t, *_ in C.D
+    ]
+    rows = ["<tr>" + "".join(cells[i : i + cols]) + "</tr>" for i in range(0, len(cells), cols)]
+    return (
+        f"<p>All {len(C.D)} supported distros and system entries, rendered from the theme code:</p>\n\n<table>\n"
+        + "\n".join(rows)
+        + f"\n</table>\n\nFull table with the matched names: [distros.md](distros.md). Not listed? [Request your distro]({REQ}).\n"
+    )
 
-def block(text, body): return f"{BEGIN}\n{body}\n{END}" if text is None else re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), lambda m: f"{BEGIN}\n{body}\n{END}", text, flags=re.S)
+
+def block(text, body):
+    return (
+        f"{BEGIN}\n{body}\n{END}"
+        if text is None
+        else re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), lambda m: f"{BEGIN}\n{body}\n{END}", text, flags=re.S)
+    )
+
+
 def current(path):
-    t = path.read_text() if path.exists() else ""; m = re.search(re.escape(BEGIN) + r"\n(.*?)\n" + re.escape(END), t, re.S); return t, (m[1] if m else None)
+    t = path.read_text() if path.exists() else ""
+    m = re.search(re.escape(BEGIN) + r"\n(.*?)\n" + re.escape(END), t, re.S)
+    return t, (m[1] if m else None)
+
 
 def render():
-    from PIL import Image
     import mgscenes
-    pkg = ROOT / "dist/material-grub"; assert (pkg / "scenes/16x9").is_dir(), "build the package first: scripts/package.py --res 1920x1080 --scheme dark"
-    R = mgscenes.Renderer(pkg, 1080); IMG.mkdir(parents=True, exist_ok=True)
-    for k, title, sub, g, seed, src, al in C.D:
+    from PIL import Image
+
+    pkg = ROOT / "dist/material-grub"
+    assert (pkg / "scenes/16x9").is_dir(), "build the package first: scripts/package.py --res 1920x1080 --scheme dark"
+    R = mgscenes.Renderer(pkg, 1080)
+    IMG.mkdir(parents=True, exist_ok=True)
+    for k, title, sub, _g, _seed, _src, _al in C.D:
         if k in mgscenes.SYS | mgscenes.WIN:
-            sc = Image.open(pkg / "scenes/16x9/icons" / f"{C.CLASSES[k][0]}.png").convert("RGBA"); R.draw_cookie(sc, R.pal[k])
+            sc = Image.open(pkg / "scenes/16x9/icons" / f"{C.CLASSES[k][0]}.png").convert("RGBA")
+            R.draw_cookie(sc, R.pal[k])
         else:
-            sc = Image.open(pkg / "scenes/16x9/bg" / f"{k}.png").convert("RGBA"); R.draw_cookie(sc, R.pal[k])
-            R.hero(sc, {"key": k, "kind": "kernel", "title": title, "os": title, "osver": "", "kver": "6.12.4-200", "edition": sub if sub != title else None, "default": True}, R.pal[k])
-        sc.convert("RGB").resize((480, 270), Image.LANCZOS).quantize(96, method=Image.MEDIANCUT).save(IMG / f"{k}.png", optimize=True)
+            sc = Image.open(pkg / "scenes/16x9/bg" / f"{k}.png").convert("RGBA")
+            R.draw_cookie(sc, R.pal[k])
+            R.hero(
+                sc,
+                {
+                    "key": k,
+                    "kind": "kernel",
+                    "title": title,
+                    "os": title,
+                    "osver": "",
+                    "kver": "6.12.4-200",
+                    "edition": sub if sub != title else None,
+                    "default": True,
+                },
+                R.pal[k],
+            )
+        sc.convert("RGB").resize((480, 270), Image.LANCZOS).quantize(96, method=Image.MEDIANCUT).save(
+            IMG / f"{k}.png", optimize=True
+        )
     print(f"rendered {len(C.D)} samples into {IMG}")
 
+
 def write_tables():
-    for path, body in ((DOCS, "# Supported distros\n\nEvery entry below is matched by name (case-insensitive) and by GRUB class. Samples are rendered from the theme code (dark scheme, 16:9, `rail`-less hero scene with the cookie); this page is generated by `scripts/gen_distro_table.py`.\n\n" + BEGIN + "\n" + full_table() + "\n" + END + "\n"), (GALLERY, None)):
-        if path == DOCS: path.parent.mkdir(exist_ok=True); path.write_text(body) if not path.exists() else path.write_text(block(path.read_text(), full_table()))
+    for path, body in (
+        (
+            DOCS,
+            "# Supported distros\n\nEvery entry below is matched by name (case-insensitive) and by GRUB class. Samples are rendered from the theme code (dark scheme, 16:9, `rail`-less hero scene with the cookie); this page is generated by `scripts/gen_distro_table.py`.\n\n"
+            + BEGIN
+            + "\n"
+            + full_table()
+            + "\n"
+            + END
+            + "\n",
+        ),
+        (GALLERY, None),
+    ):
+        if path == DOCS:
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(body) if not path.exists() else path.write_text(block(path.read_text(), full_table()))
         else:
-            t = path.read_text(); path.write_text(block(t, grid()) if BEGIN in t else t)
+            t = path.read_text()
+            path.write_text(block(t, grid()) if BEGIN in t else t)
+
 
 def check():
     bad = []
-    _, d = current(DOCS); _, r = current(GALLERY)
-    if d != full_table(): bad.append("docs/distros.md table is out of date (run: python3 scripts/gen_distro_table.py --tables)")
-    if r != grid(): bad.append("docs/gallery.md distro grid is out of date (run: python3 scripts/gen_distro_table.py --tables)")
-    have = {p.stem for p in IMG.glob("*.png")}; want = {e[0] for e in C.D}
-    if want - have: bad.append("missing sample images: " + ", ".join(sorted(want - have)) + " (run the generator with a built package)")
-    if have - want: bad.append("stale sample images: " + ", ".join(sorted(have - want)))
-    if bad: sys.exit("distro gallery check failed:\n  " + "\n  ".join(bad))
+    _, d = current(DOCS)
+    _, r = current(GALLERY)
+    if d != full_table():
+        bad.append("docs/distros.md table is out of date (run: python3 scripts/gen_distro_table.py --tables)")
+    if r != grid():
+        bad.append("docs/gallery.md distro grid is out of date (run: python3 scripts/gen_distro_table.py --tables)")
+    have = {p.stem for p in IMG.glob("*.png")}
+    want = {e[0] for e in C.D}
+    if want - have:
+        bad.append(
+            "missing sample images: " + ", ".join(sorted(want - have)) + " (run the generator with a built package)"
+        )
+    if have - want:
+        bad.append("stale sample images: " + ", ".join(sorted(have - want)))
+    if bad:
+        sys.exit("distro gallery check failed:\n  " + "\n  ".join(bad))
     print(f"distro gallery ok ({len(want)} entries)")
 
+
 if __name__ == "__main__":
-    if "--check" in sys.argv: check()
+    if "--check" in sys.argv:
+        check()
     else:
-        if "--tables" not in sys.argv: render()
+        if "--tables" not in sys.argv:
+            render()
         write_tables()
