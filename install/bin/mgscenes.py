@@ -221,6 +221,10 @@ class Renderer:
             out = [(e["kver"], "accent", "kernel")] if e.get("kver") else []
             if os_:
                 out.append((os_, "plain", None))
+            if e.get(
+                "where"
+            ):  # os-prober entries: tells two installs of the same distro apart (kept before the edition: a full row drops the last pills)
+                out.append((e["where"], "plain", None))
             if e.get("edition"):
                 out.append((e["edition"], "plain", None))
             if e.get("default"):
@@ -232,12 +236,16 @@ class Renderer:
                 out.append((e["kver"], "plain", "kernel"))
             if os_:
                 out.append((os_, "plain", None))
+            if e.get("where"):
+                out.append((e["where"], "plain", None))
             return out
         if kind == "advanced":
             out = [("Advanced options", "accent", "gear")]
             if e.get("count"):
                 out.append((f"{e['count']} more entries", "plain", None))
             return out
+        if e.get("where"):  # Windows and other foreign systems found by os-prober
+            return [(e["where"], "plain", None)]
         return []
 
     def title_for(self, e):

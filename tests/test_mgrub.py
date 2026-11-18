@@ -223,5 +223,27 @@ class Requirements(unittest.TestCase):
             self.assertIn(name, text)
 
 
+class DrivePill(unittest.TestCase):
+    """Two installs of one distro (os-prober) must be told apart: the drive shows in the info pills."""
+
+    def test_where_is_a_pill(self):
+        import mgscenes
+
+        a = {**mgrub.parse_title("Ubuntu 24.04.1 LTS (on /dev/sda5)"), "kind": "kernel", "title": "x"}
+        b = {**mgrub.parse_title("Ubuntu 22.04 LTS (on /dev/nvme0n1p3)"), "kind": "kernel", "title": "y"}
+        pa = [t for t, *_ in mgscenes.Renderer.info_pills(a)]
+        pb = [t for t, *_ in mgscenes.Renderer.info_pills(b)]
+        self.assertIn("/dev/sda5", pa)
+        self.assertIn("/dev/nvme0n1p3", pb)
+        self.assertNotEqual(pa, pb)
+        self.assertEqual(
+            mgscenes.Renderer.info_pills({"kind": "plain", "title": "W", "where": "/dev/sdb1"})[0][0], "/dev/sdb1"
+        )
+        self.assertEqual(mgscenes.Renderer.info_pills({"kind": "plain", "title": "W"}), [])
+
+    def test_distinct_classes_per_drive(self):
+        self.assertNotEqual(mgrub.uid("top", "Ubuntu (on /dev/sda5)"), mgrub.uid("top", "Ubuntu (on /dev/sdb5)"))
+
+
 if __name__ == "__main__":
     unittest.main()

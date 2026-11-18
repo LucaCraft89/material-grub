@@ -3,6 +3,7 @@ from real grub-mkconfig output (Debian, Ubuntu, Arch, Fedora/BLS). Needs a built
 usage: python3 tests/test_grubscript.py"""
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -145,6 +146,9 @@ class Tool(unittest.TestCase):
             + ["--state", str(st / "entries.json")],
             capture_output=True,
             text=True,
+            env=dict(
+                os.environ, OS_RELEASE=str(GOLD / "os-release")
+            ),  # the name in the Advanced submenu must not depend on the host
         )
         self.assertEqual(r.returncode, 0, r.stderr)
         return cfg.read_text(), json.loads((st / "entries.json").read_text())

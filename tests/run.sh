@@ -17,6 +17,7 @@ python3 tests/test_ventoy.py
 python3 tests/test_grubscript.py
 python3 tests/test_safety.py
 python3 tests/test_dryrun.py
+python3 tests/test_installer.py
 python3 scripts/gen_distro_table.py --check
 echo "== pipeline test (needs a built package)"
 python3 tests/test_pipeline.py

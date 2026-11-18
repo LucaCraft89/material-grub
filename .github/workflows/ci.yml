@@ -52,6 +52,7 @@ jobs:
           - {name: Debian,      image: "docker.io/library/debian:stable",                res: 1920x1080, scheme: dark}
           - {name: Arch,        image: "docker.io/library/archlinux:latest",             res: 1920x1200, scheme: light}
           - {name: openSUSE,    image: "registry.opensuse.org/opensuse/tumbleweed:latest", res: 2560x1080, scheme: dark}
+          - {name: AlmaLinux 8 (Python 3.6 by default), image: "docker.io/library/almalinux:8",     res: 1920x1080, scheme: dark}
           - {name: Alpine,      image: "docker.io/library/alpine:latest",                res: 5120x1440, scheme: light}
     steps:
       - uses: actions/checkout@v4
