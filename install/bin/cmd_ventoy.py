@@ -499,8 +499,6 @@ def main():
     elif "pnlug" in classes and "pnlug" not in keys:
         keys.append("pnlug")  # its rules are always written, so its scene must exist
     groups = mgscenes.groups_of(keys)
-    by_class = {e["class"]: e for e in entries}
-    menu = [{"level": "top", "items": [e["class"] for e in entries]}]
     opts = {"cookie": conf["COOKIE"] == "on", "hints": conf["HINTS"] == "on", "shape": "cookie"}
     per_entry = style == "list"
     print(
