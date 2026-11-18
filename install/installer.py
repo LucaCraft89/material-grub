@@ -600,7 +600,7 @@ class Installer:
                 cmd = {
                     "dnf": ["dnf", "install", "-y"],
                     "apt-get": ["apt-get", "install", "-y"],
-                    "pacman": ["pacman", "-S", "--needed", "--noconfirm"],
+                    "pacman": ["pacman", "-Sy", "--needed", "--noconfirm"],
                 }.get(self.pm, [self.pm, "install", "-y"] if self.pm != "apk" else ["apk", "add"])
                 if self.pm == "zypper":
                     cmd = ["zypper", "--non-interactive", "install"]
@@ -719,7 +719,8 @@ class Installer:
         b = self.build_dir
         for d in ("scripts", "install", "vendor", "fonts"):
             shutil.copytree(HERE / d, b / d, symlinks=True)
-        shutil.copy(HERE / "requirements.txt", b / "requirements.txt")
+        for f in ("requirements.txt", "VERSION"):
+            shutil.copy(HERE / f, b / f)
         py = self.build_python()
         self.info("creating a Python virtual environment")
         r = self.run([py, "-m", "venv", "--system-site-packages", ".venv"], cwd=b, capture_output=True)
