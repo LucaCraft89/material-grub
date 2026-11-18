@@ -43,16 +43,20 @@ SHAPES = {  # same outlines as scripts/render_scene.py (the build-time panels)
 }
 
 
-def groups_of(keys):
-    return [
-        g
-        for g in (
-            [k for k in keys if k not in WIN | SYS],
-            [k for k in keys if k in WIN],
-            [k for k in ("firmware", "reboot", "shutdown") if k in keys],
-        )
-        if g
-    ]
+def base_key(k):
+    """The catalog key of a (possibly customised) entry key: 'fedora~2' is the second customised Fedora."""
+    return k.split("~", 1)[0]
+
+
+def groups_of(keys, order=None):
+    """The rail sections: Linux, Windows, System (firmware and power). `order` (names from mgoverrides.GROUPS) moves sections; those left out keep their place after."""
+    parts = {
+        "linux": [k for k in keys if base_key(k) not in WIN | SYS],
+        "windows": [k for k in keys if base_key(k) in WIN],
+        "system": sorted((k for k in keys if base_key(k) in SYS), key=lambda k: ("firmware", "reboot", "shutdown").index(base_key(k))),
+    }
+    names = list(order or []) + [n for n in ("linux", "windows", "system") if n not in (order or [])]
+    return [parts[n] for n in names if parts[n]]
 
 
 class Renderer:
@@ -158,7 +162,9 @@ class Renderer:
 
     def glyph(self, name, size, color):
         name = self.galias.get(name, name)
-        a = self._g.setdefault(name, Image.open(self.pkg / "glyphs" / f"{name}.png").convert("RGBA").getchannel("A"))
+        a = self._g.get(name)
+        if a is None:
+            a = self._g[name] = Image.open(self.pkg / "glyphs" / f"{name}.png").convert("RGBA").getchannel("A")
         im = Image.new("RGBA", (size, size), color)
         im.putalpha(a.resize((size, size), Image.LANCZOS))
         return im
@@ -251,7 +257,7 @@ class Renderer:
         return []
 
     def title_for(self, e):
-        return {"advanced": "Advanced", "rescue": "Rescue"}.get(e["kind"]) or self.titles.get(e["key"], e["key"])
+        return e.get("name") or {"advanced": "Advanced", "rescue": "Rescue"}.get(e["kind"]) or self.titles.get(e["key"], e["key"])
 
     # ---- cookie (top-right) and key hints: drawn at config time, so they are runtime options ----
     def draw_cookie(self, canvas, p):
@@ -494,7 +500,7 @@ class Renderer:
     LIST = dict(col=640, row=76, gap=12, div=30, top=110, bottom=840, more_h=40, shape_glyph=40)
 
     def _group(self, key):
-        return 2 if key in SYS else 1 if key in WIN else 0
+        return 2 if base_key(key) in SYS else 1 if base_key(key) in WIN else 0
 
     def list_label(self, e):
         return {"advanced": "Advanced options", "rescue": "Rescue"}.get(e["kind"]) or self.label_for(e)

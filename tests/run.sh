@@ -14,6 +14,7 @@ python3 tests/test_mgrub.py
 python3 tests/test_overrides.py
 python3 tests/test_palette.py
 python3 tests/test_panel.py
+python3 tests/test_custom.py
 python3 tests/test_monitors.py
 python3 tests/test_tui.py
 python3 tests/test_ventoy.py
