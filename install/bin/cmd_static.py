@@ -16,6 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import grubscript
 import mgrub
 
 
@@ -39,6 +40,23 @@ menuentry 'Restart' --class restart --id material-reboot {{ reboot }}
 menuentry 'Shut down' --class shutdown --id material-halt {{ halt }}
 {D}
 """
+
+
+def insertion_line(body, lines):
+    """Index of the line the theme block goes before: the first `blscfg` call (or our structured-BLS block), else the first menu entry.
+    Found with the GRUB script scanner, so a line inside a quoted title or a comment is never taken for a command."""
+    sc = grubscript.scan(body)
+    first_entry = None
+    for i, ln in enumerate(lines):
+        cmd = sc.command_at_line(i)
+        if cmd is not None and cmd.value == "blscfg" and mgrub.bls_call(ln.rstrip("\n")) is not None:
+            return i
+        com = sc.comment_at_line(i)
+        if com is not None and com.text.startswith("# material-grub: structured BLS"):
+            return i
+        if first_entry is None and cmd is not None and cmd.value in ("menuentry", "submenu"):
+            first_entry = i
+    return len(lines) if first_entry is None else first_entry
 
 
 def main():
@@ -103,19 +121,8 @@ unset menu_hide_ok
 """
     had_system = C in text
     body = strip(text, [(A, B)] + ([] if had_system else [(C, D)]))
-    lines = body.splitlines(keepends=True)
-    at = next(
-        (
-            i
-            for i, l in enumerate(lines)
-            if mgrub.bls_call(l) is not None
-            or l.startswith("# material-grub: structured BLS")
-            or l.strip().startswith("# material-grub: structured BLS")
-        ),
-        None,
-    )
-    if at is None:
-        at = next((i for i, l in enumerate(lines) if re.match(r"\s*(menuentry|submenu)\b", l)), len(lines))
+    lines = grubscript.split_lines(body)
+    at = insertion_line(body, lines)
     if lines and not lines[-1].endswith("\n"):
         lines[-1] += "\n"
     new = "".join(lines[:at]) + block + "".join(lines[at:]) + ("" if had_system else system)

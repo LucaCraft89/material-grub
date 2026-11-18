@@ -17,6 +17,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import grubscript
 import mgrub
 
 
@@ -80,6 +81,82 @@ def mkentry(title, key, kind, level, cls, **kw):
 bls_entries = []
 
 
+def annotate(text, bls_confs, mbase, fallback):
+    """Add the unique per-entry classes to every menuentry/submenu and restructure `blscfg`.
+    The GRUB script is scanned with grubscript (quotes, escapes, nesting, multi-line headers), never matched line by line.
+    Returns (new text, entries found, number of entries that come before the blscfg call)."""
+    sc = grubscript.scan(text)
+    cfg_entries, inserts, ids = [], [], {}
+    for e in sc.entries:  # file order, parents before their children
+        key = key_of(e.title, e.classes)
+        kind = mgrub.kind_of(e.title, key, e.word == "submenu")
+        c = mgrub.uid(
+            e.level, e.title
+        )  # unique per entry, also for plain ones (Windows, Firmware...): their key stays the 2nd class, so the shared class scene is the fallback
+        if c not in e.classes:
+            inserts.append((e.title_end, f" --class {c}" + (f" --class {key}" if c != key else "")))
+        ids[id(e)] = c
+        cfg_entries.append(mkentry(e.title, key, kind, e.level, c, parent=ids.get(id(e.parent))))
+    lines = grubscript.split_lines(text)
+    offsets, pos = [], 0
+    for ln in lines:
+        offsets.append(pos)
+        pos += len(ln)
+    replaced, bls_at = [], 0
+    for i, ln in enumerate(lines):
+        tok = sc.command_at_line(i)
+        if tok is None or tok.value != "blscfg":
+            continue
+        call = mgrub.bls_call(ln.rstrip("\n"))
+        if not call:
+            continue
+        inside = any(
+            e.open_brace < offsets[i] and (e.close_brace is None or offsets[i] < e.close_brace) for e in sc.entries
+        )
+        if inside or not mgrub.bls_restructurable(call):
+            if not inside:
+                print(
+                    f"material-grub: leaving `{ln.strip()}` untouched (its options are not compatible with the Advanced-options structure); entries are themed by class only"
+                )
+        elif bls_confs:
+            bls_at = sum(1 for e in sc.entries if e.title_end < offsets[i])
+            replaced.append((offsets[i], offsets[i] + len(ln.rstrip("\n")), bls_block(call, mbase, fallback)))
+    edits = [(at, at, ins) for at, ins in inserts] + replaced
+    out, last = [], 0
+    for start, end, repl in sorted(edits, key=lambda t: t[0]):
+        out.append(text[last:start])
+        out.append(repl)
+        last = end
+    out.append(text[last:])
+    result = "".join(out)
+    return (result if result.endswith("\n") else result + "\n"), cfg_entries, bls_at
+
+
+def bls_block(call, mbase, fallback):
+    osn = os_name()
+    k = key_of(osn)
+    ac = mgrub.uid("adv-menu", osn)
+    ind, bargs = call
+    bcmd = ("blscfg " + bargs).strip()
+    blk = [
+        "# material-grub: structured BLS entries (default kernel here, the rest under Advanced options)",
+        f"set blsdir={mbase}/material-top",
+        f"if {bcmd}; then true; else unset blsdir; {bcmd}; fi",
+        f"submenu 'Advanced options for {osn}' --class {ac} --class {k} --id material-advanced {{",
+        f"\tset blsdir={mbase}/material-adv",
+        f"\t{bcmd}",
+        "}",
+        "unset blsdir",
+    ]
+    if fallback:
+        blk += [
+            f"submenu 'All boot entries (raw, always current)' --class {k} --id material-fallback {{",
+            f"\t{bcmd}",
+            "}",
+        ]
+    return "\n".join(ind + l for l in blk)
+
+
 def main():
     global alias2key, rules
     cfg = Path(sys.argv[1])
@@ -99,63 +176,9 @@ def main():
     first = MARK not in text
     bls_confs = sorted(bls.glob("*.conf")) if bls.is_dir() else []
     if first:
-        out, cfg_entries, stack, pstack, bls_at = [], [], [], [], 0
-        pat = re.compile(r"^(\s*)(menuentry|submenu)\s+(['\"])(.*?)\3(.*)$")
-        for line in text.splitlines():
-            m = pat.match(line)
-            if m:
-                ind, word, q, title, rest = m.groups()
-                level = "adv" if "submenu" in stack else "top"
-                cls = re.findall(r"--class\s+(\S+)", rest)
-                key = key_of(title, cls)
-                kind = mgrub.kind_of(title, key, word == "submenu")
-                c = mgrub.uid(
-                    level, title
-                )  # unique per entry, also for plain ones (Windows, Firmware...): their key stays the 2nd class, so the shared class scene is the fallback
-                if not re.search(rf"--class {re.escape(c)}\b", rest):
-                    line = f"{ind}{word} {q}{title}{q} --class {c}{(' --class ' + key) if c != key else ''}{rest}"
-                cfg_entries.append(mkentry(title, key, kind, level, c, parent=pstack[-1] if pstack else None))
-                if line.rstrip().endswith("{"):
-                    stack.append(word)
-                    pstack.append(c)
-            elif line.strip() == "}" and stack:
-                stack.pop()
-                pstack.pop()
-            elif mgrub.bls_call(line) and (stack or not mgrub.bls_restructurable(mgrub.bls_call(line))):
-                if not stack:
-                    print(
-                        f"material-grub: leaving `{line.strip()}` untouched (its options are not compatible with the Advanced-options structure); entries are themed by class only"
-                    )
-                out.append(line)
-                continue
-            elif mgrub.bls_restructurable(mgrub.bls_call(line)) and bls_confs:
-                bls_at = len(cfg_entries)
-                osn = os_name()
-                k = key_of(osn)
-                ac = mgrub.uid("adv-menu", osn)
-                ind, bargs = mgrub.bls_call(line)
-                bcmd = ("blscfg " + bargs).strip()
-                blk = [
-                    "# material-grub: structured BLS entries (default kernel here, the rest under Advanced options)",
-                    f"set blsdir={mbase}/material-top",
-                    f"if {bcmd}; then true; else unset blsdir; {bcmd}; fi",
-                    f"submenu 'Advanced options for {osn}' --class {ac} --class {k} --id material-advanced {{",
-                    f"\tset blsdir={mbase}/material-adv",
-                    f"\t{bcmd}",
-                    "}",
-                    "unset blsdir",
-                ]
-                if FALLBACK:
-                    blk += [
-                        f"submenu 'All boot entries (raw, always current)' --class {k} --id material-fallback {{",
-                        f"\t{bcmd}",
-                        "}",
-                    ]
-                out += [ind + l for l in blk]
-                continue
-            out.append(line)
+        new_text, cfg_entries, bls_at = annotate(text, bls_confs, mbase, FALLBACK)
         tmp = cfg.with_name(cfg.name + ".material")
-        tmp.write_text(MARK + "\n" + "\n".join(out) + "\n")
+        tmp.write_text(MARK + "\n" + new_text)
         os.chmod(tmp, cfg.stat().st_mode)
         os.replace(tmp, cfg)
         state.parent.mkdir(parents=True, exist_ok=True)
