@@ -158,8 +158,19 @@ class Doctor:
             )
         return pkg
 
+    def boot_unreadable(self):
+        """True when a GRUB directory exists but this user may not look inside it (Fedora makes /boot/grub2 0700)."""
+        for d in ("/boot/grub2", "/boot/grub"):
+            p = self.p(d)
+            if p.is_dir() and not os.access(p, os.R_OK | os.X_OK):
+                return True
+        return False
+
     def theme(self, pkg, gfx):
         found = [d for d in ("/boot/grub2/themes/material", "/boot/grub/themes/material") if self.p(d).is_dir()]
+        if not found and self.boot_unreadable():
+            self.add(WARN, "theme", "/boot/grub2 is root-only (Fedora does this): run with sudo to check the theme")
+            return None
         if not found:
             self.add(FAIL, "theme", "no theme directory in /boot/grub2/themes or /boot/grub/themes")
             return None
@@ -188,6 +199,9 @@ class Doctor:
 
     def grub_cfg(self):
         found = [f for f in ("/boot/grub2/grub.cfg", "/boot/grub/grub.cfg") if self.p(f).exists()]
+        if not found and self.boot_unreadable():
+            self.add(WARN, "grub.cfg", "/boot/grub2 is root-only (Fedora does this): run with sudo to check grub.cfg")
+            return None
         if not found:
             self.add(FAIL, "grub.cfg", "not found in /boot/grub2 or /boot/grub")
             return None

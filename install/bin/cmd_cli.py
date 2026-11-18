@@ -86,8 +86,17 @@ def tool(name, *args):
 
 
 # ---------------------------------------------------------------- commands
+def boot_root_only():
+    """True when a GRUB directory exists but we may not look inside it (Fedora makes /boot/grub2 0700)."""
+    return any(os.path.isdir(d) and not os.access(d, os.R_OK | os.X_OK) for d in ("/boot/grub2", "/boot/grub"))
+
+
 def c_doctor(argv):
     import cmd_doctor
+
+    # the theme and grub.cfg cannot be checked without root: ask sudo in a terminal, like apply (scripts and the GUI get the warning)
+    if "--root" not in argv and boot_root_only() and sys.stdin.isatty() and shutil.which("sudo"):
+        elevate(["doctor", *argv])
 
     return cmd_doctor.main(argv)
 
