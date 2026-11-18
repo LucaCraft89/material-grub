@@ -43,6 +43,30 @@ class Cli(unittest.TestCase):
         )
         return r.returncode, r.stdout + r.stderr
 
+    def test_doctor_asks_sudo_when_boot_is_root_only(self):
+        # Fedora's /boot/grub2 is 0700: in a terminal doctor re-runs itself under sudo, in a script it just warns
+        import unittest.mock as mock
+
+        import cmd_cli
+
+        with (
+            mock.patch.object(cmd_cli, "boot_root_only", return_value=True),
+            mock.patch.object(cmd_cli.sys.stdin, "isatty", return_value=True),
+            mock.patch.object(cmd_cli.shutil, "which", return_value="/usr/bin/sudo"),
+            mock.patch.object(cmd_cli, "elevate") as el,
+            mock.patch("cmd_doctor.main", return_value=0),
+        ):
+            cmd_cli.c_doctor(["--json"])
+            el.assert_called_once_with(["doctor", "--json"])
+        with (
+            mock.patch.object(cmd_cli, "boot_root_only", return_value=True),
+            mock.patch.object(cmd_cli.sys.stdin, "isatty", return_value=False),
+            mock.patch.object(cmd_cli, "elevate") as el,
+            mock.patch("cmd_doctor.main", return_value=0),
+        ):
+            cmd_cli.c_doctor([])
+            el.assert_not_called()
+
     def test_help_version_unknown(self):
         rc, out = self.mg("help")
         self.assertEqual(rc, 0)
