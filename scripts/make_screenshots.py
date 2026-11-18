@@ -3,10 +3,17 @@
 usage: make_screenshots.py [WxH ...]   (default: 1920x1080 2560x1080)  -> docs/screenshots/
        make_screenshots.py --styles    (every style, in the scheme of the package) -> styles/<style>-<scheme>-<n>.png
        make_screenshots.py --light     (needs a package built with --scheme light) -> light-*.png"""
-import shutil, subprocess, sys
+
+import shutil
+import subprocess
+import sys
 from pathlib import Path
-ROOT = Path(__file__).resolve().parent.parent; PKG = ROOT / "dist/material-grub"; OUT = ROOT / "docs/screenshots"
-BIN = PKG / "bin"; PY = sys.executable
+
+ROOT = Path(__file__).resolve().parent.parent
+PKG = ROOT / "dist/material-grub"
+OUT = ROOT / "docs/screenshots"
+BIN = PKG / "bin"
+PY = sys.executable
 
 CFG = """set timeout=120
 set gfxmode={res}
@@ -30,39 +37,107 @@ menuentry 'Shut down' --class shutdown --id material-halt {{ halt }}
 """
 BLS = ("Fedora Linux ({v}.fc44.x86_64) 44 (Workstation Edition)", "{v}.fc44.x86_64")
 
+
 def build_tree(res, tree):
-    shutil.rmtree(tree, ignore_errors=True); (tree / "loader/entries").mkdir(parents=True); (tree / "boot/grub").mkdir(parents=True)
+    shutil.rmtree(tree, ignore_errors=True)
+    (tree / "loader/entries").mkdir(parents=True)
+    (tree / "boot/grub").mkdir(parents=True)
     for v in ("7.3.3-200", "7.2.11-200", "7.2.8-200", "0-rescue-1657f3fb24ae"):
         title = BLS[0].format(v=v) if "rescue" not in v else f"Fedora Linux ({v}) 44 (Workstation Edition)"
-        (tree / f"loader/entries/abc-{v.split('-')[0] + '-rescue' if 'rescue' in v else v}.conf").write_text(f"title {title}\nversion {v}\nlinux /vmlinuz-{v}\ninitrd /initramfs-{v}.img\noptions root=UUID=x ro\ngrub_class fedora\n")
+        (tree / f"loader/entries/abc-{v.split('-')[0] + '-rescue' if 'rescue' in v else v}.conf").write_text(
+            f"title {title}\nversion {v}\nlinux /vmlinuz-{v}\ninitrd /initramfs-{v}.img\noptions root=UUID=x ro\ngrub_class fedora\n"
+        )
     (tree / "boot/grub/grub.cfg").write_text(CFG.format(res=res))
-    th = tree / "boot/grub/themes/material"; state = tree / "state/entries.json"
-    subprocess.run([PY, BIN / "material-grub-assemble", "--mode", res, "--pkg", PKG, "--out", th], check=True, stdout=subprocess.DEVNULL)
-    subprocess.run([PY, BIN / "material-grub-classes", tree / "boot/grub/grub.cfg", "--pkg", PKG, "--bls", tree / "loader/entries", "--loader", tree / "loader",
-                    "--blsbase", "/loader", "--state", state, "--default", "abc-7.3.3-200"], check=True)
+    th = tree / "boot/grub/themes/material"
+    state = tree / "state/entries.json"
+    subprocess.run(
+        [PY, BIN / "material-grub-assemble", "--mode", res, "--pkg", PKG, "--out", th],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        [
+            PY,
+            BIN / "material-grub-classes",
+            tree / "boot/grub/grub.cfg",
+            "--pkg",
+            PKG,
+            "--bls",
+            tree / "loader/entries",
+            "--loader",
+            tree / "loader",
+            "--blsbase",
+            "/loader",
+            "--state",
+            state,
+            "--default",
+            "abc-7.3.3-200",
+        ],
+        check=True,
+    )
     subprocess.run([PY, BIN / "material-grub-scenes", "--theme", th, "--state", state, "--pkg", PKG], check=True)
 
+
 def shoot(res, keys, names):
-    tree = ROOT / "build/shots-tree"; build_tree(res, tree)
-    subprocess.run([PY, ROOT / "scripts/qemu_tree.py", tree, res] + keys, check=True, env={**__import__("os").environ, "BOOT_WAIT": "14", "KEY_WAIT": "2.2"})
+    tree = ROOT / "build/shots-tree"
+    build_tree(res, tree)
+    subprocess.run(
+        [PY, ROOT / "scripts/qemu_tree.py", tree, res] + keys,
+        check=True,
+        env={**__import__("os").environ, "BOOT_WAIT": "14", "KEY_WAIT": "2.2"},
+    )
     OUT.mkdir(parents=True, exist_ok=True)
     for i, n in enumerate(names):
-        if n.startswith("_"): continue
-        from PIL import Image; (OUT / n).parent.mkdir(parents=True, exist_ok=True); Image.open(ROOT / f"build/tree-{i}.png").save(OUT / f"{n}.png", optimize=True)
+        if n.startswith("_"):
+            continue
+        from PIL import Image
+
+        (OUT / n).parent.mkdir(parents=True, exist_ok=True)
+        Image.open(ROOT / f"build/tree-{i}.png").save(OUT / f"{n}.png", optimize=True)
+
 
 if __name__ == "__main__":
     resl = [a for a in sys.argv[1:] if not a.startswith("--")] or ["1920x1080", "2560x1080"]
-    if "--styles" in sys.argv:      # two shots of every style in the scheme the package was built with -> docs/screenshots/styles/<style>-<scheme>-<n>.png
-        import os; scheme = (PKG / "scheme.txt").read_text().strip(); conf = ROOT / "build/shots.conf"
+    if (
+        "--styles" in sys.argv
+    ):  # two shots of every style in the scheme the package was built with -> docs/screenshots/styles/<style>-<scheme>-<n>.png
+        import os
+
+        scheme = (PKG / "scheme.txt").read_text().strip()
+        conf = ROOT / "build/shots.conf"
         for style in ("rail", "clean", "list", "split"):
-            conf.parent.mkdir(exist_ok=True); conf.write_text(f"STYLE={style}\n"); os.environ["MATERIAL_CONF"] = str(conf)
+            conf.parent.mkdir(exist_ok=True)
+            conf.write_text(f"STYLE={style}\n")
+            os.environ["MATERIAL_CONF"] = str(conf)
             shoot("1920x1080", ["down", "down"], [f"styles/{style}-{scheme}-1", "_", f"styles/{style}-{scheme}-2"])
         sys.exit(0)
     if "--light" in sys.argv:
-        shoot("1920x1080", ["down", "down", "down", "down"], ["light-fedora", "_adv", "light-windows", "light-arch", "_ubuntu"]); sys.exit(0)
+        shoot(
+            "1920x1080",
+            ["down", "down", "down", "down"],
+            ["light-fedora", "_adv", "light-windows", "light-arch", "_ubuntu"],
+        )
+        sys.exit(0)
     if "1920x1080" in resl:
         # shot 0 = initial, then one per key. "_" names are navigation steps that are not kept.
         keys = ["down", "ret", "down", "down", "esc", "down", "down", "down", "down", "down", "down"]
-        shoot("1920x1080", keys, ["fedora", "advanced", "kernel-older", "kernel-oldest", "rescue", "_top", "_adv", "windows", "arch", "ubuntu", "firmware", "restart"])
+        shoot(
+            "1920x1080",
+            keys,
+            [
+                "fedora",
+                "advanced",
+                "kernel-older",
+                "kernel-oldest",
+                "rescue",
+                "_top",
+                "_adv",
+                "windows",
+                "arch",
+                "ubuntu",
+                "firmware",
+                "restart",
+            ],
+        )
     if "2560x1080" in resl:
         shoot("2560x1080", ["down", "down"], ["ultrawide-fedora", "ultrawide-advanced", "ultrawide-windows"])

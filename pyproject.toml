@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+extend-exclude = ["build", "dist", "vendor", "theme-*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+# E501: `ruff format` wraps code; long comments and message strings are left as written.
+# E402: the scripts put the repo's own directories on sys.path before importing from them.
+# E741: `l` for a line of text is used throughout.
+# B023: the closures in the Ventoy scene loop are called inside the iteration that defines them.
+ignore = ["E501", "E402", "E741", "B023"]

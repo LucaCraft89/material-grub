@@ -111,7 +111,9 @@ if want_tui; then
   IMMQ=""; [ "$IMM" = 1 ] && [ "$STAGE" = 0 ] && IMMQ=--immutable
   # shellcheck disable=SC2086
   python3 "$HERE/install/tui.py" --out "$ANS" $PRE $IMMQ || { rm -f "$ANS"; die "cancelled, nothing was changed"; }
-  sed 's/^/A_/' "$ANS" > "$ANS.sh"; . "$ANS.sh"; rm -f "$ANS" "$ANS.sh"
+  sed 's/^/A_/' "$ANS" > "$ANS.sh"
+  # shellcheck disable=SC1090
+  . "$ANS.sh"; rm -f "$ANS" "$ANS.sh"
   [ -n "${A_RES:-}" ] && RES=$A_RES; [ -n "${A_STYLE:-}" ] && STYLE=$A_STYLE; [ -n "${A_SCHEME:-}" ] && { SCHEME=$A_SCHEME; SCHEME_SET=1; }
   [ -n "${A_COOKIE:-}" ] && COOKIE=$A_COOKIE; [ -n "${A_LOGO:-}" ] && LOGO=$A_LOGO
   [ -n "${A_HINTS:-}" ] && { [ "$A_HINTS" = off ] && HINTS=0 || HINTS=1; HINTS_SET=1; }
@@ -296,7 +298,7 @@ if [ "$VENTOY" = 1 ]; then
     if [ "$(id -u)" -eq 0 ]; then mount "$DEV" "$MNT" || die "could not mount $DEV"; MOUNTED_BY_US=$MNT
     else rmdir "$MNT"; U=$(udisksctl mount -b "$DEV" 2>&1) || die "could not mount $DEV (mount it in your file manager, or run with sudo): $U"; MNT=$(printf '%s' "$U" | sed -n 's/.* at \(.*\)\.$/\1/p'); [ -d "$MNT" ] || die "mounted $DEV but could not find where: $U"; UDISKS_DEV=$DEV; fi
     STICK=$MNT; info "mounted $DEV at $STICK";; esac
-  HOW=$(python3 "$HERE/install/ventoy_sticks.py" --check "$STICK") || die "$STICK is not the data partition of a Ventoy stick (its disk has no VTOYEFI partition and it has no /ventoy folder)."
+  python3 "$HERE/install/ventoy_sticks.py" --check "$STICK" >/dev/null || die "$STICK is not the data partition of a Ventoy stick (its disk has no VTOYEFI partition and it has no /ventoy folder)."
   [ -d "$STICK/ventoy" ] || { mkdir -p "$STICK/ventoy" && info "created $STICK/ventoy (a fresh Ventoy stick has none)"; }     # only after the check above: Ventoy was found through its VTOYEFI partition
   CONF="$STICK/ventoy/material-grub.conf"; : > "$CONF"
   for w in $CONFSETS; do case $w in --set) ;; *) printf '%s\n' "$w" >> "$CONF";; esac; done
@@ -312,6 +314,7 @@ if [ "$VENTOY" = 1 ]; then
   exit 0
 fi
 step "Installing into GRUB"
+# shellcheck disable=SC2046,SC2086 # the immutable flag and the config settings split into words on purpose
 sh "$HERE/install/install.sh" --res "$RES" --pkg "$DIST" $( [ "$IMM" = 1 ] && echo --immutable ) $CONFSETS
 
 # ---------- [6/6] done ----------

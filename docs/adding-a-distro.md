@@ -6,7 +6,7 @@ matching, `titles.json`, `rules.json`, rail glyphs) is generated from it by `scr
 ## 1. The row
 
 ```python
-("cachyos", "CachyOS", "Arch-based, optimized", FL % "cachyos", "#2BB5A0", "proposed", ["cachy", "cachy_os"]),
+(("cachyos", "CachyOS", "Arch-based, optimized", FL % "cachyos", "#2BB5A0", "proposed", ["cachy", "cachy_os"]),)
 #  key        title       subtitle                glyph            seed      source      aliases
 ```
 

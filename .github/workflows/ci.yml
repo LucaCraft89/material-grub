@@ -6,6 +6,16 @@ on:
 permissions: {contents: read}
 
 jobs:
+  lint:
+    name: Lint (ruff, shellcheck)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pipx install ruff shellcheck-py
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: shellcheck -x --severity=warning install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh
+
   checks:
     name: Syntax and unit tests
     runs-on: ubuntu-latest

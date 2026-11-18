@@ -8,6 +8,7 @@ if [ -n "$MATERIAL_GRUBDIR" ]; then GDIR=$MATERIAL_GRUBDIR; elif [ -d /boot/grub
 THEMEDIR=$GDIR/themes/material
 MODE=$(python3 "$PKG/bin/material-grub-assemble" --mode "${GRUB_GFXMODE:-}" --pkg "$PKG" --out "$THEMEDIR" 2>/dev/null | tail -n1) || exit 0
 [ -n "$MODE" ] || exit 0
+# shellcheck disable=SC2154 # grub_probe comes from grub-mkconfig_lib
 prepare_grub_to_access_device "$(${grub_probe} --target=device "$THEMEDIR")"
 REL=$(make_system_path_relative_to_its_root "$THEMEDIR")
 cat << EOF
