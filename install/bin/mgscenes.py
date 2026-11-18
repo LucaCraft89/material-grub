@@ -89,9 +89,9 @@ class Renderer:
         return round(v * self.S)
 
     # ---- fonts / glyphs ----
-    def font(self, size, wght=500, wdth=100, rond=0):
+    def font(self, size, wght=500, wdth=100, rond=0, opsz=None):
         f = ImageFont.truetype(self.font_path, size)
-        want = {"optical": size * 0.75, "width": wdth, "weight": wght, "roundness": rond, "grade": 0, "slant": 0}
+        want = {"optical": opsz or size * 0.75, "width": wdth, "weight": wght, "roundness": rond, "grade": 0, "slant": 0}
         vals = []
         for ax in f.get_variation_axes():  # by name: works with any version of the font (GRAD removed in v5)
             n = ax["name"].decode() if isinstance(ax["name"], bytes) else ax["name"]
@@ -705,6 +705,61 @@ class Renderer:
         self.decorate(sc, p, opts)
         self.draw_side_hero(sc, key, p, opts)
         return sc.convert("RGB")
+
+    # ---- build-time panels, redrawn at config time (custom colours): a port of scripts/render_scene.panel + build_theme.scene ----
+    def panel_scene(self, size, key, title="", sub="", hero=True, p=None):
+        """The class scene of `key` (the 'icons/<class>.png' with its hero when hero=True, else the 'bg/<key>.png' panel) drawn here with the
+        palette `p` (default: this renderer's), so a custom colour needs no rebuild. `size` is the scene size (W, H); H must be this renderer's height."""
+        u, ss = self.u, 3
+        p = p or self.pal[key]
+        W, H = size
+        pw, ph, yoff, r64 = W, H, u(60), u(64)
+
+        def mask(w, h, r):
+            im = Image.new("L", (w * ss, h * ss), 0)
+            ImageDraw.Draw(im).rounded_rectangle([0, 0, w * ss - 1, h * ss - 1], radius=r * ss, fill=255)
+            return im.resize((w, h), Image.LANCZOS)
+
+        def fill(m, color):
+            im = Image.new("RGBA", m.size, hexc(color) + (255,))
+            im.putalpha(m)
+            return im
+
+        def at(dst, src, cx, cy):  # int() like the build, so the pixels agree
+            dst.alpha_composite(src, (int(cx - src.width / 2), int(cy - src.height / 2)))
+
+        def shape(name, n, color):
+            return fill(poly_mask(n, SHAPES[name]), color)
+
+        im = fill(mask(pw, ph, r64), p["surface"])
+        cx = pw // 2
+        deco = Image.new("RGBA", im.size, (0, 0, 0, 0))
+        at(deco, shape("cookie", u(620), p["surfaceContainerHigh"]), cx - int(pw * 0.36), ph - u(120))
+        at(deco, shape("sunny", u(460), p["surfaceContainer"]), cx + int(pw * 0.34), ph - u(60))
+        at(deco, shape("clover", u(300), p["surfaceContainer"]), cx - int(pw * 0.29), u(150))
+        clip = Image.new("L", im.size, 0)
+        clip.paste(mask(pw, ph, r64))
+        from PIL import ImageChops
+
+        deco.putalpha(ImageChops.multiply(deco.getchannel("A"), clip))
+        im.alpha_composite(deco)
+        if hero:
+            w0, h0 = u(560), u(280)
+            at(im, fill(mask(w0 + u(40), h0 + u(40), (h0 + u(40)) // 2), p["surfaceContainerHigh"]), cx, u(300) + yoff)
+            at(im, fill(mask(w0, h0, h0 // 2), p["primaryContainer"]), cx, u(300) + yoff)
+            try:
+                at(im, self.glyph(key, u(230), hexc(p["onPrimaryContainer"]) + (255,)), cx, u(300) + yoff)
+            except OSError:
+                pass  # an entry without a glyph (the build draws nothing either)
+            tsz = u(150)
+            while tsz > u(60) and self.font(tsz, 800, 135, 60, 144).getlength(title) > pw * 0.62:
+                tsz -= u(6)
+            d = ImageDraw.Draw(im)
+            d.text((cx, u(530) + yoff), title, font=self.font(tsz, 800, 135, 60, 144), fill=hexc(p["primary"]), anchor="mm")
+            d.text((cx, u(644) + yoff), sub, font=self.font(u(40), 420, 105), fill=hexc(p["onSurfaceVariant"]), anchor="mm")
+        canvas = Image.new("RGBA", (W, H), hexc(p["surface"]) + (255,))
+        canvas.alpha_composite(im)
+        return canvas.convert("RGB")
 
     def render_class(self, key, icon_path, groups, style="rail", opts=None, menu=None, rail_sel=None):
         """Class-level scene (fallbacks, and plain entries in the rail style): the build-time hero scene + cookie + hints + style furniture."""

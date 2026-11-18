@@ -73,6 +73,7 @@ if __name__ == "__main__":
     )  # most specific first; ties in a fixed order
     (PKG / "rules.json").write_text(json.dumps(rules))
     (PKG / "titles.json").write_text(json.dumps({k: t for k, t, *_ in C.D + C.X}))
+    (PKG / "subtitles.json").write_text(json.dumps({k: sub for k, _, sub, *_ in C.D + C.X}))  # the hero subtitle, for mgscenes.panel_scene
     (PKG / "fonts").mkdir()
     shutil.copy(B.R.FONT, PKG / "fonts" / "GoogleSansFlex-VF.ttf")
     for n in ("OFL.txt", "TRADEMARKS.md"):
