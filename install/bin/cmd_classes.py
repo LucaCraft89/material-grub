@@ -18,6 +18,7 @@ import tempfile
 from pathlib import Path
 
 import grubscript
+import mgoverrides
 import mgrub
 import mgsafe
 
@@ -80,6 +81,134 @@ def mkentry(title, key, kind, level, cls, **kw):
 
 
 bls_entries = []
+BLS_MARK = "# material-grub: structured BLS entries"
+
+
+def group_of(key):
+    base = key.split("~", 1)[0]
+    return "windows" if base in ("windows10", "windows11") else "system" if base in ("firmware", "reboot", "shutdown") else "linux"
+
+
+def customise(text, cfg_entries, bls_at, ov, log=print):
+    """Apply the user's `hidden`, `order` and `groups` overrides to the annotated grub.cfg. Only whole menuentry/submenu blocks that stand at the
+    top level of the script (not inside if/while/function) are touched: hidden ones are replaced by a comment, the others swap places with each
+    other, so everything between the blocks stays where it is. The blscfg block counts as one movable item that belongs to the Linux group.
+    Returns (text, cfg_entries, bls_at). Anything unusual (a numeric `set default`) leaves everything as it was."""
+    wants = bool(ov["order"] or ov["groups"] or any(r.get("hidden") for r in ov["entries"]))
+    if not wants:
+        return text, cfg_entries, bls_at
+    if re.search(r'^\s*set\s+default\s*=\s*"?\d', text, re.M):
+        log("material-grub: overrides: grub.cfg selects its default entry by number, so entries are not hidden or reordered")
+        return text, cfg_entries, bls_at
+    by_class = {e["class"]: e for e in cfg_entries}
+
+    def info(ge):
+        return by_class.get(next((c for c in ge.classes if c.startswith("mg_")), None))
+
+    def descendants_of(root_class):
+        out, todo = set(), [root_class]
+        while todo:
+            c = todo.pop()
+            for e in cfg_entries:
+                if e.get("parent") == c and e["class"] not in out:
+                    out.add(e["class"])
+                    todo.append(e["class"])
+        return out
+
+    # 1. hidden: cut the blocks out
+    sc = grubscript.scan(text)
+    cuts = []
+    for ge in sc.entries:
+        d = info(ge)
+        if d is not None and not ge.guarded and ge.end is not None and mgoverrides.rule_for(ov, d).get("hidden"):
+            cuts.append((ge, d))
+    gone = set()
+    for ge, d in cuts:
+        gone.add(d["class"])
+        gone |= descendants_of(d["class"])
+    cuts = [(ge, d) for ge, d in cuts if not any(a in gone and a != d["class"] and d["class"] in descendants_of(a) for a in gone)]
+    if cuts:
+        out, last = [], 0
+        for ge, d in sorted(cuts, key=lambda t: t[0].start):
+            out += [text[last : ge.start], "# material-grub: hidden by overrides.json: " + re.sub(r"\s+", " ", d["title"])]
+            last = ge.end
+        out.append(text[last:])
+        text = "".join(out)
+        cfg_entries = [e for e in cfg_entries if e["class"] not in gone]
+        by_class = {e["class"]: e for e in cfg_entries}
+    # 2. order: swap the movable blocks between the slots they occupy
+    if not (ov["order"] or ov["groups"]):
+        return text, cfg_entries, bls_at
+    sc = grubscript.scan(text)
+    items = []  # (start, end, class or None for the BLS block)
+    for ge in sc.entries:
+        d = info(ge)
+        if d is not None and ge.parent is None and not ge.guarded and ge.end is not None:
+            items.append((ge.start, ge.end, d["class"]))
+    i = text.find(BLS_MARK)
+    if i >= 0:
+        i = text.rfind("\n", 0, i) + 1
+        j = text.find("\nunset blsdir", i) + 1 if "\nunset blsdir" in text[i:] else -1
+        j = text.find("\n", j) + 1 if j >= 0 else -1
+        fb = next((ge for ge in sc.entries if ge.title.startswith("All boot entries") and ge.start >= i), None)
+        if fb is not None and fb.end is not None and fb.start - j < 4:
+            j = text.find("\n", fb.end) + 1 if text.find("\n", fb.end) >= 0 else len(text)
+        if j > i:
+            items.append((i, j, None))
+    items.sort()
+    if len(items) < 2:
+        return text, cfg_entries, bls_at
+    names = list(ov["groups"]) + [n for n in ("linux", "windows", "system") if n not in ov["groups"]]
+
+    def rank(item):
+        cls = item[2]
+        e = by_class.get(cls) if cls else None
+        g = names.index(group_of(e["key"] if e else "linux")) if ov["groups"] else 0
+        o = next((n for n, m in enumerate(ov["order"]) if e and mgoverrides.matches(m, e)), len(ov["order"]))
+        return g, o
+
+    ranked = sorted(range(len(items)), key=lambda n: (*rank(items[n]), n))
+    if ranked == list(range(len(items))):
+        return text, cfg_entries, bls_at
+    out, last = [], 0
+    for slot, n in zip(items, ranked):
+        out += [text[last : slot[0]], text[items[n][0] : items[n][1]]]
+        last = slot[1]
+    out.append(text[last:])
+    # the same permutation for the entry state (a root moves together with its submenu children)
+    chunks, cur, tops_seen = [], None, 0
+    movable = {c for _, _, c in items if c}
+    has_bls = any(c is None for _, _, c in items)
+    for e in cfg_entries:
+        if e.get("level", "top") == "top" and e.get("parent") is None:
+            if has_bls and tops_seen == bls_at and not any(c[0] == "BLS" for c in chunks):
+                chunks.append(("BLS", []))
+            tops_seen += 1
+            cur = [e]
+            chunks.append((e["class"] if e["class"] in movable else None, cur))
+        elif cur is not None:
+            cur.append(e)
+        else:
+            chunks.append((None, [e]))
+    if has_bls and not any(c[0] == "BLS" for c in chunks):
+        chunks.append(("BLS", []))
+    slots = [n for n, c in enumerate(chunks) if c[0] is not None]
+    order_of = {c: n for n, (_, _, c) in enumerate(items)}
+    order_of["BLS"] = next((n for n, it in enumerate(items) if it[2] is None), None)
+    movers = [chunks[n] for n in slots if order_of.get(chunks[n][0]) is not None]
+    if movers and len(movers) == len(slots):
+        newc = sorted(movers, key=lambda c: ranked.index(order_of[c[0]]))
+        for n, c in zip(slots, newc):
+            chunks[n] = c
+    flat, tops = [], 0
+    bls_new = bls_at
+    for tag, es in chunks:
+        if tag == "BLS":
+            bls_new = tops
+        for e in es:
+            flat.append(e)
+            tops += e.get("level", "top") == "top" and e.get("parent") is None
+    return "".join(out), flat, bls_new
 
 
 def annotate(text, bls_confs, mbase, fallback):
@@ -171,6 +300,7 @@ def main():
     cfgstate = state.with_name("cfg-entries.json")
     cfgmeta = state.with_name("cfg-meta.json")
     rules = mgrub.load_rules(pkg)
+    ovr = mgoverrides.load()[0]
     classes = json.loads((pkg / "classes.json").read_text())
     alias2key = {a: k for k, al in classes.items() for a in al}
     text = cfg.read_text()
@@ -178,6 +308,10 @@ def main():
     bls_confs = sorted(bls.glob("*.conf")) if bls.is_dir() else []
     if first:
         new_text, cfg_entries, bls_at = annotate(text, bls_confs, mbase, FALLBACK)
+        ov, problems = mgoverrides.load()
+        for pr in problems:
+            print(f"material-grub: overrides: {pr}")
+        new_text, cfg_entries, bls_at = customise(new_text, cfg_entries, bls_at, ov)
         tmp = cfg.with_name(cfg.name + ".material")
         tmp.write_text(MARK + "\n" + new_text)
         os.chmod(tmp, cfg.stat().st_mode)
@@ -234,6 +368,8 @@ def main():
             key = key_of(title, [d["grub_class"]] if "grub_class" in d else [])
             kind = mgrub.kind_of(title, key)
             cls = mgrub.uid(level, title)
+            if mgoverrides.rule_for(ovr, {"key": key, "class": cls, "title": title}).get("hidden"):
+                return
             lines = [
                 l for l in f.read_text(errors="ignore").splitlines() if l.strip() and not l.startswith("grub_class")
             ] + [

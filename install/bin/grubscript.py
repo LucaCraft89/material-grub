@@ -40,6 +40,13 @@ class Entry:
         self.close_brace = None  # offset of the matching `}` (None: never closed)
         self.parent = None  # enclosing Entry or None
         self.line = 0
+        self.start = 0  # offset of the `menuentry` / `submenu` word
+        self.guarded = False  # inside an if/while/for/case or a function body: the block cannot be moved or removed on its own
+
+    @property
+    def end(self):
+        """Offset just after the closing brace (None when the block is never closed)."""
+        return None if self.close_brace is None else self.close_brace + 1
 
     @property
     def classes(self):
@@ -199,6 +206,7 @@ def scan(text):
     tokens = tokenize(text)
     entries = []
     frames = []  # open `{` blocks: an Entry, or None for a function body and the like
+    ctrl = 0  # open if / while / until / for / case constructs
     i = 0
     n = len(tokens)
     while i < n:
@@ -212,6 +220,8 @@ def scan(text):
             if j < n and tokens[j].kind == "op" and tokens[j].text == "{" and args:
                 e = Entry(t.value, args[0].value, args[0].end, [a.value for a in args], i)
                 e.line = t.line
+                e.start = t.start
+                e.guarded = ctrl > 0 or any(f is None for f in frames)
                 e.open_brace = tokens[j].start
                 e.parent = next((f for f in reversed(frames) if f is not None), None)
                 entries.append(e)
@@ -220,6 +230,10 @@ def scan(text):
                 continue
             i = j  # a menuentry without a block is not valid GRUB script: not an entry
             continue
+        if t.kind == "word" and t.cmd and t.value in ("if", "while", "until", "for", "case", "select"):
+            ctrl += 1
+        elif t.kind == "word" and t.cmd and t.value in ("fi", "done", "esac") and ctrl:
+            ctrl -= 1
         if t.kind == "op" and t.text == "{":
             frames.append(None)
         elif t.kind == "op" and t.text == "}" and frames:
