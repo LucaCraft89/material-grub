@@ -30,7 +30,7 @@ material-grub help | grep -q "colour" && say "material-grub help: ok" || { say "
 material-grub doctor > /tmp/doctor.txt 2>&1 && say "doctor: ok" || { say "doctor: FAILED"; cat /tmp/doctor.txt | tee -a $R; tail -40 /tmp/inst.log | tee -a $R; exit 1; }
 grep -q "classes applied" $CFG && say "grub.cfg annotated" || { say "grub.cfg NOT annotated"; exit 1; }
 [ -e /etc/material-grub.conf ] && say "config present"
-[ -e /usr/bin/material-grub-gui ] && { say "the GUI was installed with the theme (it must not be)"; exit 1; } || say "the GUI is not installed by the theme package"
+[ -e /usr/share/material-grub-gui/material-grub-gui ] && { say "the GUI was installed with the theme (it must not be)"; exit 1; } || say "the GUI is not installed by the theme package"
 
 say "== features: a style per distro, one seed colour, overrides, the single command"
 case $fmt in rpm) ST=split;; deb) ST=list;; *) ST=clean;; esac
@@ -54,10 +54,12 @@ grep -q "^STYLE=list" /etc/material-grub.conf && say "config kept" || { say "con
 
 say "== optional GUI package"
 inst_gui > /tmp/gui.log 2>&1 && say "gui package manager: ok" || { say "gui package manager: FAILED"; tail -30 /tmp/gui.log | tee -a $R; exit 1; }
-for f in /usr/bin/material-grub-gui /usr/libexec/material-grub-gui-helper /usr/share/polkit-1/actions/org.material-grub.gui.policy /usr/share/applications/material-grub-gui.desktop /usr/share/material-grub-gui/web/index.html; do
+for f in /usr/share/material-grub-gui/material-grub-gui /usr/libexec/material-grub-gui-helper /usr/share/polkit-1/actions/org.material-grub.gui.policy /usr/share/applications/material-grub-gui.desktop /usr/share/material-grub-gui/web/index.html; do
   [ -e "$f" ] || { say "gui file missing: $f"; exit 1; }
 done
-material-grub-gui --help >/dev/null 2>&1 && say "material-grub-gui starts" || { say "material-grub-gui --help FAILED"; material-grub-gui --help 2>&1 | tail -5 | tee -a $R; exit 1; }
+material-grub gui --help >/dev/null 2>&1 && say "material-grub gui starts" || { say "material-grub gui --help FAILED"; material-grub gui --help 2>&1 | tail -5 | tee -a $R; exit 1; }
+extra=$(ls /usr/local/bin /usr/local/sbin /usr/bin /usr/sbin 2>/dev/null | grep "^material-grub" | sort -u | tr "\n" " ")
+[ "$extra" = "material-grub " ] && say "only one command on the PATH: material-grub" || { say "unexpected commands on the PATH: $extra"; exit 1; }
 python3 /src/tests/containers/gui_probe.py > /tmp/guiprobe.txt 2>&1 && say "the packaged GUI answers (state, previews in 4 styles, security checks)" || { say "GUI PROBE FAILED"; tail -20 /tmp/guiprobe.txt | tee -a $R; exit 1; }
 echo '{"verb":"nope"}' | /usr/libexec/material-grub-gui-helper | grep -q '"event": "error"' && say "helper refuses an unknown request" || { say "helper did not refuse an unknown request"; exit 1; }
 

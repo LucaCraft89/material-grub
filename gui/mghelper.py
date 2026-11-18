@@ -6,7 +6,7 @@ step, info, ok, warn, error, log, done). It takes no arguments and no environmen
 value is validated again here, because the caller is an unprivileged program.
 
   apply   {"verb": "apply", "conf": {...}, "overrides": {...}, "icons": {"name.png": "<base64>"}}
-          backs up the current files, writes icons, overrides.json and the runtime options, runs material-grub-apply, restores the backup if that fails.
+          backs up the current files, writes icons, overrides.json and the runtime options, runs `material-grub apply`, restores the backup if that fails.
   update  {"verb": "update"}  updates Material GRUB through the system's package manager (package installs) or reruns the installer (source installs)
 
 Only when NOT running as root (the tests) may MG_HELPER_ROOT point all paths into a scratch directory; as root the environment is ignored.
@@ -67,7 +67,7 @@ CONF = p("/etc/material-grub.conf")
 OVERRIDES = p("/etc/material-grub/overrides.json")
 ICONS = OVERRIDES.parent / "icons"
 BACKUPS = p("/var/backups/material-grub")
-APPLY = os.environ.get("MG_HELPER_APPLY") if TEST else "/usr/local/sbin/material-grub-apply"
+APPLY = os.environ.get("MG_HELPER_APPLY") if TEST else "/usr/local/bin/material-grub"
 
 
 def emit(event, **kw):
@@ -177,14 +177,14 @@ def verb_apply(req):
     emit("ok", msg="settings written")
     emit("step", n=3, total=4, msg="Applying to GRUB (rebuilding grub.cfg and the scenes)")
     if APPLY:
-        rc = run([APPLY], "material-grub-apply")
+        rc = run([APPLY, "apply"], "material-grub apply")
     else:
         rc = 1
     if rc != 0:
         emit("step", n=4, total=4, msg="Going back to the previous settings")
         restore(b)
         if APPLY:
-            run([APPLY], "re-applying the previous settings")
+            run([APPLY, "apply"], "re-applying the previous settings")
         die("applying failed; your previous settings are back (see the log above)", rc or 1)
     emit("step", n=4, total=4, msg="Done")
     emit("ok", msg="Material GRUB is updated. The new menu shows on the next boot.")

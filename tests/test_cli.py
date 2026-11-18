@@ -103,12 +103,46 @@ class Cli(unittest.TestCase):
         self.assertEqual(self.mg("presets", "import", str(bad))[0], 1)
 
     def test_gui_missing_is_explained(self):
-        env = dict(self.env, PATH="/nonexistent")
-        r = subprocess.run(
-            [sys.executable, str(CLI), "gui"], capture_output=True, text=True, env=env, stdin=subprocess.DEVNULL
-        )
-        self.assertEqual(r.returncode, 1)
-        self.assertIn("--with-gui", r.stdout)
+        import contextlib
+        import io
+
+        import cmd_cli
+
+        keep = cmd_cli.gui_launcher
+        cmd_cli.gui_launcher = lambda: None  # no GUI installed
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                rc = cmd_cli.c_gui([])
+        finally:
+            cmd_cli.gui_launcher = keep
+        self.assertEqual(rc, 1)
+        self.assertIn("--with-gui", buf.getvalue())
+
+    def test_apply_without_root_says_how(self):
+        if os.geteuid() == 0:
+            self.skipTest("running as root")
+        rc, out = self.mg("apply")  # no terminal: no sudo is attempted
+        self.assertNotEqual(rc, 0)
+        self.assertIn("sudo material-grub apply", out)
+
+    def test_gui_subcommand_starts_the_launcher_of_the_checkout(self):
+        rc, out = self.mg("gui", "--help")
+        self.assertEqual(rc, 0)
+        self.assertIn("graphical editor", out)
+
+    def test_only_one_command_is_installed(self):
+        """The installer must put nothing but `material-grub` on the PATH (apply and gui are subcommands)."""
+        import re
+
+        install = (ROOT / "install/install.sh").read_text()
+        targets = set(re.findall(r'install -m755 "[^"]+" "\$D(/usr/[\w/.-]+)"', install)) & {
+            p for p in re.findall(r'"\$D(/usr/[\w/.-]+)"', install) if "/bin/" in p
+        }
+        self.assertEqual(targets, {"/usr/local/bin/material-grub"})
+        tree = (ROOT / "packaging/common/install-gui-tree.sh").read_text()
+        self.assertNotIn("/usr/bin", tree)
+        self.assertFalse((ROOT / "install/material-grub-apply").exists())
 
     def test_update_without_network_check(self):
         rc, out = self.mg("update")

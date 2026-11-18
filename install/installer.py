@@ -1061,7 +1061,7 @@ class Installer:
             self.warn("the GUI could not be installed (the theme itself is fine)")
             return
         self.ok(
-            "installed: start it with material-grub-gui (opens in your browser; changes ask for your password through polkit)"
+            "installed: start it with `material-grub gui` (opens in your browser; changes ask for your password through polkit)"
         )
 
     def write_seed(self):

@@ -4,7 +4,7 @@ set -eu
 cd "$(dirname "$0")/.."
 export MATERIAL_OVERRIDES=/nonexistent/material-grub/overrides.json   # the tests must not read the overrides of the machine they run on
 echo "== shell syntax"
-for f in install.sh install/*.sh install/material-grub install/material-grub-apply install/05_material install/15_material_menu install/90_material_system tests/run.sh packaging/common/*.sh tests/containers/*.sh; do sh -n "$f" && echo "ok $f"; done
+for f in install.sh install/*.sh install/material-grub install/05_material install/15_material_menu install/90_material_system tests/run.sh packaging/common/*.sh tests/containers/*.sh; do sh -n "$f" && echo "ok $f"; done
 echo "== python syntax"
 python3 -m py_compile scripts/*.py install/bin/material-grub-* install/bin/*.py install/*.py tests/*.py gui/*.py gui/material-grub-gui && echo ok
 echo "== front end syntax"

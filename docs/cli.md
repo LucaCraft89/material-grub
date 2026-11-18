@@ -18,4 +18,4 @@ One command for everything. Run it alone for a menu (a terminal UI; arrows and E
 | `sudo material-grub uninstall` | remove Material GRUB (your settings in `/etc` stay) |
 | `material-grub version`, `help` | |
 
-Commands that write system files ask for root themselves: in a terminal they re-run through `sudo` (your password or fingerprint), otherwise they tell you to run `sudo material-grub ...`. The older command names (`material-grub-apply`, `material-grub-doctor`, ...) keep working.
+Commands that write system files ask for root themselves: in a terminal they re-run through `sudo` (your password or fingerprint), otherwise they tell you to run `sudo material-grub ...`. It is the only command that is installed: `apply`, `gui` and the rest are subcommands (since 0.7.1; earlier versions also installed `material-grub-apply` and `material-grub-gui`, which an update removes).
