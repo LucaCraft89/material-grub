@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import mgoverrides
+import mgplugins
 import mgrub
 import mgsafe
 
@@ -293,6 +294,21 @@ class Doctor:
             + ("" if good else ": run sudo systemctl enable --now material-grub.path"),
         )
 
+    def plugins(self):
+        """Optional parts from other packages (material-plymouth): listed when present, a broken or incompatible one is a warning. Nothing is printed without any."""
+        import cmd_cli  # the names of the built-in commands, which a plugin may not take over
+
+        dirs = (
+            [self.p(d) for d in mgplugins.DEFAULT_DIRS]
+            if self.root and "MATERIAL_PLUGIN_PATH" not in os.environ
+            else None
+        )
+        for pl in mgplugins.discover(cmd_cli.COMMANDS, dirs):
+            if pl.problem:
+                self.add(WARN, f"plugin {pl.name}", pl.problem)
+            else:
+                self.add(OK, f"plugin {pl.name}", f"{pl.title} {pl.version}")
+
     def last_error(self):
         f = self.p("/var/lib/material-grub/last-error") if self.root else mgsafe.state_dir() / "last-error"
         if not f.is_file():
@@ -331,6 +347,7 @@ class Doctor:
         self.overrides(pkg)
         self.hooks()
         self.path_unit()
+        self.plugins()
         if pkg:
             theme = self.theme(pkg, gfx)
             self.grub_cfg()

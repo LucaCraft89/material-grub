@@ -47,6 +47,30 @@ class Presets(unittest.TestCase):
         self.assertEqual(mgrub.load_conf(conf2)["STYLE"], "list")
         self.assertEqual((ov2.parent / "icons/logo.png").read_bytes(), b"\x89PNG-not-really")
 
+    def test_the_plymouth_look_travels_with_a_preset(self):
+        mgrub.write_conf(self.conf, {"PLYMOUTH_BAR": "progress", "PLYMOUTH_MOTION": "calm", "PLYMOUTH": "off"})
+        mgpresets.save("Calm", self.ov, self.conf)
+        data = mgpresets.load("Calm", self.ov)
+        self.assertEqual(
+            {k: data["conf"][k] for k in ("PLYMOUTH", "PLYMOUTH_BAR", "PLYMOUTH_MOTION")},
+            {"PLYMOUTH": "off", "PLYMOUTH_BAR": "progress", "PLYMOUTH_MOTION": "calm"},
+        )
+        other = Path(tempfile.mkdtemp())
+        ov2, conf2 = other / "etc/material-grub/overrides.json", other / "material-grub.conf"
+        mgpresets.apply(data, ov2, conf2)
+        c = mgrub.load_conf(conf2)
+        self.assertEqual((c["PLYMOUTH"], c["PLYMOUTH_BAR"], c["PLYMOUTH_MOTION"]), ("off", "progress", "calm"))
+
+    def test_a_preset_from_before_the_plymouth_keys_still_applies(self):
+        old = mgpresets.build("Old", self.ov, self.conf)
+        for k in ("PLYMOUTH", "PLYMOUTH_BAR", "PLYMOUTH_MOTION"):
+            old["conf"].pop(k, None)
+        clean, errs = mgpresets.validate(old)
+        self.assertEqual(errs, [])
+        other = Path(tempfile.mkdtemp())
+        mgpresets.apply(old, other / "o/overrides.json", other / "m.conf")
+        self.assertEqual(mgrub.load_conf(other / "m.conf")["PLYMOUTH_MOTION"], "full")
+
     def test_scheme_is_not_part_of_a_preset(self):
         self.assertNotIn("SCHEME", mgpresets.build("x", self.ov, self.conf)["conf"])
 
