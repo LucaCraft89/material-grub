@@ -184,7 +184,8 @@ Sources only, rendered on the target like the main package: rpm (`%posttrans`, d
 ## 9. Phases (each one a green, reviewable step)
 
 0. **Spike (DONE, see 9a).** One script theme with a rotating cookie, shapes and the wavy bar, run with Plymouth's X11 renderer under Xvfb in this sandbox (Plymouth is installable here; QEMU is not installed and would need adding). Measures: rotation quality and CPU, wave smoothness, asset size. Decides sprite-wave vs frame-wave and the morph frame budget. If the script engine cannot do it well, I stop and report instead of building on it.
-1. **Contract and conf** (material-grub): the keys, `plymouth` subcommand dispatch, doctor hooks, tests. No Plymouth needed to test.
+1. **Contract and conf** (material-grub; DONE, PR #15): the keys, `plymouth` subcommand dispatch, doctor hooks, tests. No Plymouth needed to test.
+1b. **Upgrades and existing installs** (material-grub, section 9c): state record, detection, notice, migrations, package scriptlets, `doctor` on the same detection, upgrade tests.
 2. **Renderer**: scene assets for the four styles, light and dark, single seed and per-distro keys, BGRT/Tux, pills, password, messages. Golden tests and screenshots, like the GRUB gallery.
 3. **Script theme**: animation, bar modes, password prompt, modes (boot, shutdown, update), fallbacks.
 4. **Apply/remove** with the safety pattern, per initramfs system, command-line step.
@@ -211,6 +212,45 @@ When the shared code moves to `material-boot-core`, the user-facing shape change
 - **Compatibility (proposed, to confirm):** `material-grub` stays as a thin alias of `material-boot grub` for at least one release with a deprecation note, so existing scripts, the kernel and pacman hooks, the path unit, the polkit helper and user muscle memory keep working; `/etc/material-grub.conf` and `/etc/material-grub/` keep their paths (or are migrated with a symlink), because moving user data is the risky part of a rename.
 - Until then (phases 1 to 7) the command is `material-grub plymouth ...` as in decision 15; phase 8 renames it, with the old form kept as an alias.
 - Phase 8 stays a set of PRs into `release/0.8.0` or a later release branch, never a change to `main` in one piece, with the whole matrix of section 10 re-run on the unified installer (install only grub, only plymouth, both, none of the optional parts; upgrade from 0.7.x; uninstall each part separately).
+
+## 9c. Upgrades and existing installs (maintainer, fourth message)
+
+**Rule: the installer and every package always assume an install may already exist.** They detect it, tell the user what they found, and update it doing their best, keeping the user's settings. Nothing is overwritten or removed silently.
+
+What exists today (recon): `install.sh` simply replaces ("replacing any older version"), removes the old command names, and replaces or appends `--set` conf lines. The rpm `%posttrans`, deb `postinst` and arch `post_upgrade` re-run `install.sh --from-package` on first install and on upgrades. There is no explicit detection, no notice, no record of which parts are installed, and no migration steps; compatibility so far came from defaults and a lenient `load_conf`.
+
+### Detection
+- **A state record** `/var/lib/material-grub/state.json` (new, written by every apply): the parts installed with their versions (core, grub theme, Plymouth, GUI), how each was installed (`package`, `source`, `immutable`), the date, the conf schema, and the Ventoy sticks themed (identity and version). Plymouth records what it changed (command-line edit, backups, initramfs images) so it can be undone and upgraded cleanly.
+- **Fingerprints for installs that predate it (0.7.x and older):** `/usr/share/material-grub/VERSION`, `/etc/material-grub.conf`, `/etc/material-grub/` (overrides, icons, presets), `/usr/local/bin/material-grub` and the old command names, `/etc/grub.d/05_material`, `15_material_menu`, `90_material_system`, `/usr/libexec/material-grub-postprocess`, the systemd path and service units, the kernel and pacman hooks, `/var/lib/material-grub/` (env, entries, immutable package copy), `/usr/share/material-grub-gui`, the theme directory in `/boot/grub*/themes/material`, and the package manager's own database (`rpm -qf`, `dpkg -S`, `pacman -Qo`) to tell who owns the files.
+- **What it concludes:** none; same version; older (upgrade); newer (downgrade); partial or broken (some pieces missing); owned by a package while a source install is requested, or the reverse; a different layout (normal vs immutable); a GUI or Plymouth part whose version does not fit the core. `material-grub doctor` uses the same detection, so the report and the installer never disagree.
+
+### The notice, then the update
+- Always a plain notice first, for example: "Found Material GRUB 0.7.1 (source install; GUI 0.7.1; style list; 3 customised entries; no Plymouth). This will update it to 0.8.0 and keep your settings. Backup: /var/backups/material-grub/upgrade-0.7.1-to-0.8.0-<time>."
+- Interactive (TUI): the notice is the first screen with Continue, Details and Cancel. `--yes`, a script, `--progress json` (an `existing_install` event) and the packages' scriptlets proceed without asking and write the notice to the install log and journal.
+- `--dry-run` prints the same notice plus the list of migration steps it would run and changes nothing.
+
+### Migrations (the "does its best" part)
+- A registry of **ordered, idempotent steps** (`mgmigrate`): each has `describe()`, `plan()` (for dry-run), `apply()` and `verify()`, keyed by the version it migrates from. They run inside the guarded pattern already used (backup, apply, validate, roll back, report), and the old install keeps working until the swap.
+- **Kept always:** `/etc/material-grub.conf` values, `overrides.json`, icons, presets, the recorded sticks. Conf: new keys are added with their defaults as commented samples, never by replacing the file; renamed keys are rewritten; unknown keys are kept. Overrides and presets migrate through their own `version` fields.
+- **Cleaned up:** old command names, stale hooks and units from older layouts, duplicates (never two path units, never two sets of hooks).
+- **Package scriptlets** call the same detection and migration, so a `dnf`/`apt`/`pacman` upgrade and a re-run of `install.sh` behave identically. Conf files stay `%config(noreplace)`/conffiles; migration edits them through `write_conf`, so the user's edits survive.
+
+### Awkward cases (proposed behaviour; veto any)
+| Case | Proposed |
+|---|---|
+| Source installer run over a package-owned install | Refuse with an explanation and the right command (`dnf upgrade`, ...). Do not fight the package manager. |
+| Package installed over a source install | Adopt it: the package's files replace the source install's, hooks and units are not duplicated, settings are kept, the old `/usr/local` shim is removed. |
+| Downgrade (installed is newer) | Refuse unless `--force`, because newer conf keys, presets and overrides may not be understood; say so. (0.7.x ignores unknown conf keys but rejects presets with them.) |
+| Partial or broken install | Say what is missing, and repair it as part of the normal install. |
+| Ventoy sticks | Cannot be touched while unplugged: the notice lists the sticks that were themed by an older version, and `doctor` warns when it sees one (a version marker file on the stick is added for this). |
+| Immutable systems | Same detection and steps, run through the existing finalize/post-process path. |
+| A part without its core, or a core/part version skew | Refuse or warn from the compatibility check (`core_api`, section 7), with the update to run. |
+| Interrupted upgrade (power loss) | The backup and the "old keeps working until the swap" rule leave either the old or the new complete install; `doctor` detects a half state and the next run repairs it. |
+
+### Where it fits
+- **New phase 1b**, right after Phase 1 and before anything that touches the initramfs or the kernel command line: the state record, detection, the notice, the migration registry, the package scriptlet changes, and `doctor` using the same detection. Plymouth (phase 4) then records its changes in the state from its first version, so removal and upgrade of Plymouth are clean from day one.
+- **Phase 8 (unified installer):** it detects 0.7.x and 0.8 material-grub installs and adopts them under `material-boot` without moving user data, with `material-grub` kept as an alias (9b).
+- **Tests (added to section 10):** an upgrade matrix on every distro in Docker and QEMU: install the previous release (the 0.7.1 tag, both as a package and from source) with a customised conf, overrides, icons and presets, then upgrade to the new build and check that the notice is shown, settings are preserved, nothing is duplicated, a forced failure rolls back, a downgrade is refused, a partial install is repaired, a second run changes nothing, package-to-source and source-to-package switches behave as above, and uninstall after an upgrade leaves nothing behind. Each release keeps the previous release's tarball in CI as the starting point of the next upgrade test.
 
 ## 10. Verification and CI (maintainer: test everything in CI, Docker and QEMU, for all distros)
 
