@@ -22,6 +22,7 @@ python3 tests/test_custom.py
 python3 tests/test_customise.py
 python3 tests/test_cli.py
 python3 tests/test_plugins.py
+python3 tests/test_upgrade.py
 python3 tests/test_gui_server.py
 python3 tests/test_monitors.py
 python3 tests/test_tui.py
