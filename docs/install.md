@@ -83,3 +83,15 @@ files are never edited. Systems without `blscfg` (Debian, Ubuntu, Arch: classic 
 
 
 Immutable systems (Silverblue, Bazzite, ...): [immutable.md](immutable.md). Ventoy sticks: [ventoy.md](ventoy.md). Diagnosing problems: `sudo material-grub doctor`.
+
+## Updating and existing installs
+
+The installer and the packages always check for an install that is already there (the same check as `material-grub doctor`):
+
+- **A notice first.** For example: *Found Material GRUB 0.7.1, a source install: style list, scheme dark, 3 customised entries, GUI installed. This will update it to 0.8.0. Your settings are kept.* In a terminal it asks `Continue? [Y/n]`; `--yes`, scripts, `--progress json` (an `existing_install` event) and the packages' scriptlets go on without asking and write the notice to `/var/log/material-grub/install.log`. `--dry-run` prints the notice and the changes it would make.
+- **Your settings are kept:** `/etc/material-grub.conf`, `/etc/material-grub/` (overrides, icons, presets). An update only adds what is new (new options appear in the conf as commented samples); a file it changes is copied first to `/var/backups/material-grub/upgrade-<from>-to-<to>-<time>/`, and put back if that step fails.
+- **A record of what is installed:** `/var/lib/material-grub/state.json` (the parts and their versions, and how it was installed: package, source or immutable). Installs from before it existed are recognised by their files and get a record at their next install or update.
+- **What it refuses:** installing an *older* version over a newer one (newer options and presets may not be understood; `--force` overrides), and a *source* install over files a package owns (it would fight your package manager; update the package instead, `--force` overrides). A *package* installed over a source install takes it over and keeps your settings.
+- **Pieces that are missing** (a hook, the path unit, the theme) are named in the notice and put back by the install.
+- **Ventoy sticks** cannot be touched while they are unplugged: run `material-grub ventoy` again with the stick plugged in after an update.
+

@@ -20,6 +20,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent  # the repository root
 sys.path.insert(0, str(HERE / "install"))
 sys.path.insert(0, str(HERE / "install/bin"))
+import mgdetect  # noqa: E402
+import mgmigrate  # noqa: E402
 import mgrub  # noqa: E402
 
 MIN_RUNTIME = (3, 8)  # this installer and the installed tools
@@ -174,6 +176,7 @@ class Installer:
         self.pm = ""
         self.build_dir = None
         self.runtime_py = "python3"
+        self.found = None  # mgdetect.Finding of an install that was already there (set by existing_install)
         self.json = False  # --progress json: one JSON object per line on stdout (for the GUI)
         self.out = sys.stdout
         self.logf = None
@@ -426,6 +429,78 @@ class Installer:
 
     def py_has(self, py, module):
         return subprocess.run([py, "-c", f"import {module}"], capture_output=True).returncode == 0
+
+    # ------------------------------------------------------------ an install that is already there
+    def existing_install(self, root=""):
+        """Detect an install that is already here (`root` is only for tests), say what was found, refuse what must not happen (a downgrade, a source install over a
+        package's files) and, in a terminal, ask before updating. Packages and --yes go on without asking; the notice is in the install log either way."""
+        target = VERSION_TEXT()
+        how = "package" if self.from_package else "source"
+        f = self.found = mgdetect.detect(root, target)
+        if f.kind == "none":
+            return f
+        lines = mgdetect.notice(f, target)
+        if mgdetect.adopting(f, how):
+            lines.append("This package takes over the files of that install; your settings are kept.")
+        ctx = mgmigrate.context(root)
+        todo = mgmigrate.plan(ctx, mgmigrate.steps_for(f.version, target))
+        for _st, what in todo:
+            lines += [f"Will change in your files: {w}" for w in what]
+        if todo:
+            lines.append(
+                "A copy of every file that is changed is kept in "
+                + str(mgmigrate.backup_dir(root, f.version, target))
+                + "."
+            )
+        if self.json:  # one structured event (its `msg` is the headline, so a plain log view shows it), the rest as ordinary info lines
+            self.emit("existing_install", found=f.as_dict(), notice=lines, msg=lines[0])
+            for ln in lines[1:]:
+                self.info(ln)
+        else:
+            print(f"\n{self.B}An existing install was found{self.Z}")
+            for ln in lines:
+                print(f"      {ln}")
+        ok, msg = mgdetect.policy(f, target, how, self.force)
+        if not ok:
+            self.die(msg)
+        interactive = not (self.tuimode == "no" or self.yes or not (sys.stdin.isatty() and sys.stdout.isatty()))
+        if interactive and not self.dry:
+            try:
+                answer = input("      Continue? [Y/n] ").strip().lower()
+            except EOFError:
+                answer = ""
+            if answer in ("n", "no"):
+                print("      Nothing was changed.")
+                sys.exit(0)
+        return f
+
+    def after_install(self, root=""):
+        """After the files are in: run the migration steps (the user's files are backed up first and restored if a step fails) and write the state record.
+        Never fails the install: the theme itself is already in place."""
+        target = VERSION_TEXT()
+        f = self.found
+        before = f.version if f is not None and f.kind != "none" else None
+        try:
+            ctx = mgmigrate.context(root, mgmigrate.backup_dir(root, before, target))
+            for st, status, detail in mgmigrate.run(ctx, mgmigrate.steps_for(before, target), emit=self.info):
+                if status == "done":
+                    self.ok(f"{st.title}")
+                elif status == "failed":
+                    self.warn(f"update step '{st.id}' failed: {detail}")
+            now = mgdetect.detect(root, target)
+            how = "immutable" if self.imm else "source"
+            if self.from_package:
+                how = mgdetect.owner_of(Path(root or "/") / mgdetect.FILES["package"])
+                how = how if how.startswith("package:") else "package:unknown"
+            parts = {"core": target, "grub": target}
+            if (Path(root or "/") / "usr/share/material-grub-gui").is_dir():
+                parts["gui"] = target
+            for k, v in now.parts.items():
+                if k not in ("core", "grub", "gui"):
+                    parts[k] = v
+            mgdetect.record(root, target, how, "immutable" if self.imm else "normal", parts, previous=before)
+        except Exception as e:  # a record or a migration problem is a warning, never a failed install
+            self.warn(f"could not finish the update bookkeeping ({type(e).__name__}: {e}); the theme is installed")
 
     # ------------------------------------------------------------ steps
     def check_system(self):
@@ -1090,6 +1165,7 @@ class Installer:
         r = self.run(step_cmd + self.confset_args())
         if r.returncode != 0:
             sys.exit(r.returncode)
+        self.after_install()
         self.step("Finished")
         print(f"      {self.G}Material GRUB is installed.{self.Z} Total time: {self.elapsed()}\n")
         print("      Reboot to see it. The theme re-applies itself when kernels or boot entries change.")
@@ -1151,6 +1227,8 @@ class Installer:
 
     def run_all(self):
         self.check_system()
+        if not (self.ventoy or self.stage or self.preview):
+            self.existing_install()
         self.questions()
         self.immutable_notice()
         self.environment_info()
