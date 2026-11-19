@@ -252,6 +252,18 @@ What exists today (recon): `install.sh` simply replaces ("replacing any older ve
 - **Phase 8 (unified installer):** it detects 0.7.x and 0.8 material-grub installs and adopts them under `material-boot` without moving user data, with `material-grub` kept as an alias (9b).
 - **Tests (added to section 10):** an upgrade matrix on every distro in Docker and QEMU: install the previous release (the 0.7.1 tag, both as a package and from source) with a customised conf, overrides, icons and presets, then upgrade to the new build and check that the notice is shown, settings are preserved, nothing is duplicated, a forced failure rolls back, a downgrade is refused, a partial install is repaired, a second run changes nothing, package-to-source and source-to-package switches behave as above, and uninstall after an upgrade leaves nothing behind. Each release keeps the previous release's tarball in CI as the starting point of the next upgrade test.
 
+## 9d. What the distro probe found (material-plymouth CI, run of 2026-11-19, all five passed)
+
+| Distro | Plymouth | Script plugin | `plymouth-set-default-theme` | Initramfs integration | X11 renderer | Python |
+|---|---|---|---|---|---|---|
+| Fedora 45 | 26.134.222 | `/usr/lib64/plymouth/script.so` (`plymouth-plugin-script`) | yes (`plymouth-scripts`) | dracut 111, `modules.d/45plymouth` | no (separate package) | 3.15 |
+| Ubuntu 24.04 | 24.004.60 | `/usr/lib/x86_64-linux-gnu/plymouth/script.so` | **no**, `update-alternatives default.plymouth` | initramfs-tools hook `plymouth` | no (`plymouth-x11`) | 3.12 |
+| Debian stable | (stable) | `/usr/lib/x86_64-linux-gnu/plymouth/script.so` | yes | initramfs-tools hook `plymouth` | no (`plymouth-x11`) | 3.13 |
+| Arch | 26.134.222 | `/usr/lib/plymouth/script.so` | yes | mkinitcpio `plymouth` hook (install and runtime) | yes | 3.14 |
+| openSUSE Tumbleweed | 22.02.122 | `/usr/lib64/plymouth/script.so` (`plymouth-plugin-script`) | yes (`plymouth-scripts`) | dracut 112, `plymouth-dracut` package | no | 3.13 |
+
+What it changes: (1) the theme tooling cannot assume `plymouth-set-default-theme` (Ubuntu needs `update-alternatives` and an `initramfs` rebuild); (2) the script plugin path is found, not hard-coded; (3) the spike was measured on 24.004, while two distros ship 26.x and one 22.02: **the script API and rendering must be checked on all three generations** (the Xvfb tier gets a job per Plymouth generation once there is a theme: Arch and Fedora containers have the X11-capable 26.x packages, openSUSE 22.02); (4) every probed distro's Python is 3.12 or newer, so the 3.8 floor is about RHEL 8 and older, which the probe does not cover (AlmaLinux 8 is in the installer matrix of material-grub already); (5) the CI runner image `ubuntu-latest` is now Ubuntu 26.04: jobs that depend on a Python or Plymouth version are pinned to 24.04.
+
 ## 10. Verification and CI (maintainer: test everything in CI, Docker and QEMU, for all distros)
 
 Four tiers. Everything runs in GitHub Actions on every PR (as the GRUB theme's jobs do); nothing needs the maintainer's machine except the hardware list at the end.
@@ -282,7 +294,7 @@ Four tiers. Everything runs in GitHub Actions on every PR (as the GRUB theme's j
 - **Handover jumps** if the GRUB `gfxmode` and the native mode differ (stretching) or the display manager sets its own mode.
 - **Two repos drift** until the shared library exists: `adapter.py` and a version check are the guard; a CI job installs both at pinned versions.
 - **Asset size** of morph frames inside every initramfs.
-- **Third-party distro Plymouth packaging differences** (theme path, `plymouth-set-default-theme` absent on Debian, which uses `update-alternatives`): handled per distro and tested in containers, but only Fedora is a known-good development platform here.
+- **Distro differences in Plymouth packaging** (measured, see 9d): the Plymouth version ranges from 22.02 (openSUSE Tumbleweed) over 24.004 (Ubuntu 24.04) to 26.134 (Arch, Fedora 45); the script plugin sits in different directories; Ubuntu has no `plymouth-set-default-theme` (it uses `update-alternatives`) while Debian stable, Arch, Fedora and openSUSE have it; Fedora and openSUSE integrate through dracut, Debian and Ubuntu through initramfs-tools, Arch through mkinitcpio hooks. Each is handled per distro and tested in containers and QEMU.
 
 ## 12. Before Phase 0 (needed from the maintainer)
 
