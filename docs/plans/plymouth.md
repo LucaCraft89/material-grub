@@ -1,6 +1,6 @@
 # Plymouth plan: material-plymouth, the boot splash that continues the GRUB theme
 
-Status: PLAN ONLY (no code written yet). Waiting for the maintainer's approval of this document and for the empty repo (see "Before Phase 0").
+Status: PLAN ONLY (no code written yet). Updated after the maintainer's second message (consistency rule, customisation recon, repo names, CI and QEMU for all distros). Waiting for approval and for the empty repos (see "Before Phase 0").
 Branch for this document: `ccr-d8df62d1-7vgvjn`. Nothing below is implemented.
 
 ## 0. The request, verbatim (source of truth for intent)
@@ -12,8 +12,8 @@ Branch for this document: `ccr-d8df62d1-7vgvjn`. Nothing below is implemented.
 | # | Question | Answer |
 |---|---|---|
 | 1 | Where does it live? | A separate, empty repo `LucaCraft89/material-plymouth`, created by the maintainer; the assistant attaches it (`add_repo`) and pushes there. |
-| 2 | How does Plymouth know the distro? | **Per installed OS.** The theme is generated on each distro from its own `os-release` and the `key` rules of `overrides.json`. GRUB passes nothing on the kernel command line. Consequence: `class` and `title` override rules cannot apply in Plymouth (it never sees the GRUB title); `doctor` says so when such a rule is the only thing customising the booted distro. |
-| 3 | Shared code | **Extract later, depend now.** Phase 1: material-plymouth imports from the installed material-grub package through one thin adapter module. Phase 2 (after Plymouth works and is released): move the shared modules to a third repo and switch both over. Nothing moves in material-grub before then. |
+| 2 | How does Plymouth know the distro? (refined in 1a) | **Per installed OS.** The theme is generated on each distro from its own `os-release` and the `key` rules of `overrides.json`. GRUB passes nothing on the kernel command line. Consequence: `class` and `title` override rules cannot apply in Plymouth (it never sees the GRUB title); `doctor` says so when such a rule is the only thing customising the booted distro. |
+| 3 | Shared code | **Extract later, depend now.** Phase 1: material-plymouth imports from the installed material-grub package through one thin adapter module. Phase 2 (after Plymouth works and is released): move the shared modules to a third repo, `material-boot-core` and switch both over. Nothing moves in material-grub before then. |
 | 4 | Systems | Fedora (dracut), Debian/Ubuntu (initramfs-tools), Arch (mkinitcpio), openSUSE (dracut). Immutable/ostree systems are **not** in the first release (their initramfs is built by `rpm-ostree`); to be asked at the end. |
 | 5 | What stays from the GRUB scene | Hero (distro glyph in its card, same position) and the title; the **info pills** (without the kernel pill, see 9); the BGRT logo in the top-right cookie; the background, same layout but animated. The rail, the clean peek panels and the key-hint pills are navigation, so they are dropped. |
 | 6 | Motion | All four: slow rotation, shape morph, gentle drift/breathing, hero pulse. |
@@ -27,6 +27,67 @@ Branch for this document: `ccr-d8df62d1-7vgvjn`. Nothing below is implemented.
 | 14 | Settings | **Shared by default**: style, scheme, seed colour, per-distro colour/name/icon, cookie and logo come from the existing `/etc/material-grub.conf` and `overrides.json`. New Plymouth-only keys live in the same conf. An independent-look toggle can come later. |
 | 15 | Command | No second command. `material-grub plymouth apply | status | remove | preview` (one-command rule of 0.7.1). |
 | 16 | Deliverable now | This plan only. |
+
+## 1a. The consistency rule and the customisation recon (maintainer, second message; goes first)
+
+**Rule: every customisation the user made for GRUB must show up in Plymouth too. Turning something off in GRUB turns it off in Plymouth.** A BGRT logo switched off disappears from the Plymouth cookie, a colour override colours the Plymouth scene, and so on for every option below. The only exceptions are options that have no meaning without a keyboard or a menu; those are listed explicitly and marked with a proposed behaviour (veto any).
+
+How it is enforced, not just intended:
+- **One resolver.** `adapter.look(conf, overrides, os_release)` returns the single "look" of the booted distro (palette, name, icon, cookie on/off, logo on/off, style, scheme, shape). Plymouth renders only from that structure, and the consistency tests (section 10) compare it with what GRUB's `cmd_scenes` resolves for the same entry. No Plymouth code reads `conf` or `overrides.json` directly.
+- **A parametrised test matrix** runs every option below, on and off, through both resolvers and fails when they differ.
+- **`doctor`** reports a customisation that Plymouth cannot honour (for example, a `class` rule that is ambiguous for this OS).
+
+### Recon: every customisation that exists today, and what Plymouth does with it
+
+Runtime options in `/etc/material-grub.conf` (`mgrub.CONF_DEFAULTS`):
+
+| Option | GRUB today | Plymouth |
+|---|---|---|
+| `STYLE` rail / clean / list / split | four layouts | **Follows.** Scenes per style (section 5). `full` is Ventoy-only and never applies. |
+| `SCHEME` dark / light | baked at build time | **Follows** (read from the package's `scheme.txt`, like GRUB). Changing it needs the same reinstall; Plymouth is re-rendered by that apply. |
+| `COOKIE` on/off | top-right cookie | **Follows.** Off: no cookie at all, and no logo either. |
+| `LOGO` on/off | firmware (BGRT) logo in the cookie | **Follows.** Off: the cookie stays, empty, as in GRUB. The Tux fallback applies only when the logo is on and the firmware has none. |
+| `HINTS` | key-hint pills | **No equivalent** (no keyboard in Plymouth). Ignored. |
+| `RAW_NAME` | raw GRUB entry title at the bottom | **No equivalent** (Plymouth never sees the GRUB title). Ignored. |
+| `COUNTDOWN` | "Booting in N seconds" bar | **Proposed:** ignored. The wavy bar is a loading indicator, not a countdown, so it stays when `COUNTDOWN=off`. |
+| `TIMEOUT` | menu timeout | n/a. |
+| `MODE` dynamic / snapshot | Ventoy only | n/a. |
+| `MG_LIST_SHAPE` (env knob, default `cookie`) | shape of the list row | Follows if it ever becomes an option; Plymouth reads the same value through the resolver. |
+
+Overrides in `/etc/material-grub/overrides.json` (`mgoverrides`):
+
+| Override | GRUB today | Plymouth |
+|---|---|---|
+| `seed` `multi` | every distro keeps its brand colour | **Follows.** |
+| `seed` `single` + colour (32 presets or any `#RRGGBB`) | one Material 3 palette for every entry | **Follows**, through the same vendored `mgpalette`. |
+| entry `color` | per entry/distro colour | **Follows** (`key` rules; `class`/`title` rules, see below). |
+| entry `name` | the title on the scene, the row name | **Follows**: the title and the name pill are rendered from the override. |
+| entry `icon`: catalog key | the glyph in hero, list row, rail | **Follows.** |
+| entry `icon`: `file:NAME` | your picture, full colour on a white badge on the entry's screen and one-colour in rows | **Follows**, same badge rules; SVG still needs `rsvg-convert`. |
+| entry `hidden` | removed from the GRUB menu | Does **not** hide Plymouth: the OS still boots and still shows its splash. |
+| `groups`, `order` | menu order and rail sections | n/a (no menu). |
+| match by `key` | every entry of a catalog distro | **Follows**. |
+| match by `class` or `title` | one entry / entries whose title contains the text | **Follows when unambiguous** (refinement of decision 2, still "per installed OS"): at apply time the adapter resolves the rules against this OS's own entries in `entries.json`. If every entry of the booted OS resolves to the same effective rule, that rule is used; if they differ (for example one kernel entry is customised and the others are not), `key` rules win and `doctor` warns. |
+| the same distro installed twice (os-prober `where`) | rows tell the drive apart | The booted install is the entry without `where`; its rule is used. |
+| `version` / bad file | a bad file is ignored, reported by `doctor` | Same: Plymouth falls back to the defaults and never blocks a boot. |
+
+Build/install-time choices:
+
+| Choice | Plymouth |
+|---|---|
+| Resolution (`--res`, 12 built-in sizes, aspect sets, native 2160-high sets) | Plymouth renders for the monitor's native mode (`monitors.detect`), using the same scale rules as the GRUB scenes (`u()` and design coordinates). |
+| Presets (`mgpresets`, `CONF_KEYS`) | The three new Plymouth keys join `CONF_KEYS`, so a preset (and its export/import) carries the Plymouth look too. |
+| Installer TUI answers (`--style --scheme --cookie --logo --hints --seed --seed-mode ...`) | Unchanged. The TUI asks nothing about Plymouth; it is driven by the `material-grub plymouth` subcommand and the GUI page. |
+| Immutable systems | Not in the first release (decision 4 asks again at the end). |
+
+New Plymouth-only keys (decision 14): `PLYMOUTH`, `PLYMOUTH_BAR`, `PLYMOUTH_MOTION`.
+
+### When Plymouth is re-applied (so the two never drift)
+
+GRUB re-applies by itself when `/etc/material-grub.conf` or `overrides.json` change (`material-grub.path`). Plymouth cannot do that blindly, because every re-apply rebuilds the initramfs. So:
+- The path unit also runs `material-grub plymouth apply --if-changed`.
+- It computes a **hash of the resolved look** (the adapter's `look()` output, the icon files it uses, the firmware logo, the plugin version) and exits at once when the hash equals the one stored in `/var/lib/material-plymouth/state.json`. Only a real change renders assets and rebuilds the initramfs.
+- The GUI's *Apply to GRUB* runs both steps in one job and one progress dialog, GRUB first.
 
 ## 2. What the repo is today (facts that constrain the design)
 
@@ -99,10 +160,11 @@ New conf keys (same file): `PLYMOUTH=on|off`, `PLYMOUTH_BAR=indeterminate|progre
 
 1. `install/bin/mgrub.py`: `CONF_DEFAULTS`/`CONF_CHOICES` and `_conf_ok` for the three keys; `tui.py CHECK`, `cmd_doctor`, `gui/mgstate.CONF_KEYS`, `gui/mghelper.CONF_KEYS` and the sample `material-grub.conf` updated; tests extended.
 2. `install/bin/cmd_cli.py`: `plymouth` subcommand that finds the plugin (`/usr/share/material-plymouth/bin`, else `MATERIAL_PLYMOUTH`) and dispatches; the menu TUI and `doctor` show it only when installed. No new command is installed.
-3. `gui/mghelper.py`: a new fixed verb `plymouth` (`apply`, `remove`) that validates its input and calls `material-grub plymouth ...`; the polkit policy is unchanged (same helper).
-4. GUI: a **Plymouth** page, visible only when the plugin is installed: on/off, bar mode, motion level, still preview of boot, password and shutdown screens (drawn by the real renderer through a new `/api/plymouth/preview`), and an animated browser preview that plays the real assets with the same motion model (reusing `WavyProgress`). Style, scheme, colours and entries stay on their existing pages and are shared. Apply uses the existing progress dialog and event stream.
-5. Docs, CHANGELOG, `docs/gui.md`, `docs/how-it-works.md` (the table "Not possible in GRUB" gets a pointer: the wavy bar and animation now exist, in Plymouth), CI.
-6. The material-grub package never depends on, recommends or installs material-plymouth (same rule as the GUI package).
+3. `install/bin/mgpresets.py`: `CONF_KEYS` gains the three Plymouth keys (presets carry the Plymouth look). `install/systemd/material-grub.path`/service also run `material-grub plymouth apply --if-changed` when the plugin is installed.
+4. `gui/mghelper.py`: a new fixed verb `plymouth` (`apply`, `remove`) that validates its input and calls `material-grub plymouth ...`; the polkit policy is unchanged (same helper).
+5. GUI: a **Plymouth** page, visible only when the plugin is installed: on/off, bar mode, motion level, still preview of boot, password and shutdown screens (drawn by the real renderer through a new `/api/plymouth/preview`), and an animated browser preview that plays the real assets with the same motion model (reusing `WavyProgress`). Style, scheme, colours and entries stay on their existing pages and are shared. Apply uses the existing progress dialog and event stream.
+6. Docs, CHANGELOG, `docs/gui.md`, `docs/how-it-works.md` (the table "Not possible in GRUB" gets a pointer: the wavy bar and animation now exist, in Plymouth), CI.
+7. The material-grub package never depends on, recommends or installs material-plymouth (same rule as the GUI package).
 
 ## 8. Packaging (material-plymouth repo)
 
@@ -120,12 +182,26 @@ Sources only, rendered on the target like the main package: rpm (`%posttrans`, d
 7. **Boot test** in QEMU/OVMF (GRUB, then Plymouth, then login), screenshots at each handover to check nothing jumps.
 8. Phase 2 of decision 3: extract the shared code into the third repo.
 
-## 10. Verification
+## 10. Verification and CI (maintainer: test everything in CI, Docker and QEMU, for all distros)
 
-- Unit tests: conf keys, adapter contract, identity resolution (os-release, `ID_LIKE`, override keys, Tux fallback), scene geometry equals the GRUB geometry, asset budget.
-- Visual: Xvfb + Plymouth X11 renderer screenshots per style/scheme/mode compared with the GRUB renders; the handover frame diff (last GRUB scene against the first Plymouth frame).
-- Safety: failed rebuild restores the old initramfs; missing script plugin is reported, nothing changes; uninstall restores everything; a bad overrides file never stops a boot.
-- Real hardware: LUKS prompt, the proprietary-GPU drivers, the GRUB-to-Plymouth mode switch and the Plymouth-to-display-manager handover are only testable on real machines; the maintainer's go and report needed, as with the GRUB theme's hardware status.
+Four tiers. Everything runs in GitHub Actions on every PR (as the GRUB theme's jobs do); nothing needs the maintainer's machine except the hardware list at the end.
+
+**Tier 1: unit and consistency (seconds, no Plymouth needed).**
+- The **consistency matrix** of section 1a: for every option on and off (`COOKIE`, `LOGO`, `STYLE` x4, `SCHEME` x2, single/multi seed, entry colour/name/icon by `key`, `class`, `title`, `file:` pictures, a bad overrides file, two installs of one distro), the adapter's `look()` must equal what `cmd_scenes` resolves for that entry, and the rendered Plymouth assets must match the look (palette colours sampled from the PNGs, cookie present or absent, logo present or absent).
+- Identity resolution (`os-release` `ID`, `ID_LIKE`, `NAME`, override keys, Tux fallback), scene geometry equals GRUB geometry, asset budget, conf keys, the preset round trip, `--if-changed` hashing, the safety pattern with fault injection.
+- material-grub side: the new conf keys, the `plymouth` dispatch, the helper verb validation, the GUI API. Lint (ruff, shellcheck, `node --check`) in both repos.
+
+**Tier 2: Plymouth rendering in Xvfb (no VM).** Plymouth's X11 renderer plays the real theme under Xvfb; screenshots per style, scheme, motion level and mode (boot, password, shutdown, update) at several resolutions, checked against the GRUB renders (positions, colours) and stored as artifacts. Frame sampling proves the animation moves (rotation, wave phase, morph) and that `PLYMOUTH_MOTION=off` does not.
+
+**Tier 3: Docker, all five distros (install and initramfs, no boot).** Fedora, Ubuntu, Debian, Arch and openSUSE containers: install the built package (rpm, deb, pacman) and `material-grub` of the pinned version, install a kernel package so `/lib/modules` exists, run `material-grub plymouth apply`, then check with the distro's own tool that the initramfs lists the theme files and the script plugin (`lsinitrd`, `lsinitramfs`, `lsinitcpio`), that the command-line step produced the expected `GRUB_CMDLINE_LINUX`/`grubby` change, that the backup exists, that **a forced failure restores the previous initramfs**, that `remove` restores everything, and that a second apply with unchanged inputs does nothing (`--if-changed`). Also the dry-run diff, the package install and upgrade, and the missing-script-plugin message.
+
+**Tier 4: QEMU + OVMF, a real boot per distro (KVM on the runner).** For Fedora, Ubuntu, Debian, Arch and openSUSE: boot the distro's official cloud image, with cloud-init installing the CI-built packages, applying the theme, and rebooting. A test-only unit holds `plymouth-quit` for about 20 seconds so the splash can be photographed. Screenshots (QEMU monitor `screendump`) at: the GRUB menu, the handover (the first Plymouth frame against the last GRUB scene, a pixel diff that fails when the hero, title or cookie jump), mid-boot at two instants (the animation moved), the password prompt (an encrypted-root variant on one distro, and `plymouth ask-for-password` on the others), shutdown and reboot, and the login or the text console after Plymouth quits (the system must still boot). Matrix: every distro on its default look, plus the rotating cases so every style, both schemes, single seed, `COOKIE=off`, `LOGO=off`, a per-distro colour override, a `file:` icon and both bar modes are booted on at least two distros; the full cross product runs nightly and on demand, not on every PR.
+- A **fallback boot** on every distro: broken theme files, a missing script plugin and a deleted `splash` argument must still boot to a login.
+- A **GRUB to Plymouth to login** run on each distro is also the first QEMU boot of the GRUB theme on those distros (today only Fedora's GRUB is booted in QEMU), so it checks the whole chain at once.
+
+**What I can and cannot run myself.** In this sandbox: tiers 1 and 2 (Plymouth installs here), and tier 3 only if a container runtime is available (not confirmed). Tier 4 needs KVM and a few GB of images, so it runs only in GitHub Actions. The workflow itself can only be proven by Actions runs, so I iterate on the branch and trigger runs through `workflow_dispatch`, and report failures honestly; I don't open a PR unless you ask.
+
+**Real hardware (needs the maintainer, as for the GRUB theme):** a real LUKS prompt, proprietary GPU drivers, the GRUB-to-Plymouth mode switch on real firmware and the Plymouth-to-display-manager handover.
 
 ## 11. Risks
 
@@ -140,7 +216,10 @@ Sources only, rendered on the target like the main package: rpm (`%posttrans`, d
 
 ## 12. Before Phase 0 (needed from the maintainer)
 
-1. Create the empty repo `LucaCraft89/material-plymouth` and tell me, so I can attach it. Until then nothing is written there.
-2. Approve this plan or change it.
+1. **Create the repos** (empty, no README, MIT licence, public, and let the Claude GitHub App access them, same as for material-grub):
+   - `LucaCraft89/material-plymouth` is needed **now**.
+   - `LucaCraft89/material-boot-core` is needed only for phase 8 (the shared library, decision 3). You can create it at the same time or later; I won't touch it before you say so.
+   Tell me when they exist and I attach them with `add_repo` (with push access).
+2. Approve this plan, including the three proposed behaviours marked "Proposed"/"ignored" in 1a (`COUNTDOWN`, `HINTS`, `RAW_NAME` do nothing in Plymouth; `hidden` does not hide Plymouth; unambiguous `class`/`title` rules apply).
 3. Permission for the Phase 0 spike (installs `plymouth` and its script plugin in this sandbox only).
 4. Open question: immutable/ostree systems (Silverblue, Bazzite) after the first release, or never.
