@@ -1,6 +1,6 @@
 # Plymouth plan: material-plymouth, the boot splash that continues the GRUB theme
 
-Status: PLAN ONLY (no code written yet). Updated after the maintainer's second message (consistency rule, customisation recon, repo names, CI and QEMU for all distros). Waiting for approval and for the empty repos (see "Before Phase 0").
+Status: PLAN ONLY (no code written yet). Repos created and attached; process agreed (1b). Updated after the maintainer's second message (consistency rule, customisation recon, repo names, CI and QEMU for all distros). Waiting for approval and for the empty repos (see "Before Phase 0").
 Branch for this document: `ccr-d8df62d1-7vgvjn`. Nothing below is implemented.
 
 ## 0. The request, verbatim (source of truth for intent)
@@ -88,6 +88,16 @@ GRUB re-applies by itself when `/etc/material-grub.conf` or `overrides.json` cha
 - The path unit also runs `material-grub plymouth apply --if-changed`.
 - It computes a **hash of the resolved look** (the adapter's `look()` output, the icon files it uses, the firmware logo, the plugin version) and exits at once when the hash equals the one stored in `/var/lib/material-plymouth/state.json`. Only a real change renders assets and rebuilds the initramfs.
 - The GUI's *Apply to GRUB* runs both steps in one job and one progress dialog, GRUB first.
+
+## 1b. Process (maintainer: work in PRs, nothing is broken until everything is done)
+
+- **Repos:** `LucaCraft89/material-plymouth` and `LucaCraft89/material-boot-core` exist and are attached; each got one bootstrap commit (licence and readme) on `main`. `material-boot-core` stays empty until phase 8.
+- **material-grub:** integration branch `release/0.8.0` (from `main` at 0.7.1). One PR per phase, each into `release/0.8.0`, each with green CI. A single final PR `release/0.8.0` to `main` when the whole thing works. `main` does not change before that.
+- **material-plymouth:** everything after the bootstrap commit goes through PRs into `main`, green CI each.
+- **Inert until installed:** the material-grub changes are additive. New conf keys have defaults, `material-grub plymouth` only reports that the plugin is not installed, the GUI page is hidden without the plugin, and the theme package never depends on the plugin.
+- **No release until both are done:** no version bump, tag or published package before the pair is verified (tiers 1 to 4 of section 10, plus the hardware list). They are released together.
+- **Core order (opinion, agreed):** Plymouth first; the adapter is written as the future core API, and the extraction to `material-boot-core` is phase 8, again through PRs.
+- **The assistant opens PRs and never merges them.** PRs use the repo's template, say what was not verified, and the maintainer merges.
 
 ## 2. What the repo is today (facts that constrain the design)
 
