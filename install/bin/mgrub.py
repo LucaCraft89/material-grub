@@ -105,11 +105,17 @@ CONF_DEFAULTS = {
     "SCHEME": "dark",
     "TIMEOUT": "",
     "MODE": "dynamic",
+    # the optional Plymouth part (material-plymouth) reads these; they do nothing while it is not installed
+    "PLYMOUTH": "on",
+    "PLYMOUTH_BAR": "indeterminate",
+    "PLYMOUTH_MOTION": "full",
 }
 CONF_CHOICES = {
     "STYLE": ("rail", "clean", "list", "split", "full"),
     "SCHEME": ("dark", "light"),
     "MODE": ("dynamic", "snapshot"),
+    "PLYMOUTH_BAR": ("indeterminate", "progress"),
+    "PLYMOUTH_MOTION": ("full", "calm", "off"),
 }
 
 

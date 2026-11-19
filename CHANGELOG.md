@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+Groundwork for optional parts from other packages (the first is the Plymouth boot splash, in its own repository). Nothing changes without one.
+
+**New**
+- **Optional parts (plugins):** another package can install one manifest and add a sub-command (`material-grub plymouth ...`), a menu entry and a line in `help`, `version` and `doctor`; a part that is missing, broken or written for another plugin API is reported, never fatal. See `docs/plugins.md`.
+- Runtime options `PLYMOUTH`, `PLYMOUTH_BAR` and `PLYMOUTH_MOTION` in `/etc/material-grub.conf` (validated, kept in presets); they do nothing until the Plymouth part is installed.
+
 ## 0.7.1 (2026-11-18)
 
 One command.

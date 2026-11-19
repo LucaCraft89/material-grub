@@ -15,7 +15,18 @@ import mgoverrides
 import mgrub
 
 FORMAT = 1
-CONF_KEYS = ("STYLE", "COOKIE", "LOGO", "HINTS", "RAW_NAME", "COUNTDOWN", "TIMEOUT")
+CONF_KEYS = (
+    "STYLE",
+    "COOKIE",
+    "LOGO",
+    "HINTS",
+    "RAW_NAME",
+    "COUNTDOWN",
+    "TIMEOUT",
+    "PLYMOUTH",
+    "PLYMOUTH_BAR",
+    "PLYMOUTH_MOTION",
+)
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.()-]{0,39}$")
 MAX_ICON = 2 * 1024 * 1024
 
