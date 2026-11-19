@@ -27,6 +27,7 @@ Branch for this document: `ccr-d8df62d1-7vgvjn`. Nothing below is implemented.
 | 14 | Settings | **Shared by default**: style, scheme, seed colour, per-distro colour/name/icon, cookie and logo come from the existing `/etc/material-grub.conf` and `overrides.json`. New Plymouth-only keys live in the same conf. An independent-look toggle can come later. |
 | 15 | Command | No second command. `material-grub plymouth apply | status | remove | preview` (one-command rule of 0.7.1). |
 | 16 | Deliverable now | This plan only. |
+| 17 | End state, once `material-boot-core` exists (maintainer, third message) | **One unified installer** with options for what to install and what not (GRUB theme, Plymouth theme, GUI, Ventoy, ...), and **one command, `material-boot`**, with the sub-commands `grub` and `plymouth`, each with its own sub-commands, fully modular the way `material-grub` already is today (each part registers its own sub-commands; a part that is not installed simply is not there). See 9b. |
 
 ## 1a. The consistency rule and the customisation recon (maintainer, second message; goes first)
 
@@ -190,7 +191,7 @@ Sources only, rendered on the target like the main package: rpm (`%posttrans`, d
 5. **GUI page and preview**, helper verb.
 6. **Packaging and CI** in both repos; container tests check the built initramfs lists the theme (`lsinitrd`, `lsinitramfs`, `mkinitcpio -S`), and the dry-run diff.
 7. **Boot test** in QEMU/OVMF (GRUB, then Plymouth, then login), screenshots at each handover to check nothing jumps.
-8. Phase 2 of decision 3: extract the shared code into the third repo.
+8. Phase 2 of decision 3 and decision 17: extract the shared code into the third repo, and build the unified installer and the `material-boot` command (section 9b), in separate PRs.
 
 ## 9a. Phase 0 spike results (done; material-plymouth PR #1, `spike/FINDINGS.md`)
 
@@ -199,6 +200,17 @@ Plymouth 24.004.60, X11 renderer under Xvfb, 1920x1080. **Verdict: the script en
 - Cost: everything animated every frame about 93% of a core (and about 40 fps instead of 50); shapes and cookie staggered one per frame at a low cadence, wave every 2nd frame: **about 39%**, with a slower cadence about 25%; nothing moving about 8%. Rotating and moving large sprites is what costs.
 - Changes to the design from this: (1) the motion model of section 6 runs on a **staggered, low cadence** with a per-resolution budget, and `PLYMOUTH_MOTION=full|calm|off` changes the cadence, not just on/off; (2) wave from per-dot sprites (the cropped strip has flat ends; crop plus two round-cap dots is an optimisation to try); (3) morph frames stay few, within a RAM budget; (4) the password layout must hide or move the pills.
 - **Not shown, to be measured in the QEMU tier and on hardware:** real DRM/framebuffer cost, anything above 1080p (expect about 4x the pixels at 2160), smoothness of low-cadence rotation in motion on a real display, other Plymouth versions.
+
+## 9b. End state: one installer, one `material-boot` command (phase 8)
+
+When the shared code moves to `material-boot-core`, the user-facing shape changes with it:
+- **Command:** `material-boot` replaces `material-grub` as the one command. `material-boot grub <sub-command>` carries today's `material-grub` sub-commands (`apply`, `doctor`, `preview`, `colour`, `presets`, `overrides`, `conf`, `ventoy`, `update`, `uninstall`, `gui`, ...) and `material-boot plymouth <sub-command>` carries the Plymouth ones (`apply`, `status`, `remove`, `preview`, ...). Commands that are not specific to one part (`doctor` for the whole system, `update`, `version`, `help`, the menu TUI, `gui`) live at the top level and see every installed part.
+- **Modular like today:** each part ships its own command module and registers it with the dispatcher (the plugin mechanism that Phase 1 builds for `material-grub plymouth`, so Phase 1 is designed as this registry from the start); a part that is not installed has no sub-command and no menu entry. A new part later (another bootloader, a login screen) is another module, not a change to the core.
+- **Unified installer:** one `install.sh` / TUI with options for what to install and what not: GRUB theme, Plymouth theme, optional GUI, Ventoy sticks; each can be chosen or skipped on the command line (`--with plymouth`, `--without grub`, ...) and in the TUI, with the same safety nets, dry-run, immutable handling and `--progress json` event stream. Style, scheme, colour and the other shared choices are asked once and apply to every selected part.
+- **Packages:** `material-boot-core` (shared code, the dispatcher, the installer), `material-grub`, `material-plymouth` and the GUI as modules that require the core, plus an optional `material-boot` meta-package that installs the common set. Exact split to be decided in phase 8.
+- **Compatibility (proposed, to confirm):** `material-grub` stays as a thin alias of `material-boot grub` for at least one release with a deprecation note, so existing scripts, the kernel and pacman hooks, the path unit, the polkit helper and user muscle memory keep working; `/etc/material-grub.conf` and `/etc/material-grub/` keep their paths (or are migrated with a symlink), because moving user data is the risky part of a rename.
+- Until then (phases 1 to 7) the command is `material-grub plymouth ...` as in decision 15; phase 8 renames it, with the old form kept as an alias.
+- Phase 8 stays a set of PRs into `release/0.8.0` or a later release branch, never a change to `main` in one piece, with the whole matrix of section 10 re-run on the unified installer (install only grub, only plymouth, both, none of the optional parts; upgrade from 0.7.x; uninstall each part separately).
 
 ## 10. Verification and CI (maintainer: test everything in CI, Docker and QEMU, for all distros)
 
@@ -241,3 +253,4 @@ Four tiers. Everything runs in GitHub Actions on every PR (as the GRUB theme's j
 2. Approve this plan, including the three proposed behaviours marked "Proposed"/"ignored" in 1a (`COUNTDOWN`, `HINTS`, `RAW_NAME` do nothing in Plymouth; `hidden` does not hide Plymouth; unambiguous `class`/`title` rules apply).
 3. Permission for the Phase 0 spike (installs `plymouth` and its script plugin in this sandbox only).
 4. Open question: immutable/ostree systems (Silverblue, Bazzite) after the first release, or never.
+5. For phase 8, to confirm when we get there (not now): keep `material-grub` as an alias for one release or longer; keep the `/etc/material-grub*` paths; whether the GUI becomes `material-boot gui` with one page per part (assumed yes).
