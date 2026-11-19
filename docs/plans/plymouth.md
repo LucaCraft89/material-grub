@@ -182,7 +182,7 @@ Sources only, rendered on the target like the main package: rpm (`%posttrans`, d
 
 ## 9. Phases (each one a green, reviewable step)
 
-0. **Spike (needs your go).** One script theme with a rotating cookie, shapes and the wavy bar, run with Plymouth's X11 renderer under Xvfb in this sandbox (Plymouth is installable here; QEMU is not installed and would need adding). Measures: rotation quality and CPU, wave smoothness, asset size. Decides sprite-wave vs frame-wave and the morph frame budget. If the script engine cannot do it well, I stop and report instead of building on it.
+0. **Spike (DONE, see 9a).** One script theme with a rotating cookie, shapes and the wavy bar, run with Plymouth's X11 renderer under Xvfb in this sandbox (Plymouth is installable here; QEMU is not installed and would need adding). Measures: rotation quality and CPU, wave smoothness, asset size. Decides sprite-wave vs frame-wave and the morph frame budget. If the script engine cannot do it well, I stop and report instead of building on it.
 1. **Contract and conf** (material-grub): the keys, `plymouth` subcommand dispatch, doctor hooks, tests. No Plymouth needed to test.
 2. **Renderer**: scene assets for the four styles, light and dark, single seed and per-distro keys, BGRT/Tux, pills, password, messages. Golden tests and screenshots, like the GRUB gallery.
 3. **Script theme**: animation, bar modes, password prompt, modes (boot, shutdown, update), fallbacks.
@@ -191,6 +191,14 @@ Sources only, rendered on the target like the main package: rpm (`%posttrans`, d
 6. **Packaging and CI** in both repos; container tests check the built initramfs lists the theme (`lsinitrd`, `lsinitramfs`, `mkinitcpio -S`), and the dry-run diff.
 7. **Boot test** in QEMU/OVMF (GRUB, then Plymouth, then login), screenshots at each handover to check nothing jumps.
 8. Phase 2 of decision 3: extract the shared code into the third repo.
+
+## 9a. Phase 0 spike results (done; material-plymouth PR #1, `spike/FINDINGS.md`)
+
+Plymouth 24.004.60, X11 renderer under Xvfb, 1920x1080. **Verdict: the script engine can draw the design; the constraint is CPU.**
+- Works: crisp `Image.Rotate` (same size out as in), a smooth round-capped wavy bar from per-dot sprites (indeterminate and progress), shape-morph frames (24 frames of 400x400: +260 KiB, about +15 MB RAM, no extra CPU), and the disk-password prompt end to end (bullets, backspace, answer delivered, bar restored). `Image.Crop/Tile/Scale/Text` exist; there is no clock, only a frame counter at about 50 Hz.
+- Cost: everything animated every frame about 93% of a core (and about 40 fps instead of 50); shapes and cookie staggered one per frame at a low cadence, wave every 2nd frame: **about 39%**, with a slower cadence about 25%; nothing moving about 8%. Rotating and moving large sprites is what costs.
+- Changes to the design from this: (1) the motion model of section 6 runs on a **staggered, low cadence** with a per-resolution budget, and `PLYMOUTH_MOTION=full|calm|off` changes the cadence, not just on/off; (2) wave from per-dot sprites (the cropped strip has flat ends; crop plus two round-cap dots is an optimisation to try); (3) morph frames stay few, within a RAM budget; (4) the password layout must hide or move the pills.
+- **Not shown, to be measured in the QEMU tier and on hardware:** real DRM/framebuffer cost, anything above 1080p (expect about 4x the pixels at 2160), smoothness of low-cadence rotation in motion on a real display, other Plymouth versions.
 
 ## 10. Verification and CI (maintainer: test everything in CI, Docker and QEMU, for all distros)
 
