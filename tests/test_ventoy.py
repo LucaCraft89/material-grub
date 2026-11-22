@@ -329,14 +329,34 @@ class Stick(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.d, ignore_errors=True)
 
-    def run_tool(self, *a):
+    def run_tool(self, *a, res="1920x1080"):
         (self.d / "ventoy/material-grub.conf").write_text("MODE=snapshot\n")
         return subprocess.run(
-            [sys.executable, str(TOOL), str(self.d), "--pkg", str(PKG), "--res", "1920x1080", *a],
+            [sys.executable, str(TOOL), str(self.d), "--pkg", str(PKG), "--res", res, *a],
             capture_output=True,
             text=True,
             check=True,
         )
+
+    def test_exact_size_for_an_unusual_screen(self):
+        self.run_tool(res="1366x768,1920x1080")
+        j = json.loads(self.vj.read_text())
+        theme = self.d / "ventoy/themes/material_1366x768/theme.txt"
+        self.assertTrue(theme.exists())
+        self.assertIn("50%", theme.read_text())  # centred, so a near-miss mode does not push it into a corner
+        self.assertTrue((self.d / "ventoy/themes/material_1920x1080/theme.txt").exists())
+        self.assertIn("1366x768", j["theme"]["gfxmode"])
+        self.run_tool("--uninstall", res="1366x768,1920x1080")
+        self.assertFalse((self.d / "ventoy/themes/material_1366x768").exists())
+
+    def test_basic_theme(self):
+        self.run_tool(res="basic")
+        j = json.loads(self.vj.read_text())
+        self.assertEqual(j["theme"]["gfxmode"], "auto")
+        text = (self.d / "ventoy/themes").rglob("theme.txt")
+        for t in text:
+            self.assertNotIn("desktop-image", t.read_text())
+        self.assertEqual(j.get("menu_class", [{}])[0], {"key": "mine", "class": "x"})
 
     def test_install_rerun_uninstall(self):
         orig = json.loads(self.vj.read_text())
