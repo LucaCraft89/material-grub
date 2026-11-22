@@ -87,6 +87,21 @@ jobs:
         if: always()
         with: {name: "boot-${{ matrix.scheme }}-${{ matrix.style }}", path: build/ci-shots/}
 
+  resolution:
+    # A screen with no built-in size (1360x768): the theme must fill it, stay centred when the firmware picks a near-by mode, and fall back to the basic theme.
+    name: Boot on an awkward screen size
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:latest
+    steps:
+      - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
+      - uses: actions/checkout@v4
+      - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
+      - run: .venv/bin/python scripts/package.py --res 1280x720,1920x1080
+      - run: BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/boot_resolution.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "boot-resolution", path: build/res-*.png}
+
   features:
     # The 0.7 customisations in a real GRUB (QEMU/OVMF): one seed colour, a custom entry colour and name, Windows first, hidden entries, and the firmware
     # logo (the penguin on a machine without one) in the cookie; every style. The screenshots are artifacts (they feed the docs gallery).
