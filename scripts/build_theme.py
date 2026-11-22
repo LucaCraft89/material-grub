@@ -9,13 +9,15 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "install/bin"))
+import mgtheme  # noqa: E402  (the theme.txt template is shared with the installed tools, which write it for any screen size)
 import render_scene as R
 from catalog import CLASSES
 from fontTools.ttLib import TTFont
 from fontTools.varLib.instancer import instantiateVariableFont
 
 ROOT = R.ROOT
-ASPECTS = {"16x9": 1920, "16x10": 1728, "21x9": 2560, "32x9": 3840}  # design width at 1080 high
+ASPECTS = mgtheme.ASPECTS  # design width at 1080 high
 HI_FROM = 1800  # screens at least this high get a native 2160-high scene set ("<aspect>@2") instead of a 2x upscale of the 1080 one
 
 
@@ -46,13 +48,12 @@ def opt(n, d=None):
 WD = 1920  # set per aspect in scene()
 
 LIGHT = R.SCHEME == "light"
-# theme colours are global (GRUB cannot recolour per entry), so these are neutral M3 greys chosen per scheme
-INK_TRACK, INK_FILL, INK_TEXT = ("#CAC4D0", "#49454F", "#49454F") if LIGHT else ("#49454F", "#E6E1E5", "#CAC4D0")
+# theme colours are global (GRUB cannot recolour per entry), so these are neutral M3 greys chosen per scheme (install/bin/mgtheme.py: the same ones the theme.txt uses)
+_DESKTOP, INK_TRACK, INK_FILL, _INK_TEXT, _RAW = mgtheme.colours(LIGHT)
 # the cookie and the key-hint pills are NOT baked in any more: install/bin/mgscenes.py draws them at config time (COOKIE / HINTS in /etc/material-grub.conf)
 SCENES = ROOT / (
     "build/scenes2" + ("-light" if LIGHT else "")
 )  # separate render cache per scheme (scenes2: no cookie/hints baked in)
-DESKTOP, RAWNAME = ("#F6F4F7", "#5F5B66") if LIGHT else ("#0D1411", "#6E7681")
 
 
 def scene(entry, hero=True):
@@ -175,92 +176,7 @@ def assemble(W, H, only, pkg=None):
             ],
             check=True,
         )
-    cxp = px(WDs / 2)
-    barw = px(560)
-    logo = px(120)
-    lx = px(WDs - 150) - logo // 2
-    ly = px(140) - logo // 2
-    FN = f"MG-Label Regular {fs}"
-    RN = f"MG-Raw Regular {rs}"
-    (OUT / "theme.txt").write_text(f'''# Material 3 Expressive GRUB theme (generated for {W}x{H}, {aspect} scenes)
-title-text: ""
-desktop-color: "{DESKTOP}"
-terminal-font: "{FN}"
-
-# mg:begin raw
-# raw entry name (debug/clarity): a 1-item list that only ever shows the selected entry
-+ boot_menu {{
-  left = {px(96)}
-  top = {H - px(58)}
-  width = {W - px(192)}
-  height = {px(34)}
-  item_height = {px(34)}
-  item_spacing = 0
-  item_padding = 0
-  item_icon_space = 0
-  icon_width = 1
-  icon_height = 1
-  item_font = "{RN}"
-  selected_item_font = "{RN}"
-  item_color = "{RAWNAME}"
-  selected_item_color = "{RAWNAME}"
-  scrollbar = false
-}}
-# mg:end raw
-
-# mg:begin logo
-+ image {{
-  left = {lx}
-  top = {ly}
-  width = {logo}
-  height = {logo}
-  file = "machine-logo.png"
-}}
-# mg:end logo
-
-# mg:begin countdown
-+ progress_bar {{
-  id = "__timeout__"
-  left = {cxp - barw // 2}
-  top = {px(755)}
-  width = {barw}
-  height = {bh}
-  bar_style = "bar_*.png"
-  highlight_style = "hl_*.png"
-}}
-
-+ label {{
-  id = "__timeout__"
-  left = {cxp - barw // 2}
-  top = {px(790)}
-  width = {barw}
-  height = {px(34)}
-  align = "center"
-  color = "{INK_TEXT}"
-  font = "{FN}"
-  text = "Booting in %d seconds"
-}}
-# mg:end countdown
-
-# GRUB draws the first-declared component on top, so the menu goes last
-+ boot_menu {{
-  left = 0
-  top = 0
-  width = {W}
-  height = {H}
-  item_height = {H}
-  item_spacing = 0
-  item_padding = 0
-  item_icon_space = 0
-  icon_width = {W}
-  icon_height = {H}
-  item_font = "{FN}"
-  selected_item_font = "{FN}"
-  item_color = "#00000000"
-  selected_item_color = "#00000000"
-  scrollbar = false
-}}
-''')
+    (OUT / "theme.txt").write_text(mgtheme.theme_text(W, H, wds=WDs, light=LIGHT, aspect=aspect, fs=fs, rs=rs, bh=bh))
     print("theme at", OUT)
 
 

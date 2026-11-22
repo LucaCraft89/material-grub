@@ -102,8 +102,9 @@ def main():
     UNI = (
         "loadfont $prefix/themes/material/unicode.pf2\n" if (theme / "unicode.pf2").exists() else ""
     )  # non-Latin fallback glyphs
+    gfx = "auto" if chosen == "auto" else f"{chosen},auto"  # `auto`: the basic theme that fits any screen
     block = f"""{A}
-set gfxmode={chosen},auto
+set gfxmode={gfx}
 set gfxpayload=keep
 insmod all_video
 insmod gfxterm
