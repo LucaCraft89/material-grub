@@ -8,6 +8,10 @@ Groundwork for optional parts from other packages (the first is the Plymouth boo
 - **Optional parts (plugins):** another package can install one manifest and add a sub-command (`material-grub plymouth ...`), a menu entry and a line in `help`, `version` and `doctor`; a part that is missing, broken or written for another plugin API is reported, never fatal. See `docs/plugins.md`.
 - Runtime options `PLYMOUTH`, `PLYMOUTH_BAR` and `PLYMOUTH_MOTION` in `/etc/material-grub.conf` (validated, kept in presets); they do nothing until the Plymouth part is installed.
 
+**New (the GUI, with the optional Plymouth part)**
+- **A Boot splash page** in the GUI, shown only when the Plymouth part is installed: on or off, the loading bar, how much moves, three stills of the real splash (boot, disk password, shutdown) that follow the unsaved settings, and two buttons for the splash alone. *Apply* now updates GRUB first and then the boot splash; a Plymouth failure puts Plymouth back by itself and leaves the menu applied. The kernel command line and the mkinitcpio hooks are edited **only when the person ticks a box on that page, every session** (`plymouth_cmdline` in the request; otherwise `--no-cmdline`).
+- The helper has a fixed `plymouth` verb (`apply`, `remove`) next to `apply` and `update`; the polkit policy is unchanged. The server has `/api/plymouth/preview` and `/api/plymouth/run`, both answering 404 without the part.
+
 ## 0.7.1 (2026-11-18)
 
 One command.

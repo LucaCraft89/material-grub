@@ -37,8 +37,43 @@ class Server(unittest.TestCase):
         (t / "state/menu.json").write_text(json.dumps([{"level": "top", "items": [e["class"] for e in ENTRIES]}]))
         (t / "mg.conf").write_text("STYLE=rail\n")
         fake = t / "apply.sh"
-        fake.write_text("#!/bin/sh\necho applying the menu\nexit ${FAKE_APPLY_RC:-0}\n")
+        # logs every call; `plymouth ...` exits with FAKE_PLY_RC, everything else with FAKE_APPLY_RC
+        fake.write_text(
+            '#!/bin/sh\necho "$@" >> "$MG_TEST_LOG"\necho applying the menu\n'
+            'if [ "$1" = plymouth ]; then exit ${FAKE_PLY_RC:-0}; fi\nexit ${FAKE_APPLY_RC:-0}\n'
+        )
         fake.chmod(0o755)
+        # a stand-in for the Plymouth part: a manifest and an entry whose `preview` writes a PNG that carries the conf it was given
+        (t / "plugins").mkdir()
+        (t / "plugins/plymouth.json").write_text(
+            json.dumps(
+                {
+                    "manifest": 1,
+                    "name": "plymouth",
+                    "title": "Plymouth boot splash",
+                    "version": "0.9.9",
+                    "core_api": 1,
+                    "entry": str(t / "plymouth_entry.py"),
+                    "summary": "test double",
+                }
+            )
+        )
+        (t / "plymouth_entry.py").write_text(
+            "import sys\nfrom pathlib import Path\nfrom PIL import Image, PngImagePlugin\n"
+            "def main(argv, core):\n"
+            "    if argv[0] != 'preview':\n        return 2\n"
+            "    screen, out = argv[1], argv[2]\n"
+            "    size = argv[argv.index('--size') + 1]\n"
+            "    root = Path(argv[argv.index('--root') + 1])\n"
+            "    w, h = (int(v) for v in size.split('x'))\n"
+            "    im = Image.new('RGB', (w, h), (30, 40, 50))\n"
+            "    info = PngImagePlugin.PngInfo()\n"
+            "    info.add_text('conf', (root / 'etc/material-grub.conf').read_text())\n"
+            "    info.add_text('screen', screen)\n"
+            "    info.add_text('icons', ','.join(sorted(p.name for p in (root / 'etc/material-grub/icons').iterdir())))\n"
+            "    im.save(out, pnginfo=info)\n"
+            "    return 0\n"
+        )
         cls.env = {
             "MATERIAL_PKG": str(PKG),
             "MATERIAL_STATE_DIR": str(t / "state"),
@@ -48,6 +83,8 @@ class Server(unittest.TestCase):
             "XDG_CACHE_HOME": str(t / "cache"),
             "MG_HELPER_ROOT": str(t / "root"),
             "MG_HELPER_APPLY": str(fake),
+            "MG_TEST_LOG": str(t / "apply.log"),
+            "MATERIAL_PLUGIN_PATH": str(t / "plugins"),
             "MG_GUI_HELPER": json.dumps([sys.executable, str(ROOT / "gui/mghelper.py")]),
         }
         cls.saved = {k: os.environ.get(k) for k in cls.env}
@@ -237,6 +274,100 @@ class Server(unittest.TestCase):
         self.assertTrue(any(e["event"] == "error" and "previous settings are back" in e["msg"] for e in ev), ev)
         after = (root / "etc/material-grub.conf").read_text() if (root / "etc/material-grub.conf").exists() else ""
         self.assertEqual(after, before)
+
+    # ------------------------------------------------------------ Plymouth (the optional part; here a test double)
+    def log_lines(self):
+        f = self.t / "apply.log"
+        return f.read_text().splitlines() if f.exists() else []
+
+    def test_state_knows_the_plymouth_part_and_its_keys(self):
+        st, d, _ = self.req("GET", "/api/state")
+        self.assertEqual((d["plymouth"]["installed"], d["plymouth"]["version"]), (True, "0.9.9"))
+        self.assertEqual(
+            (d["conf"]["PLYMOUTH"], d["conf"]["PLYMOUTH_BAR"], d["conf"]["PLYMOUTH_MOTION"]),
+            ("on", "indeterminate", "full"),
+        )
+        self.assertEqual(d["choices"]["PLYMOUTH_MOTION"], ["full", "calm", "off"])
+
+    def test_state_without_the_part_says_so(self):
+        saved = os.environ["MATERIAL_PLUGIN_PATH"]
+        os.environ["MATERIAL_PLUGIN_PATH"] = str(self.t / "no-plugins-here")
+        try:
+            st, d, _ = self.req("GET", "/api/state")
+            self.assertEqual(
+                self.req("POST", "/api/plymouth/preview", {"draft": {"conf": {}, "overrides": {}}})[0], 404
+            )
+            self.assertEqual(self.req("POST", "/api/plymouth/run", {"action": "apply"})[0], 404)
+        finally:
+            os.environ["MATERIAL_PLUGIN_PATH"] = saved
+        self.assertEqual(d["plymouth"]["installed"], False)
+
+    def test_plymouth_preview_runs_the_part_with_the_unsaved_draft(self):
+        from PIL import Image
+
+        draft = {"conf": {"PLYMOUTH_BAR": "progress", "STYLE": "split"}, "overrides": {}}
+        st, png, r = self.req(
+            "POST", "/api/plymouth/preview", {"draft": draft, "screen": "password", "size": "640x360"}, raw=True
+        )
+        self.assertEqual((st, r.getheader("Content-Type")), (200, "image/png"))
+        im = Image.open(io.BytesIO(png))
+        self.assertEqual(im.size, (640, 360))
+        self.assertIn("PLYMOUTH_BAR=progress", im.text["conf"], "the draft, not the saved settings, reaches the part")
+        self.assertIn("STYLE=split", im.text["conf"])
+        self.assertEqual(im.text["screen"], "password")
+
+    def test_plymouth_preview_validates_everything(self):
+        ok = {"conf": {}, "overrides": {}}
+        for body in (
+            {"draft": {"conf": {"PLYMOUTH_MOTION": "wild"}}},  # not an allowed value
+            {"draft": ok, "screen": "bios"},
+            {"draft": ok, "size": "99999x99999"},
+            {"draft": ok, "size": "wide"},
+            {"draft": ok, "size": "1280x720; rm -rf /"},
+        ):
+            self.assertEqual(self.req("POST", "/api/plymouth/preview", body)[0], 400, body)
+
+    def test_apply_runs_the_plymouth_step_after_grub_and_never_edits_the_kernel_line_unasked(self):
+        (self.t / "apply.log").write_text("")
+        st, d, _ = self.req("POST", "/api/apply", {"draft": {"conf": {"STYLE": "rail"}, "overrides": {}}})
+        ev = self.events(d["job"])
+        self.assertTrue(ev[-1]["ok"], ev)
+        self.assertEqual(self.log_lines(), ["apply", "plymouth apply --if-changed --no-cmdline"])
+        self.assertTrue(any(e["event"] == "warn" and "command line was not edited" in e["msg"] for e in ev), ev)
+
+    def test_apply_with_the_box_ticked_may_edit_the_kernel_line(self):
+        (self.t / "apply.log").write_text("")
+        st, d, _ = self.req(
+            "POST", "/api/apply", {"draft": {"conf": {"STYLE": "rail"}, "overrides": {}}, "plymouth_cmdline": True}
+        )
+        self.assertTrue(self.events(d["job"])[-1]["ok"])
+        self.assertEqual(self.log_lines(), ["apply", "plymouth apply --if-changed --yes"])
+
+    def test_a_failed_plymouth_step_does_not_undo_the_menu(self):
+        (self.t / "apply.log").write_text("")
+        os.environ["FAKE_PLY_RC"] = "1"
+        try:
+            st, d, _ = self.req("POST", "/api/apply", {"draft": {"conf": {"STYLE": "clean"}, "overrides": {}}})
+            ev = self.events(d["job"])
+        finally:
+            del os.environ["FAKE_PLY_RC"]
+        self.assertTrue(ev[-1]["ok"], "the menu was applied")
+        self.assertTrue(any(e["event"] == "warn" and "boot splash could not be applied" in e["msg"] for e in ev), ev)
+        self.assertNotIn("re-applying", " ".join(self.log_lines()))
+        self.assertIn("STYLE=clean", (self.t / "root/etc/material-grub.conf").read_text(), "the menu settings stayed")
+
+    def test_run_apply_and_remove_alone(self):
+        for action, expect in (
+            ("apply", "plymouth apply --if-changed --no-cmdline"),
+            ("remove", "plymouth remove --yes"),
+        ):
+            (self.t / "apply.log").write_text("")
+            st, d, _ = self.req("POST", "/api/plymouth/run", {"action": action})
+            self.assertEqual(st, 200)
+            ev = self.events(d["job"])
+            self.assertTrue(ev[-1]["ok"], ev)
+            self.assertEqual(self.log_lines(), [expect])
+        self.assertEqual(self.req("POST", "/api/plymouth/run", {"action": "reboot"})[0], 400)
 
     # ------------------------------------------------------------ Ventoy
     def stick(self):

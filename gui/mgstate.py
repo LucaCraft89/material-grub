@@ -34,7 +34,10 @@ CONF_KEYS = (
     "RAW_NAME",
     "COUNTDOWN",
     "TIMEOUT",
-)  # what the GUI may change (SCHEME is baked at build time)
+    "PLYMOUTH",
+    "PLYMOUTH_BAR",
+    "PLYMOUTH_MOTION",
+)  # what the GUI may change (SCHEME is baked at build time). The three Plymouth keys are the plugin's; without the plugin the GUI shows no page for them.
 
 
 def _json(path, default):
@@ -89,6 +92,24 @@ def installed_version(pkg):
         return None
 
 
+def plymouth_info():
+    """What the GUI needs to know about the optional Plymouth part: {installed, version, title, problem}. Never raises: a broken part is a message, not a crash."""
+    try:
+        import mgplugins
+
+        rec = mgplugins.find("plymouth")
+    except Exception as e:  # a plugin directory that cannot be read must not take the GUI down
+        return {"installed": False, "version": "", "title": "", "problem": f"could not look for plugins: {e}"}
+    if rec is None:
+        return {"installed": False, "version": "", "title": "", "problem": ""}
+    return {
+        "installed": rec.problem is None,
+        "version": getattr(rec, "version", "") or "",
+        "title": getattr(rec, "title", "") or "",
+        "problem": rec.problem or "",
+    }
+
+
 def read_state(pkg):
     ov, problems = mgoverrides.load()
     ents, menu, demo = entries()
@@ -113,6 +134,7 @@ def read_state(pkg):
         "seeds": [{"name": n, "color": h} for n, h in mgseeds.SEEDS],
         "groups": list(mgoverrides.GROUPS),
         "choices": {k: list(v) for k, v in mgrub.CONF_CHOICES.items() if k in CONF_KEYS},
+        "plymouth": plymouth_info(),
     }
 
 

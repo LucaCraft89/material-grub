@@ -15,6 +15,7 @@ const S = {
   log: [], // events of the last job
   palette: {},
   pv: { n: 0 },
+  plymouthCmdline: false, // the person's permission to edit the kernel command line / mkinitcpio hooks; asked every session, never saved
 };
 const VIEWS = [
   ["overview", "Overview", "overview"],
@@ -26,6 +27,8 @@ const VIEWS = [
   ["update", "Update", "update"],
   ["logs", "Logs", "logs"],
 ];
+// The Boot splash page exists only when the optional Plymouth part is installed (the server says so in /api/state).
+const views = () => (S.srv?.plymouth?.installed ? [...VIEWS.slice(0, 4), ["plymouth", "Boot splash", "plymouth"], ...VIEWS.slice(4)] : VIEWS);
 const dirty = () => JSON.stringify(S.draft) !== S.base;
 const GROUPS = { linux: "Linux", windows: "Windows", system: "Firmware & power" };
 
@@ -79,7 +82,7 @@ async function load(keepDraft = false) {
 }
 function go(v) {
   const [name, arg] = String(v).split(":");
-  S.view = VIEWS.some((x) => x[0] === name) ? name : "overview";
+  S.view = views().some((x) => x[0] === name) ? name : "overview";
   history.replaceState(null, "", "#" + S.view);
   if (S.view === "ventoy" && arg && VT.path !== decodeURIComponent(arg)) vtLoad(decodeURIComponent(arg));
   render(true);
@@ -93,20 +96,21 @@ function render(enter = false) {
   renderRail();
   renderTop();
   const layout = document.getElementById("layout");
-  const wide = ["overview", "presets", "update", "logs", "ventoy"].includes(S.view);
+  const wide = ["overview", "presets", "update", "logs", "ventoy", "plymouth"].includes(S.view);
   layout.className = "layout" + (wide ? " wide" : "") + (enter ? " enter" : "");
   const view = h("div", { class: "col view" });
-  ({ overview: vOverview, style: vStyle, entries: vEntries, colours: vColours, ventoy: vVentoy, presets: vPresets, update: vUpdate, logs: vLogs })[S.view](view);
+  ({ overview: vOverview, style: vStyle, entries: vEntries, colours: vColours, plymouth: vPlymouth, ventoy: vVentoy, presets: vPresets, update: vUpdate, logs: vLogs })[S.view](view);
   layout.replaceChildren(view);
   if (!wide) layout.append(previewPane());
   renderFab();
   if (!wide) schedulePreview();
+  if (S.view === "plymouth") schedulePly();
 }
 function renderRail() {
   const rail = document.getElementById("rail");
   rail.replaceChildren(
     h("div", { class: "brand" }, icon("cookie"), h("div", {}, h("b", {}, "Material GRUB"), h("small", {}, S.srv.version ? "v" + S.srv.version : "not installed"))),
-    ...VIEWS.map(([id, label, ic]) =>
+    ...views().map(([id, label, ic]) =>
       h("button", { class: "nav", "aria-current": S.view === id ? "page" : false, onClick: () => go(id) }, icon(ic), h("span", {}, label), id === "entries" && S.draft.overrides.entries.length ? h("span", { class: "badge" }, S.draft.overrides.entries.length) : null),
     ),
     h("div", { class: "spacer" }),
@@ -120,7 +124,7 @@ function toggleTheme() {
 }
 function renderTop() {
   const t = document.getElementById("topbar");
-  const title = VIEWS.find((v) => v[0] === S.view)[1];
+  const title = views().find((v) => v[0] === S.view)[1];
   t.replaceChildren(
     ...[
       h("h1", {}, title),
@@ -137,7 +141,7 @@ function renderFab() {
     h("button", { class: "btn fab" + (dirty() ? " attention" : ""), disabled: !dirty() || !S.srv.installed, onClick: applyDraft, title: dirty() ? "Write your changes to GRUB (asks for your password or fingerprint)" : "Nothing to apply yet" }, icon("apply"), "Apply to GRUB"),
   );
 }
-const touch = () => { renderTop(); renderFab(); renderRail(); schedulePreview(); };
+const touch = () => { renderTop(); renderFab(); renderRail(); schedulePreview(); if (S.view === "plymouth") schedulePly(); };
 
 // ---------------------------------------------------------------- helpers for forms
 function card(title, ...kids) {
@@ -579,7 +583,7 @@ function logLine(ev) {
 // ---------------------------------------------------------------- Apply and the progress dialog
 async function applyDraft() {
   if (!dirty()) return;
-  runJob("Applying your changes", () => api.apply(S.draft), async () => { S.base = JSON.stringify(S.draft); await load(true); render(); });
+  runJob("Applying your changes", () => api.apply(S.draft, S.plymouthCmdline), async () => { S.base = JSON.stringify(S.draft); await load(true); render(); });
 }
 function runJob(title, start, after) {
   const dlg = document.getElementById("job");
@@ -657,6 +661,63 @@ async function drawPreview() {
     back.src = url;
   } catch (e) {
     if (n === S.pv.n) { frame.classList.remove("loading"); toast("Preview failed: " + e.message); }
+  }
+}
+
+
+// ---------------------------------------------------------------- Boot splash (the optional Plymouth part)
+const PLY_SCREENS = [["boot", "While it boots"], ["password", "Disk password"], ["shutdown", "Shutting down"]];
+function vPlymouth(v) {
+  const c = S.draft.conf, ply = S.srv.plymouth;
+  const set = (k, val) => { c[k] = val; touch(); };
+  const on = c.PLYMOUTH === "on";
+  v.append(
+    card("Boot splash",
+      h("p", { class: "muted" }, `Plymouth ${ply.version} draws this same look while the system starts, when it asks for the disk password and while it shuts down. The style, the colours and the entries are the ones of the other pages.`),
+      toggle("Show the Material boot splash", on, (x) => { set("PLYMOUTH", x ? "on" : "off"); render(); }, "Off takes the splash out the next time you press Apply (your distro's own splash comes back)."),
+      on ? h("div", { class: "grid cols2", style: { marginTop: "14px" } },
+        field("Loading bar", "The wavy bar under the title. Endless: a wave that keeps travelling. Fills as it boots: grows with the real boot progress.",
+          seg([["indeterminate", "Endless wave"], ["progress", "Fills as it boots"]], c.PLYMOUTH_BAR, (x) => { set("PLYMOUTH_BAR", x); render(); })),
+        field("Motion", "How much moves. Full: the shapes, the cookie and the card. Calm: fewer things, less work for the CPU. Still: nothing but the bar.",
+          seg([["full", "Full"], ["calm", "Calm"], ["off", "Still"]], c.PLYMOUTH_MOTION, (x) => { set("PLYMOUTH_MOTION", x); render(); })),
+      ) : null,
+    ),
+    card("Preview", h("p", { class: "muted" }, "Drawn by the boot splash's own code from the settings on screen, so it follows every change before you apply. The real splash is animated."),
+      h("div", { class: "grid cols3", style: { marginTop: "12px" } }, ...PLY_SCREENS.map(([id, label]) =>
+        h("figure", { class: "ply-shot" }, h("div", { class: "frame loading" }, h("img", { id: "ply-" + id, alt: `Preview: ${label}` })), h("figcaption", { class: "small muted" }, label))))),
+    card("Changes to the boot configuration",
+      h("p", { class: "muted" }, "For the splash to show, the kernel command line needs the words quiet and splash (and on Arch, mkinitcpio needs the plymouth hook). Each change is backed up first and undone if anything goes wrong."),
+      toggle("Let Apply make these changes", S.plymouthCmdline, (x) => { S.plymouthCmdline = x; render(); }, "Not ticked: the theme is installed, but it only shows if splash is already on your command line. This is asked again every time you open the page."),
+    ),
+    card("Only the boot splash",
+      h("p", { class: "muted" }, dirty() ? "You have unsaved changes: Apply (the button at the bottom) writes them for both GRUB and the boot splash. These two buttons act on what is already saved." : "These act on the saved settings only, without touching the GRUB menu."),
+      h("div", { class: "row" },
+        h("button", { class: "btn", disabled: dirty() || !on, onClick: () => runJob("Applying the boot splash", () => api.plymouthRun("apply", S.plymouthCmdline), async () => { await load(true); render(); }) }, icon("check"), "Apply the boot splash now"),
+        h("button", { class: "btn text", onClick: () => { if (confirm("Take the Material boot splash out and rebuild the initramfs?")) runJob("Removing the boot splash", () => api.plymouthRun("remove", false), async () => { await load(true); render(); }); } }, "Remove it"),
+      ),
+    ),
+  );
+}
+let plyTimer = null;
+const plyN = {};
+function schedulePly() {
+  clearTimeout(plyTimer);
+  plyTimer = setTimeout(drawPly, 220);
+}
+async function drawPly() {
+  for (const [id] of PLY_SCREENS) {
+    const img = document.getElementById("ply-" + id);
+    if (!img) continue;
+    const n = (plyN[id] = (plyN[id] || 0) + 1);
+    img.parentNode.classList.add("loading");
+    try {
+      const url = await api.plymouthPreview({ draft: S.draft, screen: id, size: "1280x720" });
+      if (n !== plyN[id] || !document.body.contains(img)) { URL.revokeObjectURL(url); continue; }
+      img.onload = () => img.parentNode.classList.remove("loading");
+      img.src = url;
+    } catch (e) {
+      if (n === plyN[id]) { img.parentNode.classList.remove("loading"); toast("Preview failed: " + e.message); }
+    }
   }
 }
 
