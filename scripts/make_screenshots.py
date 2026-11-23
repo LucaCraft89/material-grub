@@ -4,10 +4,15 @@ usage: make_screenshots.py [WxH ...]   (default: 1920x1080 2560x1080)  -> docs/s
        make_screenshots.py --styles    (every style, in the scheme of the package) -> styles/<style>-<scheme>-<n>.png
        make_screenshots.py --light     (needs a package built with --scheme light) -> light-*.png"""
 
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+# Documentation screenshots must not carry the logo of whatever machine they were made on (the cookie showed a Dell logo): with no firmware logo the theme
+# draws the Linux penguin, the same everywhere. A maintainer who wants a real logo in a one-off picture sets MG_BGRT_IMAGE to it.
+os.environ.setdefault("MG_BGRT_IMAGE", "/nonexistent/bgrt")
 
 ROOT = Path(__file__).resolve().parent.parent
 PKG = ROOT / "dist/material-grub"
