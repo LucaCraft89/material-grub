@@ -16,6 +16,7 @@ from pathlib import Path
 
 import mgoverrides
 import mgrub
+import mgtheme
 
 
 def arg(n, d=None):
@@ -413,6 +414,50 @@ LOGOS = {}  # full-colour logos of catalog entries that have their own (PNLug)
 entries = []
 
 
+def default_res(avail):
+    """The sizes to write themes for when --res is not given: this computer's own screen size when it can be told (the stick is usually themed on the PC it is
+    used with), else 1080p; and 1080p as the second theme, so that Ventoy's resolution_fit has a real fallback. (This used to be the alphabetically first
+    built-in size, 1280x720, whatever the screen: a theme for the wrong size.)"""
+    native = mgtheme.native_mode()
+    first = f"{native[0]}x{native[1]}" if native else ("1920x1080" if "1920x1080" in avail else avail[0])
+    return [first] + (["1920x1080"] if first != "1920x1080" and "1920x1080" in avail else [])
+
+
+def bundle_dir(res, avail, tmp):
+    """The bundle of one screen size: the built-in one, or (any other WxH) one written for exactly that size from the closest built-in one's fonts, pictures and
+    scene set, the way config time does it for GRUB (install/bin/mgtheme.py)."""
+    built = PKG / "res" / res
+    if built.is_dir():
+        return built
+    w, h = mgtheme.parse_mode(res)
+    src = PKG / "res" / mgrub.snap(res, avail)
+    d = Path(tmp) / res
+    shutil.copytree(src, d)
+    fs, rs = (
+        int(x)
+        for x in (
+            re.search(r"MG-Label Regular (\d+)", (src / "theme.txt").read_text())[1],
+            re.search(r"MG-Raw Regular (\d+)", (src / "theme.txt").read_text())[1],
+        )
+    )
+    light = (PKG / "scheme.txt").read_text().strip() == "light" if (PKG / "scheme.txt").exists() else False
+    aspect = (src / "aspect").read_text().strip()
+    (d / "theme.txt").write_text(
+        mgtheme.theme_text(
+            w,
+            h,
+            wds=mgtheme.ASPECTS[aspect.split("@")[0]],
+            light=light,
+            aspect=aspect,
+            fs=fs,
+            rs=rs,
+            bh=max(8, round(14 * int(src.name.split("x")[1]) / 1080)),
+        )
+    )
+    (d / "logo_size").write_text(str(round(120 * h / 1080)))
+    return d
+
+
 def main():
     global PKG, state, state_path, stick, vj_path
     stick = Path(sys.argv[1]) if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else None
@@ -441,10 +486,14 @@ def main():
     rules = mgrub.load_rules(PKG)
     classes = json.loads((PKG / "classes.json").read_text())
     avail = sorted(p.name for p in (PKG / "res").iterdir())
-    resl = [r for r in (arg("--res") or "").split(",") if r] or avail[:1]
+    resl = [r for r in (arg("--res") or "").split(",") if r] or default_res(avail)
     for r in resl:
-        if r not in avail:
-            sys.exit(f"material-grub-ventoy: resolution {r} is not in the package (has: {', '.join(avail)})")
+        if r != "basic" and mgtheme.parse_mode(r) is None:
+            sys.exit(
+                f"material-grub-ventoy: '{r}' is not a screen size (use WxH, for example 1366x768, or `basic` for the theme that fits any screen)"
+            )
+    basic_only = resl == ["basic"]
+    size_tmp = tempfile.mkdtemp(prefix="mg-ventoy-sizes-")
     dynamic = (
         conf["MODE"] == "dynamic"
     )  # dynamic: nothing depends on the files on the stick (generic rules, one scene per distro); snapshot: scenes are rendered for the files that are there now
@@ -505,12 +554,37 @@ def main():
         f"material-grub-ventoy: mode {conf['MODE']}, {len(entries)} images, {len(keys)} distros, style {style}, resolutions {', '.join(resl)}"
     )
     theme_dirs, theme_files, fonts, menu_class = [], [], [], []
+    custom_done = []  # the customised files drawn into a scene (none for the basic theme)
     for res in resl:
-        rdir = PKG / "res" / res
-        aspect = (rdir / "aspect").read_text().strip()
         rel_dir = f"{THEMES}/material_{res}"
         out = stick / rel_dir
         tmp = out.with_name(out.name + ".new")
+        if (
+            res == "basic"
+        ):  # no pictures, no pixel sizes: a plain list that fits any screen (the way out when a size keeps going wrong)
+            rdir = PKG / "res" / ("1920x1080" if "1920x1080" in avail else avail[0])
+            shutil.rmtree(tmp, ignore_errors=True)
+            (tmp / "icons").mkdir(parents=True)
+            for f in rdir.iterdir():
+                if f.name not in ("logo_size", "aspect", "theme.txt"):
+                    shutil.copy(f, tmp / f.name)
+            txt = (rdir / "theme.txt").read_text()
+            fs, rs = int(re.search(r"MG-Label Regular (\d+)", txt)[1]), int(re.search(r"MG-Raw Regular (\d+)", txt)[1])
+            light_b = (PKG / "scheme.txt").read_text().strip() == "light" if (PKG / "scheme.txt").exists() else False
+            (tmp / "theme.txt").write_text(
+                mgrub.apply_conf_to_theme(
+                    mgtheme.basic_theme_text(light_b, fs, rs, max(8, round(14 * int(rdir.name.split("x")[1]) / 1080))),
+                    dict(conf, STYLE="rail"),
+                )
+            )
+            shutil.rmtree(out, ignore_errors=True)
+            os.replace(tmp, out)
+            theme_dirs.append(rel_dir)
+            theme_files.append(f"/{rel_dir}/theme.txt")
+            fonts += [f"/{rel_dir}/{p.name}" for p in sorted(out.glob("*.pf2"))]
+            continue
+        rdir = bundle_dir(res, avail, size_tmp)
+        aspect = (rdir / "aspect").read_text().strip()
         shutil.rmtree(tmp, ignore_errors=True)
         (tmp / "icons").mkdir(parents=True)
         for f in rdir.iterdir():
@@ -676,11 +750,15 @@ def main():
                 im.save(tmp / "icons" / f"{e['class']}.png")
         shutil.rmtree(tmp / "_hero", ignore_errors=True)
         shutil.rmtree(ov_tmp, ignore_errors=True)
+        th.write_text(
+            mgtheme.anchor_centre(th.read_text(), rw, rh)
+        )  # last: every position relative to the centre, so a screen mode that is not the one asked for leaves the theme centred, not in a corner
         shutil.rmtree(out, ignore_errors=True)
         os.replace(tmp, out)
         theme_dirs.append(rel_dir)
         theme_files.append(f"/{rel_dir}/theme.txt")
         fonts += [f"/{rel_dir}/{p.name}" for p in sorted(out.glob("*.pf2"))]
+    shutil.rmtree(size_tmp, ignore_errors=True)
     bak = vj_path.with_name("ventoy.json.material-grub.bak")
     if vj_path.exists() and not bak.exists():
         shutil.copy(vj_path, bak)
@@ -710,6 +788,11 @@ def main():
             print(f"material-grub-ventoy: warning: no unique key for {name}; it keeps the generic scene")
             continue
         menu_class.append({"key": key, "class": e["class"] if per_entry else f"mg_{e['key']}"})
+    if basic_only:
+        menu_class, menu_alias = (
+            [],
+            [],
+        )  # the basic theme draws no scene pictures: there is nothing for a class to point at
     seen = set()
     menu_class = [m for m in menu_class if not (m["key"] in seen or seen.add(m["key"]))]
     vj["menu_class"] = user_mc + menu_class  # the user's own rules come first and win
@@ -729,7 +812,7 @@ def main():
     th.update(
         {
             "file": theme_files[0] if len(theme_files) == 1 else theme_files,
-            "gfxmode": arg("--gfxmode") or resl[0],
+            "gfxmode": arg("--gfxmode") or ("auto" if resl[0] == "basic" else resl[0]),
             "fonts": fonts,
         }
     )

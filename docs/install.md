@@ -50,7 +50,10 @@ The installer always builds the theme from source (there are no prebuilt downloa
 ## Supported resolutions
 
 `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `2880x1800`, `3440x1440`, `3840x1080`, `3840x1600`, `3840x2160`, `5120x1440`, `5120x2160`.
-Anything else snaps to the closest aspect ratio. The scene sets are 16:9, 16:10, 21:9 and 32:9; screens at least 1800 px high use a 2160-high set
+Any other `WxH` (for example `1366x768` or `1600x900`) gets a theme written for exactly that size, using the fonts and pictures of the closest built-in
+size, and every position in it is relative to the centre of the screen: if the firmware picks a near-by mode the theme stays together in the middle
+instead of sitting in a corner. 4:3 and 5:4 screens use the 16:10 scenes (squeezed). When no usable mode is known (`GRUB_GFXMODE=keep`, a typo) the
+**basic theme** is used: a plain list and countdown that fits any screen. `--res basic` asks for it. The scene sets are 16:9, 16:10, 21:9 and 32:9; screens at least 1800 px high use a 2160-high set
 (four times the pixels, about 20 MB per set). The installer builds only the set for the resolution it detects (or `--res`), so after
 switching monitors or `GRUB_GFXMODE`, run `sudo ./install.sh --res WxH` again.
 
