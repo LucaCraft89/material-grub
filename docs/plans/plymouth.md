@@ -307,3 +307,45 @@ Four tiers. Everything runs in GitHub Actions on every PR (as the GRUB theme's j
 3. Permission for the Phase 0 spike (installs `plymouth` and its script plugin in this sandbox only).
 4. Open question: immutable/ostree systems (Silverblue, Bazzite) after the first release, or never.
 5. For phase 8, to confirm when we get there (not now): keep `material-grub` as an alias for one release or longer; keep the `/etc/material-grub*` paths; whether the GUI becomes `material-boot gui` with one page per part (assumed yes).
+
+## 13. Status and handoff (2026-11-24)
+
+What exists, what was and was not verified, and what is next. Written for whoever continues (a fresh agent has none of the chat). The rules did not change: work only through PRs, **never merge** (the maintainer does), ask before anything unclear, state plainly what was and was not verified.
+
+### Versions (decision 18)
+The three repositories start level at **1.0.0**. material-grub's integration branch is still called `release/0.8.0` (rename it on GitHub; open PRs follow). The migration steps of this release are "since 1.0.0"; the packages need `material-grub >= 1.0.0`. `material-boot-core` is empty: its first commit starts at 1.0.0 (an empty repository has no branch to open a PR against: ask the maintainer how to seed it).
+
+### Open PRs (none merged by me; `release/0.8.0` is the integration branch of material-grub)
+**material-grub:** #14 this plan; #15 phase 1 plugin registry and conf keys (`feat/plymouth-contract`); #16 phase 1b upgrade detection, stacked on #15; #19 phase 5 GUI Boot splash page, stacked on #15; #18 documentation screenshots use the penguin, not the build machine's logo (the 79 committed pictures still show a Dell logo until a follow-up regenerates them); #20 version 1.0.0. **#17 (the theme drawn in a corner on screens with no built-in bundle) is merged into `release/0.8.0`** at the maintainer's request; it is **not verified on hardware** (an Asus laptop, about 1366x768, and a Ventoy PC: `git checkout fix/resolution-mismatch`, `sudo ./install.sh`, reboot, `material-grub doctor`).
+**material-plymouth** (a chain, each stacked on the one before): #2 CI, #3 identity and layers, #4 theme/script/wavy bar/prompt/messages, #5 apply and remove with rollback, #6 tier 3 (real initramfs per distro), #7 QEMU boot (Fedora), #8 the boot on five distros, #9 the GRUB to Plymouth hand-over, #10 `plymouth preview` (for the GUI), #11 packaging (rpm, deb, Arch). #1 is the spike.
+**Merge order (maintainer):** material-plymouth #2 to #11 in order; material-grub #15, then #16, #19, #18, #20, #14. After #15 merges, change `MATERIAL_GRUB_REF`'s default in material-plymouth's `ci.yml` from `feat/plymouth-contract` to the integration branch.
+**Not yet run on GitHub:** the CI jobs of material-plymouth #6 to #11 and of material-grub #17 to #20. Expect the first runs to need small fixes (KVM setup step, registry image names, the `ovmf` and `grub-efi-amd64-bin` packages on the runner). CI loop: push, wait about nine minutes, read the run with the GitHub tools.
+
+### What was verified, and how
+- **Tier 3** (material-plymouth #6): `plymouth apply` and `remove` against a real dracut, initramfs-tools and mkinitcpio on Fedora, Ubuntu, Debian, Arch and openSUSE: the theme, script plugin and pictures are in the image, `--if-changed` rebuilds nothing, a failing tool and a tool writing broken images both roll back byte-identically. All pass locally.
+- **QEMU** (#7, #8, #9): the real kernel and initramfs of each distro, booted in QEMU (software emulation here, KVM on GitHub): the splash draws and animates, the disk-password prompt takes the typed password, shutdown mode shows its message, plymouthd stays up, and every frame is the theme (not a text screen). Plymouth 22.02 (openSUSE), 24.004 (Debian, Ubuntu), 26.134 (Fedora, Arch). **The hand-over:** GRUB under UEFI (OVMF) with material-grub's own theme, then Plymouth, same resolution and the same background and card colours.
+- **GUI** (#19): 8 new server tests, a Chromium end-to-end section, and a manual run with the real plugin.
+- **Packages** (#11): built and exercised in Fedora, Debian and Arch containers: installing changes nothing about how the system boots; upgrade re-applies only a theme that was applied before; removal takes the theme out first.
+
+### Findings worth knowing (all fixed, with tests)
+- **Plymouth 26's script plugin crashes plymouthd when the text-label plugin is missing from the initramfs** (it dereferences a NULL console viewer), for any script theme. `apply` now refuses without the plugin and checks each image holds it.
+- **Ubuntu 24.04 under UEFI showed the scene only inside its sprites' rectangles, on black.** The script now re-sets the background colour once a second for twenty seconds, which repaints the whole screen. The cause is not pinned down; this is a workaround (see material-plymouth #9).
+- With `update-alternatives`, a failed second apply used to leave a distro default theme behind while the image still held ours.
+- `dracut --regenerate-all` can exit 0 while writing nothing: apply verifies the images, not the exit code.
+- A test that only checks "not blank, and it changes" passes on a crash dump or an emergency shell: the checks look at the process and at the colours.
+
+### Not verified (be honest about these)
+Real hardware of any kind (the display here is QEMU's `bochs` DRM device; the EFI framebuffer handing over to `i915` or `amdgpu` is the part most likely to differ); a real root file system; Secure Boot; the pkexec path and a real initramfs rebuild started from the GUI; installing next to a real material-grub package (none exists until 1.0.0 is released); the CPU cost of the new once-a-second repaint with `PLYMOUTH_MOTION=off` (the Xvfb job measures `off`, `calm` and `full`); only Plymouth 24.004 was ever played in Xvfb (Fedora, openSUSE and Arch ship no X11 renderer, so that tier cannot cover other generations: the QEMU boots do).
+
+### Next (suggested order)
+1. **Phase 8** (the maintainer approved it, with a fresh agent): extract the shared code into `material-boot-core` (an adapter is in place in material-plymouth's `adapter.py`, the one place it reaches into material-grub) and build the unified installer and the `material-boot` command (section 9b: `material-boot grub|plymouth ...`, `material-grub` kept as an alias, `/etc/material-grub*` paths kept). Separate PRs, never one change to `main`. Ask the maintainer about the shape before building: this is the big architectural step.
+2. The systemd path and service units that run `plymouth apply --if-changed` when the part is installed (item 3 of section 7); an animated preview in the GUI (the plan promises one; #19 has stills).
+3. After the maintainer confirms #17 on hardware: scene sets of their own for 4:3 and 5:4 screens (today squeezed 16:10 scenes). If gray remains, ask for the `material-grub doctor` output.
+4. A follow-up PR that regenerates `docs/screenshots` with the penguin (after #18 merges); a `--logo penguin` option for screenshots made on any machine.
+5. Smaller: the light scheme in the QEMU tests, bump `actions/checkout` and `upload-artifact` (the Node 20 warning), the Ventoy version marker and its `doctor` warning, the upgrade matrix on every distro, multiple displays, immutable systems (ask first). material-plymouth branch `ci/xvfb-per-generation` holds an unfinished per-distro Xvfb script (no PR: it cannot work where there is no X11 renderer).
+
+### Working here (the sandbox)
+- Docker is installed but its daemon does not start by itself: `dockerd --iptables=false --bridge=none &`; pull from `mirror.gcr.io` (Docker Hub rate-limits); containers need `--network host` and the proxy variables, and the sandbox CA (`/root/.ccr/ca-bundle.crt`) added to their trust store. There is no KVM: QEMU runs in software emulation (about a minute per boot) and `qemu-system-x86_64`, OVMF and `grub-mkimage` are installed.
+- **Run the GUI tests and the end-to-end as a normal user** (`runuser -u nobody`): as root the privileged helper ignores its scratch root and writes the real `/etc` (I did that once by mistake and restored it from the helper's backup). Never run `rm -rf` on a shell variable (the safety check blocks it).
+- A built material-grub with the plugin API is needed for material-plymouth's tests: a worktree of `feat/plymouth-contract` with `python scripts/package.py --res 1920x1080,1280x720` (needs `apt grub-common librsvg2-bin`), then `MATERIAL_GRUB=<that path>`.
+- The GitHub tools are deferred: load them with ToolSearch (`mcp__github__create_pull_request`, `pull_request_read`, `actions_list`, `get_job_logs`, `merge_pull_request` is not to be used).
