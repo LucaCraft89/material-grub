@@ -14,6 +14,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import mgdetect
 import mgoverrides
 import mgplugins
 import mgrub
@@ -326,6 +327,22 @@ class Doctor:
             + ("" if good else ": run sudo systemctl enable --now material-grub.path"),
         )
 
+    def install_state(self):
+        """What the installer's detection sees (the same code the installer and the packages use): how it was installed, the parts, an old-style install."""
+        f = mgdetect.detect(self.root)
+        if f.kind == "none":
+            return
+        what = f"{mgdetect.HOW_TEXT.get(f.how, f.how)}, {f.layout} layout" + (
+            ", parts: " + ", ".join(f"{k} {v}" for k, v in sorted(f.parts.items())) if f.parts else ""
+        )
+        self.add(INFO, "install", what)
+        if f.legacy:
+            self.add(
+                INFO, "state record", "none yet (installed by an older version): the next install or update writes it"
+            )
+        if f.old_names:
+            self.add(WARN, "old commands", "left from an older version: " + ", ".join("/" + n for n in f.old_names))
+
     def plugins(self):
         """Optional parts from other packages (material-plymouth): listed when present, a broken or incompatible one is a warning. Nothing is printed without any."""
         import cmd_cli  # the names of the built-in commands, which a plugin may not take over
@@ -379,6 +396,7 @@ class Doctor:
         self.overrides(pkg)
         self.hooks()
         self.path_unit()
+        self.install_state()
         self.plugins()
         if pkg:
             theme = self.theme(pkg, gfx)

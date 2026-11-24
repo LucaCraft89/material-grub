@@ -6,6 +6,7 @@ Groundwork for optional parts from other packages (the first is the Plymouth boo
 
 **New**
 - **Optional parts (plugins):** another package can install one manifest and add a sub-command (`material-grub plymouth ...`), a menu entry and a line in `help`, `version` and `doctor`; a part that is missing, broken or written for another plugin API is reported, never fatal. See `docs/plugins.md`.
+- **Updates know about existing installs:** the installer and the packages detect an install that is already there (and how it was made), show a notice before changing anything, keep the settings, back up the files an update changes (restored if a step fails), refuse a downgrade and a source install over a package's files (`--force` overrides), and record what is installed in `/var/lib/material-grub/state.json`. `material-grub doctor` shows the same detection. See `docs/install.md`.
 - Runtime options `PLYMOUTH`, `PLYMOUTH_BAR` and `PLYMOUTH_MOTION` in `/etc/material-grub.conf` (validated, kept in presets); they do nothing until the Plymouth part is installed.
 
 **Fixed**
