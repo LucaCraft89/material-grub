@@ -349,3 +349,14 @@ Real hardware of any kind (the display here is QEMU's `bochs` DRM device; the EF
 - **Run the GUI tests and the end-to-end as a normal user** (`runuser -u nobody`): as root the privileged helper ignores its scratch root and writes the real `/etc` (I did that once by mistake and restored it from the helper's backup). Never run `rm -rf` on a shell variable (the safety check blocks it).
 - A built material-grub with the plugin API is needed for material-plymouth's tests: a worktree of `feat/plymouth-contract` with `python scripts/package.py --res 1920x1080,1280x720` (needs `apt grub-common librsvg2-bin`), then `MATERIAL_GRUB=<that path>`.
 - The GitHub tools are deferred: load them with ToolSearch (`mcp__github__create_pull_request`, `pull_request_read`, `actions_list`, `get_job_logs`, `merge_pull_request` is not to be used).
+
+## 14. Phase 8 decisions (maintainer, 2026-11-24) and progress
+
+Proposal answered; the full shape is in `docs/architecture.md` of material-boot-core.
+- **Command:** `material-boot <module> [command]` with module = `core | grub | plymouth`. The shared settings and tools (`colour`, `presets`, `overrides`, `conf`, `doctor`, `update`, ...) are under `core`. Only `help`, `version` and the menu are top-level. (My opinion, for the record: top-level shared commands would read better to users; the maintainer chose `core` for uniformity. Shortcuts can be added later without breaking anything.)
+- **Alias:** `material-grub X` behaves exactly as today (`plymouth` included); `material-grub apply` stays GRUB-only; hooks and units keep calling it in 1.0.0; the deprecation note only in `help`, `version`, `doctor` and the menu.
+- **Distribution:** one bundle tarball built by the core's release CI from the three tagged repositories. **Packages:** core uses new paths (no file changes owner); meta-package = core + grub, not Plymouth; `/etc/material-grub*` unchanged, no symlink.
+- **Core repo:** it was not empty (bootstrap commit on `main`), so no seeding; PRs go against `main`.
+- **Timing:** C1 and C2 now with the modules the open PRs do not touch; `mgrub`, `mgplugins`, `mgdetect` move only after material-grub #15 and #16 merge.
+- **Rule for every move:** render hashes (styles x schemes x seeds x resolutions, plus the Plymouth layers) are snapshotted first and must be reproduced byte for byte.
+- **Progress:** material-boot-core #1 (C1 skeleton, 1.0.0, CI, architecture) open. Next: the render-hash snapshot, then C2.
