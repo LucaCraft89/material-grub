@@ -23,6 +23,7 @@ sys.path.insert(0, str(HERE / "install/bin"))
 import mgdetect  # noqa: E402
 import mgmigrate  # noqa: E402
 import mgrub  # noqa: E402
+import mgtheme  # noqa: E402
 
 MIN_RUNTIME = (3, 8)  # this installer and the installed tools
 MIN_BUILD = (3, 9)  # the build venv: materialyoucolor has no Python 3.8 wheel
@@ -889,16 +890,26 @@ class Installer:
             self.die("several resolutions (--res A,B) are only supported with --ventoy")
         out = []
         for r in self.res.split(","):
-            try:
+            if (
+                r == "basic"
+            ):  # the theme that fits any screen: no size to build for (the bundle of 1080p supplies its fonts)
+                s = "1920x1080"
+            elif mgtheme.parse_mode(r) is None:
+                self.die(f"Bad resolution '{r}' (expected WxH, for example 1366x768, or `basic`).")
+            else:
                 s = mgrub.snap(r)
-            except ValueError:
-                self.die(f"Bad resolution '{self.res}' (expected WxH).")
             if s not in out:
                 out.append(s)
         self.build_res = ",".join(out)
-        if self.build_res != self.res:
-            self.info(f"{self.res} is not a built-in size: using the {self.build_res} theme")
-        self.info(f"supported: {' '.join(mgrub.RESOLUTIONS)} (others snap to the closest aspect ratio)")
+        if self.res == "basic":
+            self.info("the basic theme will be used: a plain list that fits any screen size")
+        elif self.build_res != self.res:
+            self.info(
+                f"{self.res}: a theme is written for exactly that size (pictures and fonts of the {self.build_res} bundle)"
+            )
+        self.info(
+            f"built-in sizes: {' '.join(mgrub.RESOLUTIONS)} (any other WxH gets a theme written for exactly that size)"
+        )
 
     # ------------------------------------------------------------ build
     def build(self):
@@ -1096,7 +1107,7 @@ class Installer:
                     "--pkg",
                     self.dist,
                     "--res",
-                    self.build_res,
+                    self.res,  # the sizes asked for (or detected), not the built-in ones they snap to: the tool writes a theme for exactly each
                 ]
             )
             if r.returncode != 0:

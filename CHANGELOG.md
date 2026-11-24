@@ -9,6 +9,12 @@ Groundwork for optional parts from other packages (the first is the Plymouth boo
 - **Updates know about existing installs:** the installer and the packages detect an install that is already there (and how it was made), show a notice before changing anything, keep the settings, back up the files an update changes (restored if a step fails), refuse a downgrade and a source install over a package's files (`--force` overrides), and record what is installed in `/var/lib/material-grub/state.json`. `material-grub doctor` shows the same detection. See `docs/install.md`.
 - Runtime options `PLYMOUTH`, `PLYMOUTH_BAR` and `PLYMOUTH_MOTION` in `/etc/material-grub.conf` (validated, kept in presets); they do nothing until the Plymouth part is installed.
 
+**Fixed**
+- **The theme filled only a corner of the screen, with gray edges at the bottom and right** (seen on a 1366x768 laptop). Every size that was not a built-in one was snapped to the nearest bundle (1366x768 -> 1280x720), so the theme was drawn for 1280x720 on a bigger screen, in pixels. Now a theme is written for exactly the screen size (the fonts and pictures of the closest bundle, a `theme.txt` for the real width and height) and every position is relative to the centre of the screen, so a firmware that picks a near-by mode (1360x768 for 1366x768) gets a centred theme, not one in a corner. GRUB is asked for `WxH,auto`, so it still has a fallback mode.
+- **A mode nobody can use** (`GRUB_GFXMODE=keep`, a typo, 99999x5) no longer ends in a gray or empty screen: the **basic theme** is used, a plain list and countdown that does not depend on any size.
+- **Ventoy:** the default size is this computer's own screen (it was the alphabetically first built-in size, 1280x720), any `WxH` in `--res` gets a theme of exactly that size, and `--res basic` writes the size-independent theme.
+- `material-grub doctor` compares the configured mode with the theme in use and with the display's native mode.
+
 ## 0.7.1 (2026-11-18)
 
 One command.

@@ -12,6 +12,8 @@ THEMEDIR=$GDIR/themes/material                       # where the theme is at boo
 BUILDDIR=${MATERIAL_BUILD_DIR:-$THEMEDIR}            # `install.sh --dry-run` builds somewhere else and changes nothing on the system
 MODE=$("$PYBIN" "$PKG/bin/material-grub-assemble" --mode "${GRUB_GFXMODE:-}" --pkg "$PKG" --out "$BUILDDIR" 2>/dev/null | tail -n1) || exit 0
 [ -n "$MODE" ] || exit 0
+# $MODE is the screen mode the theme was written for (exactly that size, whatever the built-in sizes are), or `auto` for the basic theme that fits any screen
+if [ "$MODE" = auto ]; then GFX=auto; else GFX="$MODE,auto"; fi
 if [ "$BUILDDIR" = "$THEMEDIR" ]; then
   # shellcheck disable=SC2154 # grub_probe comes from grub-mkconfig_lib
   prepare_grub_to_access_device "$(${grub_probe} --target=device "$THEMEDIR")"
@@ -24,7 +26,7 @@ fi
 # the theme is only loaded when its files are there at boot (a missing disk, a half-written directory): else GRUB shows its plain menu
 cat << EOF
 # --- Material 3 Expressive theme ($MODE) ---
-set gfxmode=$MODE,auto
+set gfxmode=$GFX
 set gfxpayload=keep
 insmod all_video
 insmod gfxterm

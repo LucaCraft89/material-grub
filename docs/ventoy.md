@@ -98,7 +98,7 @@ Matching looks at the **file name only**, not the folder. These are checked by `
 
 ## Resolutions
 
-GRUB themes are drawn in pixels, so there is one theme per screen size (about 8 MB for 1080p, 14 MB for 4K) in `/ventoy/themes/material_WxH/`. The first `--res` is Ventoy's start mode (`gfxmode`). With several sizes Ventoy switches to the matching theme when you change the resolution in F5 Tools, Resolution Configuration. Pick the size of the screens you use most as the first one. Sizes that are not built in use the closest theme.
+GRUB themes are drawn in pixels, so there is one theme per screen size (about 8 MB for 1080p, 14 MB for 4K) in `/ventoy/themes/material_WxH/`. The first `--res` is Ventoy's start mode (`gfxmode`). With several sizes Ventoy switches to the matching theme when you change the resolution in F5 Tools, Resolution Configuration. Pick the size of the screens you use most as the first one. Any other `WxH` gets a theme written for exactly that size (centred, so a near-by mode does not push it into a corner), and `--res basic` writes a plain list that fits any screen. Without `--res` the first size is this computer's own screen (when it can be told, else 1080p) and 1080p is the second, as the fallback.
 
 The installer does not use `gfxmode: "max"`: it gave a broken display in the test setup.
 
@@ -117,7 +117,7 @@ The installer does not use `gfxmode: "max"`: it gave a broken display in the tes
 | The installer does not list my stick | It must be a Ventoy stick (a small `VTOYEFI` partition next to the data partition; this is also how the installer verifies a stick). Mount the data partition and pass its mount point: `--ventoy /run/media/you/Ventoy`. |
 | `is not the data partition of a Ventoy stick` | The installer checks that the disk behind the path has Ventoy's small `VTOYEFI` partition (or, as a fallback, that the path already has a `/ventoy` folder). Use the big data partition of a stick prepared with Ventoy, not `VTOYEFI` and not an ordinary USB stick. A fresh Ventoy stick has no `/ventoy` folder yet; the installer creates it. |
 | A black screen with only Ventoy's plain text | Ventoy could not find or load a scene icon for that menu item. Re-run the installer; if it persists, open an issue with your Ventoy version and the item's name. |
-| The theme looks cut off or too small | The screen size does not match an installed theme. Add that resolution with `--res`, or set Ventoy's resolution in F5 Tools. |
+| The theme looks cut off, in a corner, or the screen is gray | Add the real screen size with `--res WxH` (it gets a theme of exactly that size), set Ventoy's resolution in F5 Tools, or use `--res basic`, a plain list that fits any screen. If it persists, open an issue with the output of GRUB's `videoinfo` and say whether you boot UEFI or legacy BIOS. |
 | I want the default Ventoy look back | `./install.sh --uninstall --ventoy MOUNTPOINT`, or restore `ventoy.json.material-grub.bak`. |
 | A scene is wrong for one ISO | Add your own `menu_class` rule to `ventoy.json` (yours are kept in front of the theme's). |
 

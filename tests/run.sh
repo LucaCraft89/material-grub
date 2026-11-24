@@ -27,6 +27,7 @@ python3 tests/test_gui_server.py
 python3 tests/test_monitors.py
 python3 tests/test_tui.py
 python3 tests/test_ventoy.py
+python3 tests/test_mgtheme.py
 python3 tests/test_grubscript.py
 python3 tests/test_safety.py
 python3 tests/test_dryrun.py
