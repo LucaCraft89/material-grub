@@ -5,7 +5,7 @@ A step is small, **idempotent** (running it twice changes nothing the second tim
 by the packages' scriptlets; `--dry-run` shows the plan and changes nothing.
 
     ctx = context(root="", backup=Path(...))     # root "" is the real system
-    results = run(ctx, steps_for("0.7.1", "0.8.0"))
+    results = run(ctx, steps_for("0.7.1", "1.0.0"))
 """
 
 import os
@@ -37,10 +37,10 @@ class Step:
 
 
 class ConfSamples(Step):
-    """0.8.0: the Plymouth options appear in /etc/material-grub.conf as commented samples. Existing lines, values and comments are never touched."""
+    """1.0.0: the Plymouth options appear in /etc/material-grub.conf as commented samples. Existing lines, values and comments are never touched."""
 
     id = "conf-samples"
-    since = "0.8.0"
+    since = "1.0.0"
     title = "add the new options to /etc/material-grub.conf as commented samples"
     SAMPLES = (
         ("PLYMOUTH", "on", "the Plymouth boot splash, when the optional material-plymouth part is installed (on|off)"),

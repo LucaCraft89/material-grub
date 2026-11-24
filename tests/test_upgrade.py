@@ -69,7 +69,7 @@ class Base(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def detect(self, target="0.8.0", **kw):
+    def detect(self, target="1.0.0", **kw):
         return mgdetect.detect(str(self.r), target, **kw)
 
 
@@ -85,7 +85,7 @@ class Detection(Base):
     def test_versions_are_compared(self):
         make_install(self.r, "0.7.1")
         for target, kind in (
-            ("0.8.0", "older"),
+            ("1.0.0", "older"),
             ("0.7.1", "same"),
             ("0.7.0", "newer"),
             ("0.10.0", "older"),
@@ -94,11 +94,11 @@ class Detection(Base):
             self.assertEqual(self.detect(target).kind, kind, target)
 
     def test_version_tuple_is_forgiving(self):
-        self.assertEqual(mgdetect.version_tuple("0.8.0"), (0, 8, 0))
+        self.assertEqual(mgdetect.version_tuple("1.0.0"), (1, 0, 0))
         self.assertLess(mgdetect.version_tuple("0.9.0"), mgdetect.version_tuple("0.10.0"))
         self.assertEqual(mgdetect.version_tuple("?"), (0,))
         self.assertEqual(mgdetect.version_tuple(None), (0,))
-        self.assertEqual(mgdetect.version_tuple("0.8.0-rc1"), (0, 8, 0))
+        self.assertEqual(mgdetect.version_tuple("1.0.0-rc1"), (1, 0, 0))
 
     def test_an_install_whose_version_cannot_be_read(self):
         make_install(self.r, drop=("package",))
@@ -194,16 +194,16 @@ class Detection(Base):
 
 class Notice(Base):
     def test_no_install_no_notice(self):
-        self.assertEqual(mgdetect.notice(self.detect(), "0.8.0"), [])
+        self.assertEqual(mgdetect.notice(self.detect(), "1.0.0"), [])
 
     def test_the_notice_says_what_happens(self):
         make_install(self.r, drop=("hook15",), gui=True)
         (self.r / "usr/local/bin/material-grub-apply").write_text("x")
-        text = "\n".join(mgdetect.notice(self.detect(), "0.8.0"))
+        text = "\n".join(mgdetect.notice(self.detect(), "1.0.0"))
         for word in (
             "0.7.1",
             "style list",
-            "update it to 0.8.0",
+            "update it to 1.0.0",
             "settings",
             "hook15",
             "no state record",
@@ -220,7 +220,7 @@ class Notice(Base):
         os.unlink(self.r / "usr/share/material-grub/VERSION") if (
             self.r / "usr/share/material-grub/VERSION"
         ).exists() else None
-        self.assertIn("cannot be read", "\n".join(mgdetect.notice(self.detect(), "0.8.0")))
+        self.assertIn("cannot be read", "\n".join(mgdetect.notice(self.detect(), "1.0.0")))
 
 
 class Policy(Base):
@@ -231,21 +231,21 @@ class Policy(Base):
         return self.detect()
 
     def test_nothing_to_refuse_on_a_fresh_system(self):
-        self.assertEqual(mgdetect.policy(self.detect(), "0.8.0", "source"), (True, ""))
+        self.assertEqual(mgdetect.policy(self.detect(), "1.0.0", "source"), (True, ""))
 
     def test_an_update_is_fine(self):
-        self.assertTrue(mgdetect.policy(self.found(), "0.8.0", "source")[0])
+        self.assertTrue(mgdetect.policy(self.found(), "1.0.0", "source")[0])
 
     def test_a_downgrade_is_refused_unless_forced(self):
-        f = self.found("0.9.0")
-        ok, msg = mgdetect.policy(f, "0.8.0", "source")
+        f = self.found("1.1.0")
+        ok, msg = mgdetect.policy(f, "1.0.0", "source")
         self.assertFalse(ok)
-        self.assertIn("0.9.0", msg)
+        self.assertIn("1.1.0", msg)
         self.assertIn("--force", msg)
-        self.assertTrue(mgdetect.policy(f, "0.8.0", "source", force=True)[0])
+        self.assertTrue(mgdetect.policy(f, "1.0.0", "source", force=True)[0])
 
     def test_a_downgrade_by_a_package_is_refused_too(self):
-        self.assertFalse(mgdetect.policy(self.found("0.9.0"), "0.8.0", "package")[0])
+        self.assertFalse(mgdetect.policy(self.found("1.1.0"), "1.0.0", "package")[0])
 
     def test_a_source_install_over_a_package_is_refused_with_the_right_command(self):
         for how, word in (
@@ -254,15 +254,15 @@ class Policy(Base):
             ("package:pacman", "pacman"),
             ("package:unknown", "package manager"),
         ):
-            ok, msg = mgdetect.policy(self.found(how=how), "0.8.0", "source")
+            ok, msg = mgdetect.policy(self.found(how=how), "1.0.0", "source")
             self.assertFalse(ok, how)
             self.assertIn(word, msg)
-        self.assertTrue(mgdetect.policy(self.found(how="package:rpm"), "0.8.0", "source", force=True)[0])
+        self.assertTrue(mgdetect.policy(self.found(how="package:rpm"), "1.0.0", "source", force=True)[0])
 
     def test_a_package_over_a_package_or_a_source_install_goes_on(self):
-        self.assertTrue(mgdetect.policy(self.found(how="package:rpm"), "0.8.0", "package")[0])
+        self.assertTrue(mgdetect.policy(self.found(how="package:rpm"), "1.0.0", "package")[0])
         f = self.found(how="source")
-        self.assertTrue(mgdetect.policy(f, "0.8.0", "package")[0])
+        self.assertTrue(mgdetect.policy(f, "1.0.0", "package")[0])
         self.assertTrue(mgdetect.adopting(f, "package"))
         self.assertFalse(mgdetect.adopting(f, "source"))
         self.assertFalse(mgdetect.adopting(self.found(how="package:deb"), "package"))
@@ -275,15 +275,15 @@ class State(Base):
         mgdetect.record(root, "0.7.1", "source", "normal", {"core": "0.7.1"}, now="t1")
         d = mgdetect.record(
             root,
-            "0.8.0",
+            "1.0.0",
             "package:rpm",
             "normal",
-            {"core": "0.8.0", "plymouth": {"version": "0.1.0", "changes": ["cmdline"]}},
+            {"core": "1.0.0", "plymouth": {"version": "0.1.0", "changes": ["cmdline"]}},
             now="t2",
         )
-        self.assertEqual((d["version"], d["how"]), ("0.8.0", "package:rpm"))
-        self.assertEqual([(h["from"], h["to"]) for h in d["history"]], [(None, "0.7.1"), ("0.7.1", "0.8.0")])
-        d = mgdetect.record(root, "0.8.0", "package:rpm", "normal", {"core": "0.8.0"}, now="t3")
+        self.assertEqual((d["version"], d["how"]), ("1.0.0", "package:rpm"))
+        self.assertEqual([(h["from"], h["to"]) for h in d["history"]], [(None, "0.7.1"), ("0.7.1", "1.0.0")])
+        d = mgdetect.record(root, "1.0.0", "package:rpm", "normal", {"core": "1.0.0"}, now="t3")
         self.assertEqual(d["parts"]["plymouth"]["changes"], ["cmdline"], "a part's own record is kept")
         self.assertEqual(len(d["history"]), 2, "an install of the same version adds no history")
         self.assertEqual(mgdetect.read(root), d)
@@ -301,12 +301,12 @@ class State(Base):
         self.assertLessEqual(len(mgdetect.read(str(self.r))["history"]), 20)
 
     def test_no_temp_files_are_left(self):
-        mgdetect.record(str(self.r), "0.8.0", "source", "normal")
+        mgdetect.record(str(self.r), "1.0.0", "source", "normal")
         self.assertEqual([p.name for p in mgdetect.state_path(str(self.r)).parent.iterdir()], ["state.json"])
 
 
 class Boom(mgmigrate.Step):
-    id, since, title = "boom", "0.8.0", "fail"
+    id, since, title = "boom", "1.0.0", "fail"
 
     def __init__(self, path):
         self.path = path
@@ -323,7 +323,7 @@ class Boom(mgmigrate.Step):
 
 
 class Edit(mgmigrate.Step):
-    id, since, title = "edit", "0.8.0", "edit a file"
+    id, since, title = "edit", "1.0.0", "edit a file"
 
     def __init__(self, path, text="edited\n"):
         self.path, self.text = path, text
@@ -340,17 +340,17 @@ class Edit(mgmigrate.Step):
 
 class Migrations(Base):
     def ctx(self):
-        return mgmigrate.context(str(self.r), mgmigrate.backup_dir(str(self.r), "0.7.1", "0.8.0", now="T"))
+        return mgmigrate.context(str(self.r), mgmigrate.backup_dir(str(self.r), "0.7.1", "1.0.0", now="T"))
 
     def test_steps_run_only_for_versions_they_are_new_in(self):
         a, b = Edit(self.r / "a"), Edit(self.r / "b")
-        a.since, b.since = "0.8.0", "0.9.0"
-        self.assertEqual(mgmigrate.steps_for("0.7.1", "0.8.0", [a, b]), [a])
-        self.assertEqual(mgmigrate.steps_for("0.7.1", "0.9.0", [a, b]), [a, b])
-        self.assertEqual(mgmigrate.steps_for("0.8.0", "0.9.0", [a, b]), [b])
-        self.assertEqual(mgmigrate.steps_for("0.9.0", "0.9.0", [a, b]), [])
+        a.since, b.since = "1.0.0", "1.1.0"
+        self.assertEqual(mgmigrate.steps_for("0.7.1", "1.0.0", [a, b]), [a])
+        self.assertEqual(mgmigrate.steps_for("0.7.1", "1.1.0", [a, b]), [a, b])
+        self.assertEqual(mgmigrate.steps_for("1.0.0", "1.1.0", [a, b]), [b])
+        self.assertEqual(mgmigrate.steps_for("1.1.0", "1.1.0", [a, b]), [])
         self.assertEqual(
-            mgmigrate.steps_for(None, "0.8.0", [a, b]), [a], "an unknown version checks every step up to the target"
+            mgmigrate.steps_for(None, "1.0.0", [a, b]), [a], "an unknown version checks every step up to the target"
         )
 
     def test_plan_lists_only_what_would_change(self):
@@ -387,10 +387,10 @@ class Migrations(Base):
 
     def test_backup_directory_name(self):
         self.assertEqual(
-            mgmigrate.backup_dir("", "0.7.1", "0.8.0", "T").as_posix(),
-            "/var/backups/material-grub/upgrade-0.7.1-to-0.8.0-T",
+            mgmigrate.backup_dir("", "0.7.1", "1.0.0", "T").as_posix(),
+            "/var/backups/material-grub/upgrade-0.7.1-to-1.0.0-T",
         )
-        self.assertIn("upgrade-unknown-to-0.8.0", mgmigrate.backup_dir("", None, "0.8.0", "T").name)
+        self.assertIn("upgrade-unknown-to-1.0.0", mgmigrate.backup_dir("", None, "1.0.0", "T").name)
 
 
 class ConfSamples(Base):
@@ -467,7 +467,7 @@ class InstallerGlue(Base):
 
         out = Out()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out), unittest.mock.patch.object(
-            self.mod, "VERSION_TEXT", return_value="0.8.0"
+            self.mod, "VERSION_TEXT", return_value="1.0.0"
         ):
             try:
                 return fn(*a, **kw), out.getvalue()
@@ -488,15 +488,15 @@ class InstallerGlue(Base):
         for word in (
             "An existing install was found",
             "0.7.1",
-            "update it to 0.8.0",
+            "update it to 1.0.0",
             "Will change in your files",
             "#PLYMOUTH=on",
-            "upgrade-0.7.1-to-0.8.0",
+            "upgrade-0.7.1-to-1.0.0",
         ):
             self.assertIn(word, out)
 
     def test_a_downgrade_stops_the_installer(self):
-        make_install(self.r, "0.9.0")
+        make_install(self.r, "1.1.0")
         inst = self.installer()
         code, out = self.run_glue(inst, inst.existing_install, str(self.r))
         self.assertEqual(code, 1)
@@ -546,14 +546,14 @@ class InstallerGlue(Base):
         self.run_glue(inst, inst.existing_install, str(self.r))
         _, out = self.run_glue(inst, inst.after_install, str(self.r))
         self.assertIn("#PLYMOUTH=on", (self.r / "etc/material-grub.conf").read_text())
-        backups = list((self.r / "var/backups/material-grub").glob("upgrade-0.7.1-to-0.8.0-*/etc/material-grub.conf"))
+        backups = list((self.r / "var/backups/material-grub").glob("upgrade-0.7.1-to-1.0.0-*/etc/material-grub.conf"))
         self.assertEqual([b.read_text() for b in backups], ["STYLE=list\n"])
         st = mgdetect.read(str(self.r))
-        self.assertEqual((st["version"], st["how"], st["layout"]), ("0.8.0", "source", "normal"))
+        self.assertEqual((st["version"], st["how"], st["layout"]), ("1.0.0", "source", "normal"))
         self.assertEqual(st["history"][-1]["from"], "0.7.1")
-        self.assertEqual(st["parts"]["grub"], "0.8.0")
-        (self.r / "usr/share/material-grub/VERSION").write_text("0.8.0\n")  # what the file copy of a real install does
-        f = mgdetect.detect(str(self.r), "0.8.0")
+        self.assertEqual(st["parts"]["grub"], "1.0.0")
+        (self.r / "usr/share/material-grub/VERSION").write_text("1.0.0\n")  # what the file copy of a real install does
+        f = mgdetect.detect(str(self.r), "1.0.0")
         self.assertFalse(f.legacy)
         self.assertEqual(f.kind, "same")
 
@@ -567,7 +567,7 @@ class InstallerGlue(Base):
         self.run_glue(inst, inst.after_install, str(self.r))
         self.assertEqual(
             mgdetect.read(str(self.r))["history"][-1],
-            {"from": None, "to": "0.8.0", "at": mgdetect.read(str(self.r))["installed_at"]},
+            {"from": None, "to": "1.0.0", "at": mgdetect.read(str(self.r))["installed_at"]},
         )
         self.assertFalse((self.r / "var/backups/material-grub").exists(), "no file changed, so no backup directory")
 
@@ -579,7 +579,7 @@ class InstallerGlue(Base):
             _, out = self.run_glue(inst, inst.after_install, str(self.r))
         self.assertIn("failed", out)
         self.assertNotIn("#PLYMOUTH", (self.r / "etc/material-grub.conf").read_text())
-        self.assertEqual(mgdetect.read(str(self.r))["version"], "0.8.0", "the install is still recorded")
+        self.assertEqual(mgdetect.read(str(self.r))["version"], "1.0.0", "the install is still recorded")
 
 
 PKG = ROOT / "dist/material-grub"
@@ -627,17 +627,17 @@ class RealStagedInstall(Base):
         inst.yes, inst.tuimode = True, "no"
         out = io.StringIO()
         with contextlib.redirect_stdout(out), unittest.mock.patch.object(
-            installer, "VERSION_TEXT", return_value="0.8.0"
+            installer, "VERSION_TEXT", return_value="1.0.0"
         ):
             f = inst.existing_install(str(self.r))
-            (self.r / "usr/share/material-grub/VERSION").write_text("0.8.0\n")
+            (self.r / "usr/share/material-grub/VERSION").write_text("1.0.0\n")
             inst.after_install(str(self.r))
         self.assertEqual((f.kind, f.version), ("older", "0.7.1"))
         text = conf.read_text()
         self.assertIn("STYLE=split", text)
         self.assertIn("#PLYMOUTH_MOTION=full", text)
         self.assertEqual(mgdetect.read(str(self.r))["history"][-1]["from"], "0.7.1")
-        self.assertFalse(mgdetect.detect(str(self.r), "0.8.0").legacy)
+        self.assertFalse(mgdetect.detect(str(self.r), "1.0.0").legacy)
 
 
 if __name__ == "__main__":
