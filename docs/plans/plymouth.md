@@ -28,6 +28,7 @@ Branch for this document: `ccr-d8df62d1-7vgvjn`. Nothing below is implemented.
 | 15 | Command | No second command. `material-grub plymouth apply | status | remove | preview` (one-command rule of 0.7.1). |
 | 16 | Deliverable now | This plan only. |
 | 17 | End state, once `material-boot-core` exists (maintainer, third message) | **One unified installer** with options for what to install and what not (GRUB theme, Plymouth theme, GUI, Ventoy, ...), and **one command, `material-boot`**, with the sub-commands `grub` and `plymouth`, each with its own sub-commands, fully modular the way `material-grub` already is today (each part registers its own sub-commands; a part that is not installed simply is not there). See 9b. |
+| 18 | Versions (maintainer, after phase 6) | **The three repositories are level and start at 1.0.0:** `material-grub` (from 0.7.1), `material-plymouth` and `material-boot-core`. Packages of one release require each other at the same major (`material-grub >= 1.0.0`). From there each moves on its own number, but a release of one that needs a change in another says so in its requirement. The migration steps that belong to this release are "since 1.0.0". The integration branch keeps its old name `release/0.8.0` until it is renamed on GitHub (open PRs follow a rename). |
 
 ## 1a. The consistency rule and the customisation recon (maintainer, second message; goes first)
 
@@ -93,7 +94,7 @@ GRUB re-applies by itself when `/etc/material-grub.conf` or `overrides.json` cha
 ## 1b. Process (maintainer: work in PRs, nothing is broken until everything is done)
 
 - **Repos:** `LucaCraft89/material-plymouth` and `LucaCraft89/material-boot-core` exist and are attached; each got one bootstrap commit (licence and readme) on `main`. `material-boot-core` stays empty until phase 8.
-- **material-grub:** integration branch `release/0.8.0` (from `main` at 0.7.1). One PR per phase, each into `release/0.8.0`, each with green CI. A single final PR `release/0.8.0` to `main` when the whole thing works. `main` does not change before that.
+- **material-grub:** integration branch `release/0.8.0` (from `main` at 0.7.1; the name is from before the version decision of row 18, the release is **1.0.0**). One PR per phase, each into `release/0.8.0`, each with green CI. A single final PR `release/0.8.0` to `main` when the whole thing works. `main` does not change before that.
 - **material-plymouth:** everything after the bootstrap commit goes through PRs into `main`, green CI each.
 - **Inert until installed:** the material-grub changes are additive. New conf keys have defaults, `material-grub plymouth` only reports that the plugin is not installed, the GUI page is hidden without the plugin, and the theme package never depends on the plugin.
 - **No release until both are done:** no version bump, tag or published package before the pair is verified (tiers 1 to 4 of section 10, plus the hardware list). They are released together.
@@ -225,7 +226,7 @@ What exists today (recon): `install.sh` simply replaces ("replacing any older ve
 - **What it concludes:** none; same version; older (upgrade); newer (downgrade); partial or broken (some pieces missing); owned by a package while a source install is requested, or the reverse; a different layout (normal vs immutable); a GUI or Plymouth part whose version does not fit the core. `material-grub doctor` uses the same detection, so the report and the installer never disagree.
 
 ### The notice, then the update
-- Always a plain notice first, for example: "Found Material GRUB 0.7.1 (source install; GUI 0.7.1; style list; 3 customised entries; no Plymouth). This will update it to 0.8.0 and keep your settings. Backup: /var/backups/material-grub/upgrade-0.7.1-to-0.8.0-<time>."
+- Always a plain notice first, for example: "Found Material GRUB 0.7.1 (source install; GUI 0.7.1; style list; 3 customised entries; no Plymouth). This will update it to 1.0.0 and keep your settings. Backup: /var/backups/material-grub/upgrade-0.7.1-to-1.0.0-<time>."
 - Interactive (TUI): the notice is the first screen with Continue, Details and Cancel. `--yes`, a script, `--progress json` (an `existing_install` event) and the packages' scriptlets proceed without asking and write the notice to the install log and journal.
 - `--dry-run` prints the same notice plus the list of migration steps it would run and changes nothing.
 
