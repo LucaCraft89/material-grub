@@ -18,6 +18,7 @@ import mgoverrides
 import mgplugins
 import mgrub
 import mgsafe
+import mgtheme
 
 OK, WARN, FAIL, INFO = "ok", "warn", "FAIL", "info"
 MARK = "# material-grub: classes applied"
@@ -181,22 +182,53 @@ class Doctor:
             self.add(FAIL, "theme", f"{theme} is incomplete: " + "; ".join(problems))
         else:
             self.add(OK, "theme", f"{theme} is complete")
-        if gfx and re.match(r"^\d+x\d+", gfx):
-            want = mgrub.snap(gfx.split(",")[0], [p.name for p in (pkg / "res").iterdir()])
-            try:
-                have = (theme / ".aspect").read_text().strip()
-                need = (pkg / "res" / want / "aspect").read_text().strip()
-                if have != need:
-                    self.add(
-                        FAIL,
-                        "resolution",
-                        f"the theme was built for aspect {have}, but GRUB_GFXMODE={gfx} needs {need} ({want}): run sudo material-grub apply",
-                    )
-                else:
-                    self.add(OK, "resolution", f"GRUB_GFXMODE={gfx} -> {want} theme")
-            except OSError:
-                self.add(WARN, "resolution", "cannot compare the theme with GRUB_GFXMODE")
+        self.resolution(theme, pkg, gfx)
         return theme
+
+    def resolution(self, theme, pkg, gfx):
+        """The theme is pixel-bound: it has to be written for the mode GRUB_GFXMODE names, and that mode should be the screen's own. The first is what apply
+        fixes; the second only the user can (the firmware decides which modes exist)."""
+        want = mgtheme.first_mode(gfx) or (None if gfx and gfx.split(",")[0] not in ("", "auto") else (1920, 1080))
+        try:
+            have = (theme / ".mode").read_text().strip()
+        except OSError:
+            have = None
+        if have is None:  # a theme written by an older version: it is for the closest built-in size
+            if want:
+                best = mgrub.snap(f"{want[0]}x{want[1]}", [p.name for p in (pkg / "res").iterdir()])
+                self.add(
+                    WARN,
+                    "resolution",
+                    f"the theme was written by an older version (for {best}); run sudo material-grub apply to write it for exactly {want[0]}x{want[1]}",
+                )
+            return
+        if have == "auto":
+            self.add(
+                INFO,
+                "resolution",
+                f"the basic theme (it fits any screen) is installed: GRUB_GFXMODE={gfx or 'not set'} is not a usable mode",
+            )
+            return
+        if want and have != f"{want[0]}x{want[1]}":
+            self.add(
+                FAIL,
+                "resolution",
+                f"the theme is written for {have}, but GRUB_GFXMODE={gfx or 'not set'} asks for {want[0]}x{want[1]}: run sudo material-grub apply",
+            )
+            return
+        native = mgtheme.native_mode(str(self.p("/sys/class/drm")))
+        if native and f"{native[0]}x{native[1]}" != have:
+            self.add(
+                WARN,
+                "resolution",
+                f"the theme is written for {have} but your screen is {native[0]}x{native[1]}: if the menu does not fill the screen, set GRUB_GFXMODE={native[0]}x{native[1]} in /etc/default/grub and run sudo material-grub apply",
+            )
+        else:
+            self.add(
+                OK,
+                "resolution",
+                f"the theme is written for exactly {have}" + (" (your screen's size)" if native else ""),
+            )
 
     def grub_cfg(self):
         found = [f for f in ("/boot/grub2/grub.cfg", "/boot/grub/grub.cfg") if self.p(f).exists()]
