@@ -442,7 +442,13 @@ class Installer:
             if self.from_package:
                 how = mgdetect.owner_of(Path(root or "/") / mgdetect.FILES["package"])
                 how = how if how.startswith("package:") else "package:unknown"
-            parts = {"grub": target} if UNIFIED else {"core": target, "grub": target}
+            if UNIFIED:  # the unified installer records the part (with the core's version at the top and its own history): only what it does not know of is added
+                if (Path(root or "/") / "usr/share/material-grub-gui").is_dir():
+                    st = mgdetect.read(root) or {"state": mgdetect.STATE_VERSION, "parts": {}}
+                    st.setdefault("parts", {})["gui"] = target
+                    mgdetect.write(root, st)
+                return
+            parts = {"core": target, "grub": target}
             if (Path(root or "/") / "usr/share/material-grub-gui").is_dir():
                 parts["gui"] = target
             for k, v in now.parts.items():
