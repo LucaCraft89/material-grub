@@ -571,6 +571,23 @@ class InstallerGlue(Base):
         )
         self.assertFalse((self.r / "var/backups/material-grub").exists(), "no file changed, so no backup directory")
 
+    def test_run_by_the_unified_installer_it_does_not_repeat_the_notice_and_does_not_write_the_cores_version(self):
+        make_install(
+            self.r, "1.1.0"
+        )  # a downgrade: the plain installer stops here, the unified one has already applied the policy
+        inst = self.installer()
+        with unittest.mock.patch.object(self.mod, "UNIFIED", True):
+            f, out = self.run_glue(inst, inst.existing_install, str(self.r))
+            self.assertEqual((f.kind, out), ("newer", ""))
+            mgdetect.record(str(self.r), "1.0.0", "source", "normal", {"core": "1.0.0", "plymouth": "0.9.0"})
+            self.run_glue(inst, inst.after_install, str(self.r))
+        self.assertEqual(mgdetect.read(str(self.r))["parts"], {"core": "1.0.0", "plymouth": "0.9.0", "grub": "1.0.0"})
+        inst = self.installer()
+        self.run_glue(inst, inst.existing_install, str(self.r))
+        with unittest.mock.patch.object(self.mod, "UNIFIED", False):
+            self.run_glue(inst, inst.after_install, str(self.r))
+        self.assertEqual(mgdetect.read(str(self.r))["parts"]["core"], "1.0.0")
+
     def test_a_failing_migration_is_a_warning_not_a_failed_install(self):
         make_install(self.r)
         inst = self.installer()

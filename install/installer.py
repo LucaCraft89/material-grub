@@ -32,6 +32,9 @@ from material_boot.events import (  # noqa: E402,F401  (the install log and the 
 )
 
 MIN_RUNTIME = (3, 9)  # this installer and the installed tools (the shared code of material-boot-core needs 3.9)
+# Run by the unified installer (the GRUB part, install/part_grub.py): it has already shown the notice, applied the policy and asked, and it writes the state
+# record itself (with the core's version, which is not this program's), so this program only detects and does the work.
+UNIFIED = os.environ.get("MATERIAL_BOOT_UNIFIED") == "1"
 MIN_BUILD = (3, 9)  # the build venv: materialyoucolor has no Python 3.8 wheel
 PMS = ("dnf", "apt-get", "pacman", "zypper", "apk", "xbps-install")
 # package-manager commands that install the build and runtime dependencies (the same sets as the shell installer)
@@ -384,7 +387,7 @@ class Installer:
         target = VERSION_TEXT()
         how = "package" if self.from_package else "source"
         f = self.found = mgdetect.detect(root, target)
-        if f.kind == "none":
+        if f.kind == "none" or UNIFIED:
             return f
         lines = mgdetect.notice(f, target)
         if mgdetect.adopting(f, how):
@@ -439,7 +442,7 @@ class Installer:
             if self.from_package:
                 how = mgdetect.owner_of(Path(root or "/") / mgdetect.FILES["package"])
                 how = how if how.startswith("package:") else "package:unknown"
-            parts = {"core": target, "grub": target}
+            parts = {"grub": target} if UNIFIED else {"core": target, "grub": target}
             if (Path(root or "/") / "usr/share/material-grub-gui").is_dir():
                 parts["gui"] = target
             for k, v in now.parts.items():
