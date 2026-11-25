@@ -606,13 +606,25 @@ class InstallerGlue(Base):
             f, out = self.run_glue(inst, inst.existing_install, str(self.r))
             self.assertEqual((f.kind, out), ("newer", ""))
             mgdetect.record(str(self.r), "1.0.0", "source", "normal", {"core": "1.0.0", "plymouth": "0.9.0"})
+            before = mgdetect.read(str(self.r))
             self.run_glue(inst, inst.after_install, str(self.r))
-        self.assertEqual(mgdetect.read(str(self.r))["parts"], {"core": "1.0.0", "plymouth": "0.9.0", "grub": "1.0.0"})
+        self.assertEqual(
+            mgdetect.read(str(self.r)), before, "the unified installer records the part itself, with its own history"
+        )
         inst = self.installer()
         self.run_glue(inst, inst.existing_install, str(self.r))
         with unittest.mock.patch.object(self.mod, "UNIFIED", False):
             self.run_glue(inst, inst.after_install, str(self.r))
         self.assertEqual(mgdetect.read(str(self.r))["parts"]["core"], "1.0.0")
+
+    def test_a_merged_usr_local_sbin_is_not_a_leftover(self):
+        make_install(self.r)  # puts the command in usr/local/bin
+        (self.r / "usr/local/sbin").symlink_to("bin")
+        self.assertEqual(self.detect().old_names, [])
+        (self.r / "usr/local/sbin").unlink()
+        (self.r / "usr/local/sbin").mkdir()
+        (self.r / "usr/local/sbin/material-grub").write_text("#!/bin/sh\n")
+        self.assertEqual(self.detect().old_names, ["usr/local/sbin/material-grub"])
 
     def test_a_failing_migration_is_a_warning_not_a_failed_install(self):
         make_install(self.r)
