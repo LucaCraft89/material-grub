@@ -11,8 +11,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent.parent  # the repository, or parts/grub in a bundle
-sys.path.insert(0, str(HERE / "install/bin"))
+HERE = (
+    Path(__file__).resolve().parent.parent
+)  # the repository, or parts/grub in a bundle, or /usr/share/material-grub when this is the installed copy
+BIN = HERE / "install/bin" if (HERE / "install/bin").is_dir() else HERE / "bin"
+ENGINE = HERE / "install/installer.py"  # the installed copy has no engine: it is run from a checkout or a bundle
+sys.path.insert(0, str(BIN))
 import material_boot  # noqa: E402  (the core that is running this: the tools must use the same one)
 
 os.environ.setdefault("MATERIAL_LIB", str(Path(material_boot.__file__).resolve().parent.parent))
@@ -64,15 +68,17 @@ def engine_args(ctx, *extra):
     return a + list(extra)
 
 
-def run_engine(ctx, args):
-    """Run install/installer.py. In a json run its events are relayed through ctx.progress (stdout is the event stream); otherwise it prints as it always did.
-    Returns (exit status, the lines it printed when they were captured)."""
-    if ctx.root and "--stage-only" not in args and "--dry-run" not in args:
+def need_engine():
+    if not ENGINE.is_file():
         raise RuntimeError(
-            "the GRUB installer writes to the real system and cannot work in a staged tree (--root): use --grub-stage-only to build the theme"
+            "this is the installed copy of the part, which has no installer: run `sudo ./install.sh` from a checkout or `material-boot core install` from the bundle"
         )
+
+
+def run_cmd(ctx, cmd):
+    """Run a command of the engine. In a json run its events are relayed through ctx.progress (stdout is the event stream); otherwise it prints as it always did.
+    Returns (exit status, the lines it printed when they were captured)."""
     env = dict(os.environ, MATERIAL_BOOT_UNIFIED="1")
-    cmd = [sys.executable, str(HERE / "install/installer.py"), *args]
     if not ctx.json:
         return subprocess.run(cmd, env=env).returncode, []
     p = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, text=True)
@@ -89,6 +95,16 @@ def run_engine(ctx, args):
         else:
             ctx.progress({"event": "log", "text": line.rstrip("\n")})
     return p.wait(), lines
+
+
+def run_engine(ctx, args):
+    """Run install/installer.py with `args`."""
+    if ctx.root and "--stage-only" not in args and "--dry-run" not in args:
+        raise RuntimeError(
+            "the GRUB installer writes to the real system and cannot work in a staged tree (--root): use --grub-stage-only to build the theme"
+        )
+    need_engine()
+    return run_cmd(ctx, [sys.executable, str(ENGINE), *args])
 
 
 def hook_detect(ctx):
@@ -108,10 +124,9 @@ def hook_plan(ctx):
 
 
 def _capture(ctx, args):
+    need_engine()
     env = dict(os.environ, MATERIAL_BOOT_UNIFIED="1")
-    r = subprocess.run(
-        [sys.executable, str(HERE / "install/installer.py"), *args], env=env, capture_output=True, text=True
-    )
+    r = subprocess.run([sys.executable, str(ENGINE), *args], env=env, capture_output=True, text=True)
     return r.returncode, (r.stdout + r.stderr).splitlines()
 
 
@@ -142,7 +157,13 @@ def hook_verify(ctx):
 def hook_uninstall(ctx):
     if ctx.dry_run:
         return {"changed": False}
-    rc, _ = run_engine(ctx, ["--yes", "--no-tui", "--uninstall"] + (["--progress", "json"] if ctx.json else []))
+    if ENGINE.is_file():
+        rc, _ = run_engine(ctx, ["--yes", "--no-tui", "--uninstall"] + (["--progress", "json"] if ctx.json else []))
+    else:  # the installed copy: the script the installer put next to it (`material-grub uninstall` runs the same one)
+        script = HERE / "uninstall.sh"
+        if not script.is_file():
+            raise RuntimeError(f"{script} is missing: remove Material GRUB with `material-grub uninstall`")
+        rc, _ = run_cmd(ctx, ["sh", str(script)])
     if rc:
         raise RuntimeError(f"the uninstall failed (exit status {rc}); its output is above")
     return {"changed": True}

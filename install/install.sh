@@ -35,6 +35,11 @@ else
   cp -a "$PKG/." "$D/usr/share/material-grub/"
   chmod +x "$D/usr/share/material-grub/bin/"*
   install -m755 "$HERE/uninstall.sh" "$D/usr/share/material-grub/uninstall.sh"     # `material-grub uninstall`
+  if [ -f "$HERE/part_grub.py" ] && [ -f "$HERE/../material-boot-part.json" ]; then     # the part's manifest and entry for `material-boot` (plugin API 2): the same files whoever installs
+    install -d "$D/usr/share/material-boot/plugins.d"
+    install -m644 "$HERE/part_grub.py" "$D/usr/share/material-grub/bin/part_grub.py"
+    sed 's|"entry": "install/part_grub.py"|"entry": "/usr/share/material-grub/bin/part_grub.py"|' "$HERE/../material-boot-part.json" > "$D/usr/share/material-boot/plugins.d/grub.json"
+  fi
   echo "    - installing GRUB hooks (05_material, 15_material_menu, 90_material_system) and the systemd path unit"
   install -m755 "$HERE/postprocess.sh" "$D/usr/libexec/material-grub-postprocess"
   rm -f "$D/usr/local/sbin/material-grub-apply" "$D/usr/local/bin/material-grub-apply" "$D/usr/local/sbin/material-grub"; install -d "$D/usr/local/bin"; install -m755 "$HERE/material-grub" "$D/usr/local/bin/material-grub"   # the one command (older versions also had material-grub-apply)

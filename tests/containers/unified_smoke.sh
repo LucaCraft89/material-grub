@@ -28,7 +28,7 @@ cp /work/material-boot-part.json $B/parts/grub/manifest.json; ln -s /work/instal
 export MATERIAL_LIB=$B/lib
 MB="sh $B/bin/material-boot"
 snap() { # what is on the system that belongs to GRUB's install, with contents; the state record, backups and logs differ by design
-  find /boot /etc/grub.d /etc/default /etc/material-grub* /usr/share/material-grub /usr/libexec /usr/local /usr/lib/systemd /etc/systemd /var/lib/material-grub \
+  find /boot /etc/grub.d /etc/default /etc/material-grub* /usr/share/material-grub /usr/libexec /usr/local /usr/lib/systemd /etc/systemd /var/lib/material-grub /usr/share/material-boot/plugins.d \
     -type f 2>/dev/null | grep -v -e '/state.json$' -e '/backups/' -e '\.log$' -e '__pycache__' -e '/last-' | sort | xargs sha256sum 2>/dev/null || true; }
 
 say "== the core, through the unified installer"
@@ -50,6 +50,8 @@ grep -q "classes applied" $CFG && say "grub.cfg annotated" || { say "grub.cfg NO
 snap > /tmp/B.sum
 if cmp -s /tmp/A.sum /tmp/B.sum; then say "SAME FILES as install.sh"; else say "DIFFERENT FILES from install.sh"; diff /tmp/A.sum /tmp/B.sum | head -30 | tee -a $R; diff /tmp/conf.A /etc/material-grub.conf | tee -a $R; exit 1; fi
 grep -q '"grub"' /var/lib/material-grub/state.json && say "state record names grub" || { say "state record does not name grub"; cat /var/lib/material-grub/state.json | tee -a $R; exit 1; }
+$MB core parts | grep -q "grub .*ok" && say "material-boot core parts lists grub as usable" || { say "grub is not a usable part:"; $MB core parts | tee -a $R; exit 1; }
+$MB grub version 2>&1 | grep -q "material-grub" && say "material-boot grub version: ok" || { say "material-boot grub version FAILED"; exit 1; }
 $MB core doctor > /tmp/doctor.txt 2>&1 && say "core doctor: ok" || { say "core doctor FAILED"; cat /tmp/doctor.txt | tee -a $R; exit 1; }
 material-grub doctor > /tmp/doctor2.txt 2>&1 && say "material-grub doctor: ok" || { say "material-grub doctor FAILED"; cat /tmp/doctor2.txt | tee -a $R; exit 1; }
 
@@ -57,4 +59,6 @@ say "== removal through the unified installer"
 $MB core install --bundle $B --uninstall --only grub --yes > /tmp/un.log 2>&1 && say "uninstall: ok" || { say "uninstall FAILED"; tail -30 /tmp/un.log | tee -a $R; exit 1; }
 [ "$(sha256sum $CFG | cut -d' ' -f1)" = "$before" ] && say "grub.cfg restored" || { say "grub.cfg NOT restored by the unified uninstall"; tail -30 /tmp/un.log | tee -a $R; exit 1; }
 grep -q '"grub"' /var/lib/material-grub/state.json 2>/dev/null && { say "state record still names grub"; exit 1; } || say "state record forgot grub"
+grep -q '"core"' /var/lib/material-grub/state.json && say "state record still names the core" || { say "the unified uninstall lost the core's entry of the state record"; exit 1; }
+[ ! -e /usr/share/material-boot/plugins.d/grub.json ] && say "manifest removed" || { say "plugins.d/grub.json is still there"; exit 1; }
 say "ALL OK"

@@ -131,23 +131,48 @@ class Events(unittest.TestCase):
     """In a json run the engine's events go through ctx.progress and stdout carries nothing of its own."""
 
     def test_events_are_relayed_and_done_is_left_to_the_core(self):
-        fake = ROOT / "tests/_fake_engine.py"
-        fake.write_text(
-            "import json, os\nprint(json.dumps({'event': 'step', 'msg': os.environ.get('MATERIAL_BOOT_UNIFIED')}))\nprint('not json')\nprint(json.dumps({'event': 'done', 'rc': 0}))\n"
-        )
-        self.addCleanup(fake.unlink)
-        got = []
-        c = ctx(json=True, progress=got.append)
-        with mock.patch.object(part_grub, "HERE", ROOT / "tests/_here"):
-            (ROOT / "tests/_here/install").mkdir(parents=True, exist_ok=True)
-            self.addCleanup(shutil.rmtree, ROOT / "tests/_here", True)
-            shutil.copy(fake, ROOT / "tests/_here/install/installer.py")
-            rc, lines = part_grub.run_engine(c, [])
+        with tempfile.TemporaryDirectory() as t:
+            fake = Path(t) / "installer.py"
+            fake.write_text(
+                "import json, os\nprint(json.dumps({'event': 'step', 'msg': os.environ.get('MATERIAL_BOOT_UNIFIED')}))\nprint('not json')\nprint(json.dumps({'event': 'done', 'rc': 0}))\n"
+            )
+            got = []
+            c = ctx(json=True, progress=got.append)
+            with mock.patch.object(part_grub, "ENGINE", fake):
+                rc, lines = part_grub.run_engine(c, [])
         self.assertEqual(rc, 0)
         self.assertEqual([e["event"] for e in got], ["step", "log"])
         self.assertEqual(got[0]["msg"], "1", "the engine must be told that the unified installer runs it")
         self.assertEqual(got[1]["text"], "not json")
         self.assertEqual(len(lines), 3)
+
+
+class InstalledCopy(unittest.TestCase):
+    """The copy install.sh leaves in /usr/share/material-grub/bin has no engine: it can detect, verify, doctor and uninstall, and says so for the rest."""
+
+    def test_it_refuses_to_install_and_names_the_way(self):
+        with mock.patch.object(part_grub, "ENGINE", Path("/nonexistent/installer.py")):
+            with self.assertRaisesRegex(RuntimeError, "installed copy of the part"):
+                part_grub.run_engine(ctx(), ["--yes"])
+            with self.assertRaisesRegex(RuntimeError, "installed copy of the part"):
+                part_grub.hook_plan(ctx())
+
+    def test_uninstall_runs_the_script_next_to_it(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as t:
+            (Path(t) / "uninstall.sh").write_text("#!/bin/sh\n")
+            with mock.patch.object(part_grub, "ENGINE", Path("/nonexistent/installer.py")):
+                with mock.patch.object(part_grub, "HERE", Path(t)):
+                    with mock.patch.object(part_grub, "run_cmd", lambda c, cmd: calls.append(cmd) or (0, [])):
+                        self.assertEqual(part_grub.hook_uninstall(ctx()), {"changed": True})
+        self.assertEqual(calls, [["sh", str(Path(t) / "uninstall.sh")]])
+
+    def test_uninstall_without_the_script_says_what_to_do(self):
+        with tempfile.TemporaryDirectory() as t:
+            with mock.patch.object(part_grub, "ENGINE", Path("/nonexistent/installer.py")):
+                with mock.patch.object(part_grub, "HERE", Path(t)):
+                    with self.assertRaisesRegex(RuntimeError, "material-grub uninstall"):
+                        part_grub.hook_uninstall(ctx())
 
 
 def tree(d):

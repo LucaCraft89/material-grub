@@ -653,6 +653,20 @@ class RealStagedInstall(Base):
         # the theme directory GRUB loads from (--no-run does not build it): an empty one is what the fingerprint looks for
         (self.r / "boot/grub2/themes/material").mkdir(parents=True)
 
+    def test_the_real_install_registers_the_part_for_material_boot(self):
+        """install.sh puts the part's manifest where the core looks, its entry next to the tools, and the uninstall script takes the manifest away again."""
+        import subprocess
+
+        self.stage()
+        m = self.r / "usr/share/material-boot/plugins.d/grub.json"
+        manifest = json.loads(m.read_text())
+        self.assertEqual(manifest["name"], "grub")
+        self.assertEqual(manifest["entry"], "/usr/share/material-grub/bin/part_grub.py")
+        self.assertTrue((self.r / "usr/share/material-grub/bin/part_grub.py").is_file())
+        self.assertEqual(manifest["version"], (ROOT / "VERSION").read_text().strip())
+        self.assertIn("rm -f /usr/share/material-boot/plugins.d/grub.json", (ROOT / "install/uninstall.sh").read_text())
+        self.assertEqual(subprocess.run(["sh", "-n", str(ROOT / "install/uninstall.sh")]).returncode, 0)
+
     def test_the_fingerprints_match_the_real_install(self):
         self.stage()
         f = self.detect(target=(PKG / "VERSION").read_text().strip())
