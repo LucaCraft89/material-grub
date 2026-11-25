@@ -6,8 +6,8 @@
 #                hooks are applied directly to the static grub.cfg instead of through grub-mkconfig.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd); PKG=$HERE/../dist/material-grub
-D=""; RES=""; RUN=1; PKGARG=""; IMM=0; SETS=""; PYARG=""
-while [ $# -gt 0 ]; do case $1 in --dest) D=$2; shift;; --res) RES=$2; shift;; --pkg) PKGARG=$2; shift;; --no-run) RUN=0;; --immutable) IMM=1;; --py) PYARG=$2; shift;; --set) SETS="$SETS $2"; shift;; esac; shift; done
+D=""; RES=""; RUN=1; PKGARG=""; IMM=0; SETS=""; PYARG=""; REGISTER=1
+while [ $# -gt 0 ]; do case $1 in --dest) D=$2; shift;; --res) RES=$2; shift;; --pkg) PKGARG=$2; shift;; --no-run) RUN=0;; --no-register) REGISTER=0;; --immutable) IMM=1;; --py) PYARG=$2; shift;; --set) SETS="$SETS $2"; shift;; esac; shift; done
 [ -n "$PKGARG" ] && PKG=$PKGARG
 [ -d "$PKG" ] || { echo "run scripts/package.py first"; exit 1; }
 
@@ -35,7 +35,7 @@ else
   cp -a "$PKG/." "$D/usr/share/material-grub/"
   chmod +x "$D/usr/share/material-grub/bin/"*
   install -m755 "$HERE/uninstall.sh" "$D/usr/share/material-grub/uninstall.sh"     # `material-grub uninstall`
-  if [ -f "$HERE/part_grub.py" ] && [ -f "$HERE/../material-boot-part.json" ]; then     # the part's manifest and entry for `material-boot` (plugin API 2): the same files whoever installs
+  if [ "$REGISTER" = 1 ] && [ -f "$HERE/part_grub.py" ] && [ -f "$HERE/../material-boot-part.json" ]; then     # (a package ships its own manifest: --no-register) the part's manifest and entry for `material-boot` (plugin API 2): the same files whoever installs
     install -d "$D/usr/share/material-boot/plugins.d"
     install -m644 "$HERE/part_grub.py" "$D/usr/share/material-grub/bin/part_grub.py"
     sed 's|"entry": "install/part_grub.py"|"entry": "/usr/share/material-grub/bin/part_grub.py"|' "$HERE/../material-boot-part.json" > "$D/usr/share/material-boot/plugins.d/grub.json"

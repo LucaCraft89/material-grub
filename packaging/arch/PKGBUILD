@@ -15,7 +15,7 @@ source=("$pkgbase-$pkgver.tar.gz::${MG_SOURCE:-https://github.com/LucaCraft89/ma
 sha256sums=('SKIP' 'SKIP')   # the release script fills in the real sums once the tag exists
 
 package_material-grub() {
-  depends=('grub' 'librsvg' 'python>=3.9' 'python-pip' 'python-pillow')
+  depends=('material-boot-core>=1.0.0' 'grub' 'librsvg' 'python>=3.9' 'python-pip' 'python-pillow')
   backup=('etc/material-grub.conf')
   install=material-grub.install
   cd "$srcdir/$pkgbase-$pkgver"
