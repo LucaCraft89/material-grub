@@ -7,6 +7,10 @@ permissions: {contents: read}
 # material-boot-core is checked out at the ref in the repository variable MATERIAL_CORE_REF; until the core's PRs are merged that is the branch that holds them
 # (feat/packages), after that it is main, then a tag.
 
+env:
+  # the core checked out inside the workspace; explicit, because some tests run the tools from a temporary copy of the package, where walking up finds nothing
+  MATERIAL_LIB: ${{ github.workspace }}/material-boot-core
+
 jobs:
   lint:
     name: Lint (ruff, shellcheck)

@@ -7,7 +7,8 @@ Importing this module is enough: `import mgcore` before `import material_boot`. 
   /var/lib/material-boot/lib            reserved for immutable systems (not used by the core's installer yet)
   <an ancestor of this file>/material-boot-core    a checkout: next to material-grub's, or inside it (what CI does)
 
-The installed tools refuse to start without it, with a message that says what to install: they cannot do anything useful without the shared code.
+What is found is exported as $MATERIAL_LIB, so that the programs started from here (the installer's build in a temporary copy of the tree, a staged copy of the package)
+use the same core. The installed tools refuse to start without it, with a message that says what to install: they cannot do anything useful without the shared code.
 """
 
 import os
@@ -75,6 +76,9 @@ def ensure():
             f"material-grub: material-boot-core {material_boot.__version__} (plugin API {getattr(material_boot, 'CORE_API', '?')}) at {where} "
             f"does not fit: this needs {'.'.join(map(str, MIN_CORE))} or newer with plugin API {CORE_API}. Update whichever of the two is older."
         )
+    # What was found is what every program started from here must use: the installer builds in a temporary copy of the tree, and a staged copy of the
+    # package has no core next to it. $MATERIAL_LIB is inherited by those children (an explicit value of the user is kept).
+    os.environ.setdefault("MATERIAL_LIB", str(where))
     return where
 
 

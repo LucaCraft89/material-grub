@@ -133,6 +133,41 @@ class InstallerNeedsTheCore(unittest.TestCase):
             self.installer().check_core()
 
 
+class ExportsWhatItFound(unittest.TestCase):
+    """The installer builds in a temporary copy of the tree, and tests stage a copy of the package: the programs they start must find the same core."""
+
+    def test_the_core_found_is_exported_to_the_children(self):
+        import shutil
+
+        with tempfile.TemporaryDirectory() as t:
+            t = Path(t)
+            bin_ = t / "repo/install/bin"
+            bin_.mkdir(parents=True)
+            shutil.copy(BIN / "mgcore.py", bin_ / "mgcore.py")
+            core = fake_core(
+                t / "repo/material-boot-core"
+            )  # inside the checkout, found by walking up: no environment variable set
+            env = {k: v for k, v in os.environ.items() if k != "MATERIAL_LIB"}
+            code = (
+                f"import sys; sys.path.insert(0, {str(bin_)!r}); import mgcore, os; print(os.environ['MATERIAL_LIB'])"
+            )
+            r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, cwd=t)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(Path(r.stdout.strip()), core)
+
+    def test_an_explicit_value_is_kept(self):
+        with tempfile.TemporaryDirectory() as t:
+            core = fake_core(Path(t) / "core")
+            code = f"import sys; sys.path.insert(0, {str(BIN)!r}); import mgcore, os; print(os.environ['MATERIAL_LIB'])"
+            r = subprocess.run(
+                [sys.executable, "-c", code],
+                capture_output=True,
+                text=True,
+                env=dict(os.environ, MATERIAL_LIB=str(core)),
+            )
+            self.assertEqual(Path(r.stdout.strip()), core)
+
+
 class Shims(unittest.TestCase):
     def test_each_old_name_is_the_cores_module(self):
         import importlib
