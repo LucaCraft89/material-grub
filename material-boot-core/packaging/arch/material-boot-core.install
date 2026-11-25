@@ -1,0 +1,4 @@
+_run() { /usr/bin/material-boot core install --from-package --only core --yes || true; }   # never fails the pacman transaction
+post_install() { _run; }
+post_upgrade() { _run; }
+pre_remove() { /usr/bin/material-boot core install --from-package --uninstall --only core --yes || true; }

@@ -1,0 +1,21 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: material-boot-core
+Source: https://github.com/LucaCraft89/material-boot-core
+
+Files: *
+Copyright: 2026 LucaCraft89
+License: MIT
+
+Files: assets/fonts/*
+Copyright: 2015 The Google Sans Flex Authors
+License: OFL-1.1
+ SIL Open Font License, Version 1.1 (assets/fonts/OFL.txt).
+
+Files: assets/font-logos/*
+License: Unlicense
+
+Files: assets/material-symbols/*
+License: Apache-2.0
+
+Files: material_boot/_vendor/materialyoucolor/*
+License: Apache-2.0 or MIT
