@@ -89,7 +89,9 @@ def detect(root="", target=None, owner=None):
     present = {k: (r / v).exists() for k, v in files.items()}
     conf = r / "etc/material-grub.conf"
     theme = any((r / d).is_dir() for d in ("boot/grub2/themes/material", "boot/grub/themes/material"))
-    f.old_names = [n for n in OLD_NAMES if (r / n).exists()]
+    # (a merged /usr/local/sbin is a link to /usr/local/bin: the command we install there is not a leftover)
+    here = (r / "usr/local/bin/material-grub").resolve() if (r / "usr/local/bin/material-grub").exists() else None
+    f.old_names = [n for n in OLD_NAMES if (r / n).exists() and (here is None or (r / n).resolve() != here)]
     # The state record is shared with the other parts (the core writes its own version at the top of it): one that names parts and not this one says nothing
     # about GRUB, and the version that counts is the one recorded for it.
     sp = (f.state or {}).get("parts")
