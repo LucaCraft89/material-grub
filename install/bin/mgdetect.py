@@ -126,7 +126,7 @@ def detect(root="", target=None, owner=None):
     if (r / "usr/share/material-grub-gui").is_dir():
         f.parts.setdefault("gui", ver or "?")
     plug_dirs = [r / d.lstrip("/") for d in mgplugins.DEFAULT_DIRS] if root else None
-    for p in mgplugins.discover((), plug_dirs):
+    for p in mgplugins.discover((), plug_dirs, root):
         f.parts.setdefault(p.name, p.version if not p.problem else f"{p.version} (not usable)")
     if conf.is_file():
         c = mgrub.load_conf(str(conf))

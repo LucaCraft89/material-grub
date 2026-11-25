@@ -184,7 +184,7 @@ class Detection(Base):
         entry = self.r / "e.py"
         entry.write_text("def main(a, c): return 0\n")
         (d / "plymouth.json").write_text(
-            json.dumps({"manifest": 1, "name": "plymouth", "version": "0.1.0", "core_api": 1, "entry": str(entry)})
+            json.dumps({"manifest": 2, "name": "plymouth", "version": "0.1.0", "core_api": 2, "entry": str(entry)})
         )
         with unittest.mock.patch.dict(os.environ):
             os.environ.pop("MATERIAL_PLUGIN_PATH")
