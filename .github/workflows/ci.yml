@@ -210,6 +210,27 @@ jobs:
           grep -q "^exit: 0" build/out/dry-${{ matrix.distro }}.txt
           grep -q "^SYSTEM UNCHANGED" build/out/dry-${{ matrix.distro }}.txt
 
+  unified:
+    # The GRUB part for real, in a distro container with a fake /boot: install the core through `material-boot core install`, install GRUB with install.sh and
+    # through `material-boot core install --only grub`: the same files must be on the system; then remove it through the unified installer.
+    name: Unified installer on ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: Debian, distro: debian, image: "docker.io/library/debian:stable"}
+          - {name: Fedora, distro: fedora, image: "registry.fedoraproject.org/fedora:latest"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import, and the core of the bundle the test makes
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+      - run: |
+          mkdir -p build/out
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/unified_smoke.sh ${{ matrix.distro }}
+          cat build/out/unified-${{ matrix.distro }}.txt
+          grep -q "^ALL OK" build/out/unified-${{ matrix.distro }}.txt
+
   packages:
     # Source-only packages: build each from the checked-out tree, install it in a distro container with a fake /boot (the theme is built on install),
     # upgrade it, and force a rejected upgrade: the package manager must still succeed and grub.cfg must be rolled back.

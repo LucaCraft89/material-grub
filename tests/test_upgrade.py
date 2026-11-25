@@ -192,6 +192,32 @@ class Detection(Base):
         self.assertEqual(f.parts["plymouth"], "0.1.0")
 
 
+class SharedRecord(Base):
+    """The state record belongs to every part: the core writes its own version at the top of it."""
+
+    def write_record(self, parts, version="1.0.0"):
+        mgdetect.record(str(self.r), version, "source", "normal", parts)
+
+    def test_a_record_that_does_not_name_grub_is_not_a_grub_install(self):
+        self.write_record({"core": "1.0.0"})
+        self.assertEqual(self.detect().kind, "none")
+
+    def test_the_version_of_grub_is_the_one_recorded_for_it(self):
+        make_install(self.r, "0.7.1")
+        (self.r / "usr/share/material-grub/VERSION").unlink()
+        self.write_record({"core": "1.0.0", "grub": "0.9.0"}, version="1.0.0")
+        f = self.detect("1.0.0")
+        self.assertEqual((f.version, f.kind), ("0.9.0", "older"))
+
+    def test_a_record_without_parts_still_counts(self):
+        self.write_record({}, version="0.7.1")
+        self.assertEqual(self.detect("1.0.0").version, "0.7.1")
+
+    def test_a_part_that_wrote_a_dict_is_read(self):
+        self.write_record({"grub": {"version": "0.8.0", "extra": 1}})
+        self.assertEqual(self.detect("1.0.0").version, "0.8.0")
+
+
 class Notice(Base):
     def test_no_install_no_notice(self):
         self.assertEqual(mgdetect.notice(self.detect(), "1.0.0"), [])

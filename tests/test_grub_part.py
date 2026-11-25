@@ -24,6 +24,7 @@ from material_boot import cli, plugins  # noqa: E402
 
 sys.path.insert(0, str(ROOT / "install"))
 import part_grub  # noqa: E402
+from material_boot.conf import CONF_DEFAULTS as DEFAULTS  # noqa: E402
 
 MANIFEST = ROOT / "material-boot-part.json"
 
@@ -70,14 +71,25 @@ class Manifest(unittest.TestCase):
 
 class Arguments(unittest.TestCase):
     def test_the_installers_options_and_the_shared_look_become_the_engines_options(self):
-        a = part_grub.engine_args(ctx(options={"res": "1920x1080", "stage-only": True, "with-gui": True}))
+        a = part_grub.engine_args(
+            ctx(
+                options={"res": "1920x1080", "stage-only": True, "with-gui": True},
+                conf={"STYLE": "list", "SCHEME": "light", "COOKIE": "off", "LOGO": "on", "HINTS": "off"},
+            )
+        )
         self.assertEqual(a[:2], ["--yes", "--no-tui"])
-        for want in (["--res", "1920x1080"], ["--style", "rail"], ["--scheme", "dark"]):
+        for want in (["--res", "1920x1080"], ["--style", "list"], ["--scheme", "light"]):
             i = a.index(want[0])
             self.assertEqual(a[i : i + 2], want)
-        for flag in ("--stage-only", "--with-gui", "--cookie", "--logo", "--no-hints"):
+        for flag in ("--stage-only", "--with-gui", "--no-cookie", "--no-hints"):
             self.assertIn(flag, a)
-        for flag in ("--no-cookie", "--hints", "--immutable", "--from-package", "--progress"):
+        for flag in ("--cookie", "--logo", "--no-logo", "--hints", "--immutable", "--from-package", "--progress"):
+            self.assertNotIn(flag, a)
+
+    def test_what_is_the_default_is_not_passed(self):
+        """install.sh leaves what was not chosen as a commented sample; the files of the two entry points must be the same."""
+        a = part_grub.engine_args(ctx(conf=dict(DEFAULTS)))
+        for flag in ("--style", "--scheme", "--cookie", "--no-cookie", "--logo", "--no-logo", "--hints", "--no-hints"):
             self.assertNotIn(flag, a)
 
     def test_how_and_json_are_passed_on(self):

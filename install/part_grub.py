@@ -18,6 +18,9 @@ import material_boot  # noqa: E402  (the core that is running this: the tools mu
 os.environ.setdefault("MATERIAL_LIB", str(Path(material_boot.__file__).resolve().parent.parent))
 import mgcore  # noqa: E402,F401
 import mgdetect  # noqa: E402
+from material_boot.conf import (
+    CONF_DEFAULTS as DEFAULTS,  # noqa: E402  (the conf the core loads has the defaults filled in)
+)
 
 FLAGS = {
     "stage-only": "--stage-only",
@@ -42,12 +45,15 @@ def engine_args(ctx, *extra):
     for name, flag in VALUES.items():
         if o.get(name) not in (None, False):
             a += [flag, str(o[name])]
+    # Only what differs from the default is passed: install.sh writes what was chosen and leaves the rest as commented samples, and the files must be the same.
     for key, flag in LOOK.items():
-        if ctx.conf.get(key):
+        if ctx.conf.get(key) and ctx.conf[key] != DEFAULTS.get(key):
             a += [flag, str(ctx.conf[key])]
     for key, (on, off) in SWITCH.items():
         v = ctx.conf.get(key)
-        if v in ("on", "off"):
+        if v in ("on", "off") and v != DEFAULTS.get(
+            key
+        ):  # a default is left as it is: install.sh writes only what was chosen, and the files must be the same
             a.append(on if v == "on" else off)
     if ctx.how == "package":
         a.append("--from-package")
