@@ -5,3 +5,4 @@ theme-*/
 __pycache__/
 *.pyc
 data/
+/material-boot-core/   # the core checked out next to the sources (CI, or a local copy); it has its own repository

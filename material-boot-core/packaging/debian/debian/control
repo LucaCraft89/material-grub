@@ -1,0 +1,19 @@
+Source: material-boot-core
+Section: misc
+Priority: optional
+Maintainer: LucaCraft89 <noreply@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/LucaCraft89/material-boot-core
+Rules-Requires-Root: no
+
+Package: material-boot-core
+Architecture: all
+Depends: ${misc:Depends}, python3 (>= 3.9), python3-pil, librsvg2-bin
+Description: The code and the command that Material GRUB and Material Plymouth share
+ The shared code of the Material boot parts (palettes, the scene renderer, the
+ conf and overrides formats, presets, the state record and the migrations), the
+ shared data built from the distro catalog, and the material-boot command that
+ the parts plug into. The data is built on this machine when the package is
+ installed or updated, for the configured scheme. It installs no theme by
+ itself: Material GRUB and Material Plymouth are separate packages that need it.

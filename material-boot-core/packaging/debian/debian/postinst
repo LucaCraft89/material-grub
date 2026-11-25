@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+case "$1" in
+  configure) /usr/bin/material-boot core install --from-package --only core --yes || true ;;   # never fails the dpkg run
+esac
+#DEBHELPER#
+exit 0

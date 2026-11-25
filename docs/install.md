@@ -47,6 +47,24 @@ sudo ./install.sh --uninstall       # remove the theme and hooks
 
 The installer always builds the theme from source (there are no prebuilt downloads); `--pkg DIR` installs a package you built elsewhere, which is how immutable hosts without build tools work.
 
+## Requirement: material-boot-core
+
+Material GRUB shares its code with the other Material Boot parts through **material-boot-core**: the colour palettes, the scene renderer, the settings, overrides and presets, the state record and the migrations. The installed tools import it from `/usr/share/material-boot/lib` and **refuse to start without it**, with a message that says what to install. A real install (`sudo ./install.sh`) checks for it first, before touching anything; `--dry-run`, `--preview`, `--stage-only`, Ventoy sticks and `--uninstall` do not need it on the system.
+
+- **Packages:** `material-boot-core` is its own package (rpm, deb, Arch). Material GRUB's packages will require it once both are released.
+- **Source, today:** install the core from its repository first (it is a few commands: lay its files out like its package does, then build its shared data):
+
+  ```sh
+  git clone https://github.com/LucaCraft89/material-boot-core.git
+  sudo sh material-boot-core/packaging/common/install-tree.sh material-boot-core /     # lays the core out like its package does
+  sudo material-boot core install --from-package --only core --yes                      # builds its shared data on this machine
+  ```
+
+- **The bundle** (one tarball with the core and the parts, `install.sh` at its root) installs the core first, then whichever parts you choose.
+- **From a checkout** (development, CI): put `material-boot-core` next to the `material-grub` directory or inside it, or set `MATERIAL_LIB` to the directory that holds `material_boot/`. The tools run from the checkout find it; an installed system does not use that, it looks in `/usr/share/material-boot/lib`.
+- **Python 3.9 or newer** is needed (the shared code needs it); the installer finds one or installs it, as before.
+- Immutable systems (ostree, bootc) do not have a place for the core yet; that layout is not designed. Until it is, do not take this version for them.
+
 ## Supported resolutions
 
 `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `2880x1800`, `3440x1440`, `3840x1080`, `3840x1600`, `3840x2160`, `5120x1440`, `5120x2160`.
