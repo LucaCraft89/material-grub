@@ -426,6 +426,11 @@ def core():
         run=run,
         elevate=elevate,
         conf_path=lambda: os.environ.get("MATERIAL_CONF", "/etc/material-grub.conf"),
+        state_dir=lambda: Path(os.environ.get("MATERIAL_STATE_DIR", "/var/lib/material-grub")),
+        lib=Path(sys.modules["material_boot"].__file__)
+        .resolve()
+        .parent.parent,  # the core that is running, and the data it is to use (this package's: one scheme)
+        data=PKG,
     )
 
 
