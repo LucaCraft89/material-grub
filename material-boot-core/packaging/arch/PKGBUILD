@@ -1,0 +1,21 @@
+# Maintainer: LucaCraft89
+# The package ships the library, the command and the build inputs; the shared data is built on the target machine by the install script
+# (post_install / post_upgrade), for the configured scheme. Not published on the AUR yet.
+pkgname=material-boot-core
+pkgver=1.0.0
+pkgrel=1
+pkgdesc='The code and the command that Material GRUB and Material Plymouth share'
+arch=('any')
+url='https://github.com/LucaCraft89/material-boot-core'
+license=('MIT')
+depends=('python>=3.9' 'python-pillow' 'librsvg')
+install=material-boot-core.install
+# MB_SOURCE overrides the source (CI builds from the checked-out tree: MB_SOURCE=file:///path/material-boot-core-$pkgver.tar.gz)
+source=("$pkgname-$pkgver.tar.gz::${MB_SOURCE:-https://github.com/LucaCraft89/material-boot-core/archive/v$pkgver.tar.gz}")
+sha256sums=('SKIP')   # the release script fills in the real sum once the tag exists
+
+package() {
+  cd "$srcdir/$pkgname-$pkgver"
+  sh packaging/common/install-tree.sh . "$pkgdir"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
