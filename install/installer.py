@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Material GRUB installer (the logic; install.sh is only a POSIX sh bootstrap that finds Python 3.8+ and runs this). stdlib only.
+"""Material GRUB installer (the logic; install.sh is only a POSIX sh bootstrap that finds Python 3.9+ and runs this). stdlib only.
 
 Same flags and steps as the shell installer it replaces: checks, questions (TUI), dependencies, build from source, install into GRUB or
 onto a Ventoy stick. The file copying into / is still done by install/install.sh (it also serves `--dest` staging and the packages).
@@ -20,12 +20,18 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent  # the repository root
 sys.path.insert(0, str(HERE / "install"))
 sys.path.insert(0, str(HERE / "install/bin"))
+import mgcore  # noqa: E402,F401  (puts material-boot-core on sys.path)
 import mgdetect  # noqa: E402
 import mgmigrate  # noqa: E402
 import mgrub  # noqa: E402
 import mgtheme  # noqa: E402
+from material_boot.events import (  # noqa: E402,F401  (the install log and the --progress json stream)
+    LineEvents,
+    Tee,
+    open_log,
+)
 
-MIN_RUNTIME = (3, 8)  # this installer and the installed tools
+MIN_RUNTIME = (3, 9)  # this installer and the installed tools (the shared code of material-boot-core needs 3.9)
 MIN_BUILD = (3, 9)  # the build venv: materialyoucolor has no Python 3.8 wheel
 PMS = ("dnf", "apt-get", "pacman", "zypper", "apk", "xbps-install")
 # package-manager commands that install the build and runtime dependencies (the same sets as the shell installer)
@@ -70,66 +76,6 @@ PYTHON_PACKAGES = {
     "xbps-install": ["python3"],
 }
 STYLES = ("rail", "clean", "list", "split", "full")
-
-
-class LineEvents:
-    """File-like stand-in for sys.stdout/sys.stderr in --progress json mode: every printed line becomes a 'log' event."""
-
-    def __init__(self, emit, level):
-        self.emit, self.level, self.buf = emit, level, ""
-
-    def write(self, text):
-        self.buf += text
-        *lines, self.buf = self.buf.split("\n")
-        for ln in lines:
-            if ln.strip():
-                self.emit("log", text=ln.rstrip(), level=self.level)
-        return len(text)
-
-    def flush(self):
-        if self.buf.strip():
-            self.emit("log", text=self.buf.rstrip(), level=self.level)
-        self.buf = ""
-
-    def isatty(self):
-        return False
-
-
-class Tee:
-    """Copies everything printed to the terminal into the install log too (colour codes stripped)."""
-
-    def __init__(self, real, logf):
-        self.real, self.logf, self.buf = real, logf, ""
-
-    def write(self, text):
-        self.real.write(text)
-        self.buf += text.replace("\r", "\n")
-        *lines, self.buf = self.buf.split("\n")
-        for ln in lines:
-            ln = re.sub(r"\x1b\[[0-9;]*m", "", ln).rstrip()
-            if ln.strip():
-                self.logf.write(time.strftime("%F %T ") + ln + "\n")
-        self.logf.flush()
-        return len(text)
-
-    def flush(self):
-        self.real.flush()
-
-    def __getattr__(self, name):
-        return getattr(self.real, name)
-
-
-def open_log():
-    """The persistent install log: $MG_INSTALL_LOG, else /var/log/material-grub/install.log. None when it cannot be written
-    (no root, read-only /var): logging is never a reason to fail an install."""
-    path = Path(os.environ.get("MG_INSTALL_LOG", "/var/log/material-grub/install.log"))
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists() and path.stat().st_size > 1_000_000:  # keep one old log, the file never grows without bound
-            os.replace(path, str(path) + ".1")
-        return open(path, "a", errors="replace")
-    except OSError:
-        return None
 
 
 class Installer:
@@ -504,6 +450,18 @@ class Installer:
             self.warn(f"could not finish the update bookkeeping ({type(e).__name__}: {e}); the theme is installed")
 
     # ------------------------------------------------------------ steps
+    def check_core(self):
+        """The installed tools import material-boot-core from its place on the system (/usr/share/material-boot/lib), never from a checkout. A real install
+        without it would leave a material-grub that cannot start, so it is refused here, before anything is touched. The build-only modes need nothing."""
+        if self.ventoy or self.stage or self.preview or self.dry or self.uninstall:
+            return
+        if mgcore.system() is None:
+            self.die(
+                "material-boot-core is not installed on this system. Material GRUB shares its code with the other Material Boot parts, and the installed "
+                "tools look for it in /usr/share/material-boot/lib. Install the package `material-boot-core` (or run the installer from the Material Boot "
+                "bundle, which installs it first), then run this again."
+            )
+
     def check_system(self):
         print(f"\n{self.B}Material GRUB installer{self.Z}")
         self.step("Checking the system")
@@ -1029,7 +987,7 @@ class Installer:
 
     # ------------------------------------------------------------ install
     def prepare_runtime_python(self):
-        """The interpreter the installed hooks will use: python3 when it is 3.8+ with Pillow, else this one, else a venv with Pillow."""
+        """The interpreter the installed hooks will use: python3 when it is 3.9+ with Pillow, else this one, else a venv with Pillow."""
         p3 = shutil.which("python3")
         v = self.py_version(p3) if p3 else None
         if v and v >= MIN_RUNTIME and self.py_has(p3, "PIL"):
@@ -1238,6 +1196,7 @@ class Installer:
 
     def run_all(self):
         self.check_system()
+        self.check_core()
         if not (self.ventoy or self.stage or self.preview):
             self.existing_install()
         self.questions()

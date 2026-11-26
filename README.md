@@ -29,6 +29,14 @@ cd material-grub
 sudo ./install.sh          # asks for style, colour scheme and resolution; Enter keeps the defaults
 ```
 
+> **Material GRUB needs [material-boot-core](https://github.com/LucaCraft89/material-boot-core)**, the code it shares with the other Material Boot parts (Material Plymouth, ...). The installer refuses to go on without it and says so. Packages and the Material Boot bundle bring it along once they are released; until then, install it first (Python 3.9+, Pillow and `rsvg-convert` are needed, as for the theme itself):
+>
+> ```sh
+> git clone https://github.com/LucaCraft89/material-boot-core.git
+> sudo sh material-boot-core/packaging/common/install-tree.sh material-boot-core /     # lays the core out like its package does
+> sudo material-boot core install --from-package --only core --yes                      # builds its shared data on this machine
+> ```
+
 Reboot and the new menu is there. Want another look later? `sudo ./install.sh --style split --scheme light`. Want it gone? `sudo ./install.sh --uninstall` (your original GRUB files are backed up in `/var/backups/material-grub`). Keep a live USB around the first time, since this edits your bootloader configuration.
 
 **On a Ventoy USB stick** (no root, nothing on your computer changes):

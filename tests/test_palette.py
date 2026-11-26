@@ -1,4 +1,4 @@
-"""mgpalette (the vendored colour science the installed tools use) must give exactly what the build's pinned materialyoucolor gives.
+"""mgpalette (the colour science the installed tools use: material-boot-core's vendored copy) must give exactly what the build's pinned materialyoucolor gives.
 The build copy is only importable in a build venv, so that half is skipped elsewhere. usage: python3 tests/test_palette.py"""
 
 import random

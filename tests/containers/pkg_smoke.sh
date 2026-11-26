@@ -8,6 +8,10 @@ set -e
 fmt=$1
 R=/out/pkg-$fmt.txt; : > $R
 say() { echo "$*" | tee -a $R; }
+# material-boot-core: the installed tools import it from /usr/share/material-boot/lib. Its own package comes with G3 (material-grub then requires it); until
+# then the checked-out core is copied to where that package would put it.
+mkdir -p /usr/share/material-boot/lib && cp -a /src/material-boot-core/material_boot /usr/share/material-boot/lib/ && cp /src/material-boot-core/VERSION /usr/share/material-boot/lib/material_boot/VERSION \
+  && find /usr/share/material-boot/lib -name __pycache__ -prune -exec rm -rf {} +
 case $fmt in
   rpm)  dnf install -y -q grub2-tools grub2-tools-extra librsvg2-tools python3 python3-pip python3-pillow >/dev/null 2>&1; CFG=/boot/grub2/grub.cfg
         inst() { dnf install -y /pkg/material-grub-[0-9]*.rpm; }; reinst() { dnf reinstall -y /pkg/material-grub-[0-9]*.rpm; }; inst_gui() { dnf install -y /pkg/material-grub-gui-*.rpm; } ;;

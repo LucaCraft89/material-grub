@@ -363,7 +363,7 @@ class Bootstrap(unittest.TestCase):
             self.skipTest("running as root")
         r = self.run_boot(False)
         self.assertEqual(r.returncode, 1)
-        self.assertIn("Python 3.8 or newer is needed", r.stderr)
+        self.assertIn("Python 3.9 or newer is needed", r.stderr)
         self.assertIn("sudo ./install.sh", r.stderr)
 
     @unittest.skipUnless(os.geteuid() == 0, "needs root: the bootstrap installs Python only as root")
