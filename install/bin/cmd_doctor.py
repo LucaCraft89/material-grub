@@ -352,7 +352,7 @@ class Doctor:
             if self.root and "MATERIAL_PLUGIN_PATH" not in os.environ
             else None
         )
-        for pl in mgplugins.discover(cmd_cli.COMMANDS, dirs):
+        for pl in mgplugins.discover(cmd_cli.COMMANDS, dirs, self.root):
             if pl.problem:
                 self.add(WARN, f"plugin {pl.name}", pl.problem)
             else:

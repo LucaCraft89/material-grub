@@ -89,8 +89,16 @@ def detect(root="", target=None, owner=None):
     present = {k: (r / v).exists() for k, v in files.items()}
     conf = r / "etc/material-grub.conf"
     theme = any((r / d).is_dir() for d in ("boot/grub2/themes/material", "boot/grub/themes/material"))
-    f.old_names = [n for n in OLD_NAMES if (r / n).exists()]
-    anything = any(present.values()) or theme or bool(f.state)
+    # (a merged /usr/local/sbin is a link to /usr/local/bin: the command we install there is not a leftover)
+    here = (r / "usr/local/bin/material-grub").resolve() if (r / "usr/local/bin/material-grub").exists() else None
+    f.old_names = [n for n in OLD_NAMES if (r / n).exists() and (here is None or (r / n).resolve() != here)]
+    # The state record is shared with the other parts (the core writes its own version at the top of it): one that names parts and not this one says nothing
+    # about GRUB, and the version that counts is the one recorded for it.
+    sp = (f.state or {}).get("parts")
+    other = isinstance(sp, dict) and bool(sp) and "grub" not in sp
+    mine = sp.get("grub") if isinstance(sp, dict) else None
+    mine = mine.get("version") if isinstance(mine, dict) else mine
+    anything = any(present.values()) or theme or (bool(f.state) and not other)
     if not anything:
         return f  # kind "none": settings left behind by an uninstall are not an install
     f.legacy = f.state is None
@@ -100,7 +108,9 @@ def detect(root="", target=None, owner=None):
         ver = (r / files["package"]).read_text().strip() or None
     except OSError:
         pass
-    ver = ver or (f.state or {}).get("version")
+    ver = (
+        ver or (mine if isinstance(mine, str) and mine else None) or (None if other else (f.state or {}).get("version"))
+    )
     f.version = ver
     if ver and target:
         a, b = version_tuple(ver), version_tuple(target)
@@ -118,7 +128,7 @@ def detect(root="", target=None, owner=None):
     if (r / "usr/share/material-grub-gui").is_dir():
         f.parts.setdefault("gui", ver or "?")
     plug_dirs = [r / d.lstrip("/") for d in mgplugins.DEFAULT_DIRS] if root else None
-    for p in mgplugins.discover((), plug_dirs):
+    for p in mgplugins.discover((), plug_dirs, root):
         f.parts.setdefault(p.name, p.version if not p.problem else f"{p.version} (not usable)")
     if conf.is_file():
         c = mgrub.load_conf(str(conf))

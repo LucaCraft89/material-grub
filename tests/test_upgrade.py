@@ -184,12 +184,38 @@ class Detection(Base):
         entry = self.r / "e.py"
         entry.write_text("def main(a, c): return 0\n")
         (d / "plymouth.json").write_text(
-            json.dumps({"manifest": 1, "name": "plymouth", "version": "0.1.0", "core_api": 1, "entry": str(entry)})
+            json.dumps({"manifest": 2, "name": "plymouth", "version": "0.1.0", "core_api": 2, "entry": str(entry)})
         )
         with unittest.mock.patch.dict(os.environ):
             os.environ.pop("MATERIAL_PLUGIN_PATH")
             f = self.detect()
         self.assertEqual(f.parts["plymouth"], "0.1.0")
+
+
+class SharedRecord(Base):
+    """The state record belongs to every part: the core writes its own version at the top of it."""
+
+    def write_record(self, parts, version="1.0.0"):
+        mgdetect.record(str(self.r), version, "source", "normal", parts)
+
+    def test_a_record_that_does_not_name_grub_is_not_a_grub_install(self):
+        self.write_record({"core": "1.0.0"})
+        self.assertEqual(self.detect().kind, "none")
+
+    def test_the_version_of_grub_is_the_one_recorded_for_it(self):
+        make_install(self.r, "0.7.1")
+        (self.r / "usr/share/material-grub/VERSION").unlink()
+        self.write_record({"core": "1.0.0", "grub": "0.9.0"}, version="1.0.0")
+        f = self.detect("1.0.0")
+        self.assertEqual((f.version, f.kind), ("0.9.0", "older"))
+
+    def test_a_record_without_parts_still_counts(self):
+        self.write_record({}, version="0.7.1")
+        self.assertEqual(self.detect("1.0.0").version, "0.7.1")
+
+    def test_a_part_that_wrote_a_dict_is_read(self):
+        self.write_record({"grub": {"version": "0.8.0", "extra": 1}})
+        self.assertEqual(self.detect("1.0.0").version, "0.8.0")
 
 
 class Notice(Base):
@@ -571,6 +597,35 @@ class InstallerGlue(Base):
         )
         self.assertFalse((self.r / "var/backups/material-grub").exists(), "no file changed, so no backup directory")
 
+    def test_run_by_the_unified_installer_it_does_not_repeat_the_notice_and_does_not_write_the_cores_version(self):
+        make_install(
+            self.r, "1.1.0"
+        )  # a downgrade: the plain installer stops here, the unified one has already applied the policy
+        inst = self.installer()
+        with unittest.mock.patch.object(self.mod, "UNIFIED", True):
+            f, out = self.run_glue(inst, inst.existing_install, str(self.r))
+            self.assertEqual((f.kind, out), ("newer", ""))
+            mgdetect.record(str(self.r), "1.0.0", "source", "normal", {"core": "1.0.0", "plymouth": "0.9.0"})
+            before = mgdetect.read(str(self.r))
+            self.run_glue(inst, inst.after_install, str(self.r))
+        self.assertEqual(
+            mgdetect.read(str(self.r)), before, "the unified installer records the part itself, with its own history"
+        )
+        inst = self.installer()
+        self.run_glue(inst, inst.existing_install, str(self.r))
+        with unittest.mock.patch.object(self.mod, "UNIFIED", False):
+            self.run_glue(inst, inst.after_install, str(self.r))
+        self.assertEqual(mgdetect.read(str(self.r))["parts"]["core"], "1.0.0")
+
+    def test_a_merged_usr_local_sbin_is_not_a_leftover(self):
+        make_install(self.r)  # puts the command in usr/local/bin
+        (self.r / "usr/local/sbin").symlink_to("bin")
+        self.assertEqual(self.detect().old_names, [])
+        (self.r / "usr/local/sbin").unlink()
+        (self.r / "usr/local/sbin").mkdir()
+        (self.r / "usr/local/sbin/material-grub").write_text("#!/bin/sh\n")
+        self.assertEqual(self.detect().old_names, ["usr/local/sbin/material-grub"])
+
     def test_a_failing_migration_is_a_warning_not_a_failed_install(self):
         make_install(self.r)
         inst = self.installer()
@@ -609,6 +664,20 @@ class RealStagedInstall(Base):
         )
         # the theme directory GRUB loads from (--no-run does not build it): an empty one is what the fingerprint looks for
         (self.r / "boot/grub2/themes/material").mkdir(parents=True)
+
+    def test_the_real_install_registers_the_part_for_material_boot(self):
+        """install.sh puts the part's manifest where the core looks, its entry next to the tools, and the uninstall script takes the manifest away again."""
+        import subprocess
+
+        self.stage()
+        m = self.r / "usr/share/material-boot/plugins.d/grub.json"
+        manifest = json.loads(m.read_text())
+        self.assertEqual(manifest["name"], "grub")
+        self.assertEqual(manifest["entry"], "/usr/share/material-grub/bin/part_grub.py")
+        self.assertTrue((self.r / "usr/share/material-grub/bin/part_grub.py").is_file())
+        self.assertEqual(manifest["version"], (ROOT / "VERSION").read_text().strip())
+        self.assertIn("rm -f /usr/share/material-boot/plugins.d/grub.json", (ROOT / "install/uninstall.sh").read_text())
+        self.assertEqual(subprocess.run(["sh", "-n", str(ROOT / "install/uninstall.sh")]).returncode, 0)
 
     def test_the_fingerprints_match_the_real_install(self):
         self.stage()
