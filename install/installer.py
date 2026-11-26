@@ -1133,6 +1133,8 @@ class Installer:
     def grub_install(self):
         self.write_seed()
         step_cmd = ["sh", HERE / "install/install.sh", "--res", self.res, "--pkg", self.dist]
+        if self.from_package:
+            step_cmd.append("--no-register")  # the package ships and owns the part's manifest
         if self.imm:
             step_cmd.append("--immutable")
         self.step("Installing into GRUB")

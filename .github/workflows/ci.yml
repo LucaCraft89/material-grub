@@ -249,6 +249,8 @@ jobs:
         with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
       - run: |
           mkdir -p build/pkg build/out
+          # the core is a dependency of the package: its own package is built from the core's checkout and installed with it
+          docker run --rm -v "$PWD/material-boot-core:/src:ro" -v "$PWD/build/pkg:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
           docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/pkg:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
           docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/pkg:/pkg:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/pkg_smoke.sh ${{ matrix.fmt }}
       - run: cat build/out/pkg-${{ matrix.fmt }}.txt; grep -q "^ALL OK" build/out/pkg-${{ matrix.fmt }}.txt

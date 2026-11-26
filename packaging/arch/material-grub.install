@@ -1,4 +1,7 @@
-_run() { /usr/share/material-grub-src/install.sh --from-package || true; }   # never fails the pacman transaction
+_run() {   # never fails the pacman transaction: through the unified installer (the core is a dependency), the old way if the command is missing
+  if command -v material-boot >/dev/null 2>&1; then material-boot core install --from-package --only grub --yes || true
+  else /usr/share/material-grub-src/install.sh --from-package || true; fi
+}
 post_install() { _run; }
 post_upgrade() { _run; }
 pre_remove() { sh /usr/share/material-grub-src/install/uninstall.sh || true; }

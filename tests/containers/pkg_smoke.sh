@@ -8,17 +8,17 @@ set -e
 fmt=$1
 R=/out/pkg-$fmt.txt; : > $R
 say() { echo "$*" | tee -a $R; }
-# material-boot-core: the installed tools import it from /usr/share/material-boot/lib. Its own package comes with G3 (material-grub then requires it); until
-# then the checked-out core is copied to where that package would put it.
-mkdir -p /usr/share/material-boot/lib && cp -a /src/material-boot-core/material_boot /usr/share/material-boot/lib/ && cp /src/material-boot-core/VERSION /usr/share/material-boot/lib/material_boot/VERSION \
-  && find /usr/share/material-boot/lib -name __pycache__ -prune -exec rm -rf {} +
+# material-boot-core is a dependency of the package: its own package (built from the core's checkout, see build_pkg.sh there) is in /pkg too.
 case $fmt in
   rpm)  dnf install -y -q grub2-tools grub2-tools-extra librsvg2-tools python3 python3-pip python3-pillow >/dev/null 2>&1; CFG=/boot/grub2/grub.cfg
-        inst() { dnf install -y /pkg/material-grub-[0-9]*.rpm; }; reinst() { dnf reinstall -y /pkg/material-grub-[0-9]*.rpm; }; inst_gui() { dnf install -y /pkg/material-grub-gui-*.rpm; } ;;
+        rm_pkg() { dnf remove -y material-grub-gui material-grub; }
+        inst() { dnf install -y /pkg/material-boot-core-[0-9]*.rpm /pkg/material-grub-[0-9]*.rpm; }; reinst() { dnf reinstall -y /pkg/material-grub-[0-9]*.rpm; }; inst_gui() { dnf install -y /pkg/material-grub-gui-*.rpm; } ;;
   deb)  apt-get update -qq >/dev/null; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq grub-common os-prober python3 python3-pil python3-venv python3-pip librsvg2-bin >/dev/null 2>&1; CFG=/boot/grub/grub.cfg
-        inst() { DEBIAN_FRONTEND=noninteractive apt-get install -y /pkg/material-grub_*.deb; }; reinst() { DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall /pkg/material-grub_*.deb; }; inst_gui() { DEBIAN_FRONTEND=noninteractive apt-get install -y /pkg/material-grub-gui_*.deb; } ;;
+        rm_pkg() { DEBIAN_FRONTEND=noninteractive apt-get remove -y material-grub-gui material-grub; }
+        inst() { DEBIAN_FRONTEND=noninteractive apt-get install -y /pkg/material-boot-core_*.deb /pkg/material-grub_*.deb; }; reinst() { DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall /pkg/material-grub_*.deb; }; inst_gui() { DEBIAN_FRONTEND=noninteractive apt-get install -y /pkg/material-grub-gui_*.deb; } ;;
   arch) pacman -Syu --noconfirm --needed grub librsvg python python-pip python-pillow >/dev/null 2>&1; CFG=/boot/grub/grub.cfg
-        inst() { pacman -U --noconfirm /pkg/material-grub-[0-9]*.pkg.tar.*; }; reinst() { pacman -U --noconfirm /pkg/material-grub-[0-9]*.pkg.tar.*; }; inst_gui() { pacman -U --noconfirm /pkg/material-grub-gui-[0-9]*.pkg.tar.*; } ;;
+        rm_pkg() { pacman -R --noconfirm material-grub-gui material-grub; }
+        inst() { pacman -U --noconfirm /pkg/material-boot-core-[0-9]*.pkg.tar.* /pkg/material-grub-[0-9]*.pkg.tar.*; }; reinst() { pacman -U --noconfirm /pkg/material-grub-[0-9]*.pkg.tar.*; }; inst_gui() { pacman -U --noconfirm /pkg/material-grub-gui-[0-9]*.pkg.tar.*; } ;;
 esac
 mkdir -p "$(dirname $CFG)" /etc/default
 for v in 6.8.0-45-generic 6.8.0-40-generic; do touch /boot/vmlinuz-$v /boot/initrd.img-$v; done
@@ -29,6 +29,9 @@ before=$(sha256sum $CFG | cut -d' ' -f1)
 
 say "== install"
 inst > /tmp/inst.log 2>&1 && say "package manager: ok" || { say "package manager: FAILED"; tail -30 /tmp/inst.log | tee -a $R; exit 1; }
+material-boot core parts 2>&1 | grep -q "grub .*ok" && say "material-boot core parts lists grub as usable" || { say "grub is not a usable part"; material-boot core parts | tee -a $R; exit 1; }
+grep -q '"grub"' /var/lib/material-grub/state.json && grep -q '"core"' /var/lib/material-grub/state.json && say "state record names the core and grub" || { say "state record is wrong"; cat /var/lib/material-grub/state.json | tee -a $R; exit 1; }
+[ "$(sed -n 's/.*"entry": "\(.*\)".*/\1/p' /usr/share/material-boot/plugins.d/grub.json)" = /usr/share/material-grub-src/install/part_grub.py ] && say "the manifest is the package's, its entry is the copy with the installer" || { say "the manifest was rewritten"; cat /usr/share/material-boot/plugins.d/grub.json | tee -a $R; exit 1; }
 material-grub version | grep -q "^material-grub [0-9]" && say "material-grub version: ok" || { say "material-grub version FAILED"; exit 1; }
 material-grub help | grep -q "colour" && say "material-grub help: ok" || { say "material-grub help FAILED"; exit 1; }
 material-grub doctor > /tmp/doctor.txt 2>&1 && say "doctor: ok" || { say "doctor: FAILED"; cat /tmp/doctor.txt | tee -a $R; tail -40 /tmp/inst.log | tee -a $R; exit 1; }
@@ -80,4 +83,12 @@ grep -q "classes applied" $CFG && { say "grub.cfg still holds the rejected resul
 $REAL $CFG && say "restored grub.cfg is valid"
 [ -e /var/lib/material-grub/last-error ] && say "last-error written" || { say "last-error MISSING"; exit 1; }
 grep -qi "rolled back" /tmp/bad.log && say "rollback reported in the package manager output" || say "note: rollback text not in the package manager output"
+
+say "== removal (the core stays)"
+rm_pkg > /tmp/rm.log 2>&1 && say "package manager: ok" || { say "package manager: FAILED on removal"; tail -30 /tmp/rm.log | tee -a $R; exit 1; }
+grep -q "classes applied" $CFG && { say "grub.cfg is still annotated after the removal"; exit 1; } || say "grub.cfg is plain again"
+[ ! -e /usr/share/material-boot/plugins.d/grub.json ] && say "the manifest is gone" || { say "the manifest is still there"; exit 1; }
+material-boot core parts 2>&1 | grep -q grub && { say "core parts still lists grub"; exit 1; } || say "core parts no longer lists grub"
+grep -q '"core"' /var/lib/material-grub/state.json && ! grep -q '"grub"' /var/lib/material-grub/state.json && say "the state record kept the core and forgot grub" || { say "state record after removal:"; cat /var/lib/material-grub/state.json 2>&1 | tee -a $R; exit 1; }
+material-boot version > /dev/null && say "material-boot still works" || { say "material-boot is broken after the removal"; exit 1; }
 say "ALL OK"
