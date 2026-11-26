@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: pipx install ruff shellcheck-py
       - run: ruff check .
       - run: ruff format --check .
@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: python -m venv .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python -c "import fontTools, materialyoucolor, PIL; print(PIL.__version__)"
       - run: python scripts/update_requirements.py --check   # the pins still match requirements.in (PyPI hashes)
@@ -71,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - name: Build in a fresh container (installs only missing dependencies, stops before touching GRUB)
         run: |
           docker run --rm -v "$PWD:/src:ro" "${{ matrix.image }}" \
@@ -95,7 +95,7 @@ jobs:
       - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080 --scheme ${{ matrix.scheme }}
       - run: BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/boot_smoke.py 1920x1080 ${{ matrix.scheme }} ${{ matrix.style }}
@@ -112,7 +112,7 @@ jobs:
       - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1280x720,1920x1080
       - run: BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/boot_resolution.py
@@ -140,7 +140,7 @@ jobs:
       - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080 --scheme ${{ matrix.scheme }}
       - run: |
@@ -159,7 +159,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/pip install playwright      # test tooling only; the browser is the runner's Chrome, nothing is downloaded
@@ -178,7 +178,7 @@ jobs:
       - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
       - run: BOOT_WAIT=90 KEY_WAIT=4 .venv/bin/python tests/fallback_smoke.py 1920x1080 dark
@@ -199,7 +199,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
@@ -224,7 +224,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import, and the core of the bundle the test makes
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: |
           mkdir -p build/out
           docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/unified_smoke.sh ${{ matrix.distro }}
@@ -246,7 +246,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: |
           mkdir -p build/pkg build/out
           # the core is a dependency of the package: its own package is built from the core's checkout and installed with it
@@ -275,7 +275,7 @@ jobs:
       - uses: actions/checkout@v4
         with: {ref: main, path: old}
       - uses: actions/checkout@v4     # material-boot-core: its own package is a dependency of the new one
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: |
           mkdir -p build/old build/pkg build/out
           docker run --rm -v "$PWD/old:/src:ro" -v "$PWD/build/old:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
@@ -292,7 +292,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf mtools python3-pil librsvg2-bin grub-common
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080
@@ -310,7 +310,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-system-x86 ovmf mtools python3-pil librsvg2-bin grub-common
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/pip install playwright      # only the gui scenario drives a browser (the runner's Chrome; nothing is downloaded)
@@ -326,7 +326,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: python3 scripts/gen_distro_table.py --check      # tables vs catalog + image file list; PNG bytes are never compared
 
   gallery-render:
@@ -336,7 +336,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4     # material-boot-core: the shared code the tools import (install/bin/mgcore.py finds it inside the workspace)
-        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil librsvg2-bin grub-common
       - run: python3 -m venv --system-site-packages .venv && .venv/bin/pip install --require-hashes -r requirements.txt
       - run: .venv/bin/python scripts/package.py --res 1920x1080 --scheme dark && .venv/bin/python scripts/gen_distro_table.py
