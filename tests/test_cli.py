@@ -43,6 +43,26 @@ class Cli(unittest.TestCase):
         )
         return r.returncode, r.stdout + r.stderr
 
+    def test_a_reader_that_closes_the_pipe_is_not_an_error(self):
+        """`material-grub help | grep -q x`: the reader is gone before the output is written; no traceback."""
+        p = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                f"import time; time.sleep(0.8); import runpy, sys; sys.argv=[{str(CLI)!r}, 'help']; runpy.run_path({str(CLI)!r}, run_name='__main__')",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=self.env,
+            stdin=subprocess.DEVNULL,
+        )
+        p.stdout.close()  # the reader leaves before anything is written
+        err = p.stderr.read()
+        p.wait()
+        self.assertNotIn("Traceback", err)
+        self.assertNotIn("BrokenPipe", err)
+
     def test_doctor_asks_sudo_when_boot_is_root_only(self):
         # Fedora's /boot/grub2 is 0700: in a terminal doctor re-runs itself under sudo, in a script it just warns
         import contextlib
