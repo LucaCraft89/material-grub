@@ -258,6 +258,32 @@ jobs:
         if: always()
         with: {name: "package-${{ matrix.fmt }}", path: build/out/}
 
+  upgrade:
+    # An update from the RELEASED package (0.7.x on main: no core, no manifest) to the new packages, which need the core: the person's settings survive, the
+    # dependency is enforced, the part is registered and recorded. Same version number on both sides, so rpm and apt are told to treat it as an update.
+    name: Update from the released package (${{ matrix.fmt }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {fmt: rpm,  image: "registry.fedoraproject.org/fedora:latest"}
+          - {fmt: deb,  image: "docker.io/library/debian:stable"}
+          - {fmt: arch, image: "docker.io/library/archlinux:latest"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: {ref: main, path: old}
+      - uses: actions/checkout@v4     # material-boot-core: its own package is a dependency of the new one
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'feat/ctx-json' }}", path: material-boot-core}
+      - run: |
+          mkdir -p build/old build/pkg build/out
+          docker run --rm -v "$PWD/old:/src:ro" -v "$PWD/build/old:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
+          docker run --rm -v "$PWD/material-boot-core:/src:ro" -v "$PWD/build/pkg:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/pkg:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/old:/old:ro" -v "$PWD/build/pkg:/pkg:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/upgrade_smoke.sh ${{ matrix.fmt }}
+      - run: cat build/out/upgrade-${{ matrix.fmt }}.txt; grep -q "^ALL OK" build/out/upgrade-${{ matrix.fmt }}.txt
+
   ventoy:
     # Real Ventoy 1.1.18 (downloaded, sha256 checked) booted in QEMU/OVMF with the theme installed; ISOs are then added, renamed and removed WITHOUT running the installer again.
     # Software emulation on the runner, so the script waits 4x longer.
