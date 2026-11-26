@@ -6,7 +6,7 @@ set -e
 src=$1; dest=$2
 share=$dest/usr/share/material-grub-gui
 install -d "$share/web" "$dest/usr/libexec" "$dest/usr/share/polkit-1/actions" "$dest/usr/share/applications"
-for f in mgpaths.py mgstate.py mgpreview.py mgserver.py; do install -m644 "$src/gui/$f" "$share/$f"; done
+for f in mgpaths.py mgstate.py mgpreview.py mgplymouth.py mgserver.py; do install -m644 "$src/gui/$f" "$share/$f"; done
 install -m644 "$src/install/ventoy_sticks.py" "$share/ventoy_sticks.py"
 install -m755 "$src/gui/material-grub-gui" "$share/material-grub-gui"
 for f in "$src"/gui/web/*; do install -m644 "$f" "$share/web/$(basename "$f")"; done
