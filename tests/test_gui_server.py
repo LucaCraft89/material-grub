@@ -48,11 +48,11 @@ class Server(unittest.TestCase):
         (t / "plugins/plymouth.json").write_text(
             json.dumps(
                 {
-                    "manifest": 1,
+                    "manifest": 2,
                     "name": "plymouth",
                     "title": "Plymouth boot splash",
                     "version": "0.9.9",
-                    "core_api": 1,
+                    "core_api": 2,
                     "entry": str(t / "plymouth_entry.py"),
                     "summary": "test double",
                 }
