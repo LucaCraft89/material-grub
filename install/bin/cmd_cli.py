@@ -644,5 +644,18 @@ def main(argv=None):
     return fn(rest) or 0
 
 
+def main_quiet():
+    """`material-grub version | head -1`: a reader that closes the pipe is not an error (no traceback, the status of a SIGPIPE'd program)."""
+    try:
+        code = main()
+        sys.stdout.flush()
+        return code
+    except BrokenPipeError:
+        os.dup2(
+            os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno()
+        )  # so the flush at exit has nowhere to fail either
+        return 141
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main_quiet())
