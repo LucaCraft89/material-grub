@@ -1,18 +1,25 @@
 """Shared helpers for material-grub tools (stdlib only)."""
 
-import hashlib
 import json
 import re
 import sys
 from pathlib import Path
 
+import mgcore  # noqa: F401  (puts material-boot-core, the shared code, on sys.path)
+from material_boot.catalog import GENERIC  # noqa: F401  (catalog aliases too generic to match an entry by themselves)
+from material_boot.conf import (  # noqa: F401  (/etc/material-grub.conf)
+    CONF_CHOICES,
+    CONF_DEFAULTS,
+    _conf_ok,
+    load_conf,
+    write_conf,
+)
+from material_boot.titles import key_for, kind_of, load_rules, parse_title, uid  # noqa: F401  (which distro a title is)
+
 HERE = Path(__file__).resolve().parent
 
 # The one list of built-in resolutions (install/bin/resolutions.json); the packager, the installer, the TUI and the README check read it.
 RESOLUTIONS = json.loads((HERE / "resolutions.json").read_text())["resolutions"]
-
-# Catalog aliases that are too generic to match an entry by themselves (shared by the packager, the Ventoy tool and the distro table).
-GENERIC = {"os", "gnu", "gnu-linux", "unknown", "win", "mx", "nix", "linux"}
 
 
 def snap(res, available=None):
@@ -26,164 +33,6 @@ def snap(res, available=None):
         return tuple(map(int, r.split("x")))
 
     return min(avail, key=lambda r: (abs(size(r)[0] / size(r)[1] - w / h) > 0.02, abs(size(r)[1] - h)))
-
-
-def load_rules(pkg):
-    return json.loads((Path(pkg) / "rules.json").read_text())
-
-
-def key_for(title, rules):
-    """Match an entry title (case-insensitive, token based) to a catalog key; None if unknown/Windows."""
-    toks = re.findall(r"[a-z0-9]+", title.lower())
-    if "windows" in toks or "microsoft" in toks:
-        return None
-    for r in rules:
-        t = r["tokens"]
-        n = len(t)
-        if any(toks[i : i + n] == t for i in range(len(toks) - n + 1)):
-            return r["key"]
-        if "".join(t) in toks:
-            return r["key"]
-    return None
-
-
-def uid(*parts):
-    return "mg_" + hashlib.sha1("|".join(parts).encode()).hexdigest()[:10]
-
-
-def parse_title(title):
-    """Extract kernel/os/edition info from BLS or classic GRUB entry titles."""
-    t = title.strip()
-    d = {"os": None, "kver": None, "osver": None, "edition": None, "where": None}
-    m = re.search(r"\(on (/dev/[^)\s]+)\)", t)
-    if m:
-        d["where"] = m.group(1)
-        t = t.replace(m.group(0), "").strip()
-    m = re.match(
-        r"^(?P<os>.+?) (?P<v>\d\S*) \((?P<ed>[^)]+)\) \((?P<k>ostree:\d+)\)$", t
-    )  # ostree: Fedora Linux 44.20260301.0 (Silverblue) (ostree:0)
-    if m:
-        d.update(os=m["os"], osver=m["v"], edition=m["ed"], kver=m["k"])
-        return d
-    m = re.match(
-        r"^(?P<os>.+?) \((?P<kver>[^)]+)\) (?P<osver>\S+)(?: \((?P<ed>[^)]+)\))?$", t
-    )  # BLS: Fedora Linux (6.x) 44 (Workstation)
-    if m:
-        d.update(os=m["os"], kver=m["kver"], osver=m["osver"], edition=m["ed"])
-        return d
-    m = re.match(
-        r"^(?P<os>.+?), with (?P<k>[A-Za-z]+) (?P<v>\S+)(?: \((?P<x>[^)]+)\))?$", t
-    )  # classic: Ubuntu, with Linux 6.8.0-45-generic (recovery mode)
-    if m:
-        d.update(os=m["os"], kver=m["v"], edition=m["x"])
-        return d
-    m = re.match(r"^(?P<os>[A-Za-z][A-Za-z!_ /\-]*?)\s+(?P<v>\d[\w.\-+ ]*)$", t)  # os-prober: Ubuntu 24.04.1 LTS
-    if m:
-        d.update(os=m["os"], osver=m["v"])
-        return d
-    d["os"] = t
-    return d
-
-
-def kind_of(title, key, is_submenu=False):
-    if is_submenu and re.search(r"advanced options", title, re.I):
-        return "advanced"
-    if re.search(r"recovery|rescue", title, re.I):
-        return "rescue"
-    if key in ("windows10", "windows11", "firmware", "reboot", "shutdown"):
-        return "plain"
-    return "kernel"
-
-
-CONF_DEFAULTS = {
-    "RAW_NAME": "on",
-    "COUNTDOWN": "on",
-    "LOGO": "on",
-    "COOKIE": "on",
-    "HINTS": "on",
-    "STYLE": "rail",
-    "SCHEME": "dark",
-    "TIMEOUT": "",
-    "MODE": "dynamic",
-}
-CONF_CHOICES = {
-    "STYLE": ("rail", "clean", "list", "split", "full"),
-    "SCHEME": ("dark", "light"),
-    "MODE": ("dynamic", "snapshot"),
-}
-
-
-def load_conf(path=None):
-    """/etc/material-grub.conf: KEY=value lines, '#' comments. Unknown keys and bad values are ignored (never fatal in a boot-config path)."""
-    import os
-
-    c = dict(CONF_DEFAULTS)
-    path = path or os.environ.get("MATERIAL_CONF", "/etc/material-grub.conf")
-    try:
-        for line in Path(path).read_text().splitlines():
-            m = re.match(r"^\s*([A-Z_]+)\s*=\s*\"?([^\"#]*?)\"?\s*(?:#.*)?$", line)
-            if not m or m[1] not in c:
-                continue
-            k, v = m[1], m[2].strip()
-            if k == "TIMEOUT":
-                c[k] = v if v.isdigit() else ""
-            elif k in CONF_CHOICES:
-                c[k] = v.lower() if v.lower() in CONF_CHOICES[k] else c[k]
-            elif v.lower() in ("on", "off", "yes", "no", "true", "false", "1", "0"):
-                c[k] = "on" if v.lower() in ("on", "yes", "true", "1") else "off"
-    except OSError:
-        pass
-    return c
-
-
-def _conf_ok(key, value):
-    """Strict check for write_conf (load_conf is lenient on purpose; a writer must not store junk)."""
-    if key not in CONF_DEFAULTS:
-        return False
-    if key == "TIMEOUT":
-        return value == "" or value.isdigit()
-    if key in CONF_CHOICES:
-        return value in CONF_CHOICES[key]
-    return value in ("on", "off")
-
-
-def write_conf(path, updates):
-    """Set KEY=value in the conf file, atomically (temp file in the same directory, then rename).
-    Replaces the first active or commented-out sample line of a key (keeps the comments), else appends.
-    Raises ValueError for an unknown key or a bad value, before anything is written."""
-    import os
-    import tempfile
-
-    for k, v in updates.items():
-        if not _conf_ok(k, str(v)):
-            raise ValueError(f"bad config: {k}={v!r}")
-    path = Path(path)
-    try:
-        lines = path.read_text().splitlines()
-        mode = path.stat().st_mode & 0o7777
-    except OSError:
-        lines, mode = [], 0o644
-    for k, v in updates.items():
-        new = f"{k}={v}"
-        active = re.compile(rf"^\s*{k}\s*=")
-        sample = re.compile(rf"^#\s*{k}\s*=")
-        for rx in (active, sample):
-            hit = next((i for i, ln in enumerate(lines) if rx.match(ln)), None)
-            if hit is not None:
-                lines[hit] = new
-                break
-        else:
-            lines.append(new)
-    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".mgconf.")
-    try:
-        with os.fdopen(fd, "w") as f:
-            f.write("\n".join(lines) + "\n")
-        os.chmod(tmp, mode)
-        os.replace(tmp, str(path))
-    except BaseException:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-        raise
 
 
 def apply_conf_to_theme(text, conf):

@@ -232,14 +232,34 @@ def drive(keys, env_extra=None, size=(24, 80), cmd=None, extra=(), sticks=None):
                 except OSError:
                     return
 
+    def settle(limit, quiet=0.2):
+        # wait until the program has drawn and been quiet for `quiet` seconds: a fixed pause per key is too short on a busy runner (six suites at a time), and
+        # a key sent before the screen is ready is lost, which is what made these tests flaky
+        nonlocal buf
+        end, last = time.time() + limit, time.time()
+        while time.time() < end:
+            if time.time() - last >= quiet:
+                return
+            if select.select([fd], [], [], 0.05)[0]:
+                try:
+                    chunk = os.read(fd, 65536)
+                except OSError:
+                    return
+                buf += chunk
+                last = time.time()
+
     pump(0.8)
+    settle(5)
     for k in keys:
         os.write(fd, k)
         pump(0.25)
+        settle(5)
     pump(0.5)
     st = 0
     reaped = False
-    for _ in range(40 if cmd else 1):  # install.sh keeps running after the questions: wait for it to finish
+    for _ in range(
+        240 if cmd else 40
+    ):  # install.sh keeps running after the questions: wait for it to finish (a minute at most)
         try:
             p, status = os.waitpid(pid, os.WNOHANG)
         except ChildProcessError:
@@ -248,6 +268,9 @@ def drive(keys, env_extra=None, size=(24, 80), cmd=None, extra=(), sticks=None):
             st, reaped = status, True
             break
         pump(0.25)
+        time.sleep(
+            0.25
+        )  # pump returns at once once the pty is closed: without this the loop ends before the child has exited
     if reaped:
         return os.waitstatus_to_exitcode(st), buf.decode(errors="replace"), out
     if st == 0 and not out.exists():

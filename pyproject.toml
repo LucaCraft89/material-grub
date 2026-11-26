@@ -1,7 +1,7 @@
 [tool.ruff]
 line-length = 120
-target-version = "py38"
-extend-exclude = ["build", "dist", "vendor", "theme-*"]
+target-version = "py38"   # to be raised to py39 (the shared code needs it) in a change of its own: it reformats unrelated test files
+extend-exclude = ["build", "dist", "vendor", "theme-*", "material-boot-core"]   # the last one is the core checked out for CI, not ours
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]

@@ -33,6 +33,8 @@ git archive --prefix=material-grub-$(cat VERSION)/ -o material-grub-$(cat VERSIO
 
 ## Updates
 
+The scriptlets run the installer (`install.sh --from-package`), so a package install or upgrade gets the same detection and update steps as a source install: it notices an existing install (also one made from source, which it takes over), keeps the settings, backs up what it changes and records itself in `/var/lib/material-grub/state.json` (see [install.md](install.md#updating-and-existing-installs)).
+
 A plain `dnf upgrade`, `pacman -Syu` or `apt upgrade` installs the new sources and runs the same post-install step: backup of `grub.cfg` and
 `/etc/default/grub` in `/var/backups/material-grub`, theme rendered into a new directory and swapped in, classes applied, validation,
 rollback on failure. `/etc/material-grub.conf` is never overwritten. The repositories that serve the updates are set up by the maintainer

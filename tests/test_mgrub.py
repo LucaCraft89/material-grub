@@ -188,6 +188,26 @@ class Conf(unittest.TestCase):
         t = "# mg:begin logo\nY\n# mg:end logo\nb\n"
         self.assertEqual(mgrub.apply_conf_to_theme(t, c), "b\n", "COOKIE=off removes the logo block too")
 
+    def test_plymouth_keys(self):
+        import os
+        import tempfile
+
+        d = mgrub.load_conf("/nonexistent")
+        self.assertEqual((d["PLYMOUTH"], d["PLYMOUTH_BAR"], d["PLYMOUTH_MOTION"]), ("on", "indeterminate", "full"))
+        with tempfile.TemporaryDirectory() as t:
+            f = os.path.join(t, "c.conf")
+            open(f, "w").write("PLYMOUTH=no\nPLYMOUTH_BAR=Progress\nPLYMOUTH_MOTION=sideways\n")
+            c = mgrub.load_conf(f)
+            self.assertEqual((c["PLYMOUTH"], c["PLYMOUTH_BAR"], c["PLYMOUTH_MOTION"]), ("off", "progress", "full"))
+            mgrub.write_conf(f, {"PLYMOUTH_MOTION": "calm", "PLYMOUTH": "on"})
+            self.assertEqual(mgrub.load_conf(f)["PLYMOUTH_MOTION"], "calm")
+            for k, v in (("PLYMOUTH", "maybe"), ("PLYMOUTH_BAR", "wavy"), ("PLYMOUTH_MOTION", "")):
+                with self.assertRaises(ValueError):
+                    mgrub.write_conf(f, {k: v})
+        # a theme built without the part never changes because of these keys
+        t = "a\n# mg:begin raw\nX\n# mg:end raw\nb\n"
+        self.assertEqual(mgrub.apply_conf_to_theme(t, dict(d, PLYMOUTH="off")), mgrub.apply_conf_to_theme(t, d))
+
 
 class Catalog(unittest.TestCase):
     def test_catalog(self):

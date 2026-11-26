@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Material GRUB installer (the logic; install.sh is only a POSIX sh bootstrap that finds Python 3.8+ and runs this). stdlib only.
+"""Material GRUB installer (the logic; install.sh is only a POSIX sh bootstrap that finds Python 3.9+ and runs this). stdlib only.
 
 Same flags and steps as the shell installer it replaces: checks, questions (TUI), dependencies, build from source, install into GRUB or
 onto a Ventoy stick. The file copying into / is still done by install/install.sh (it also serves `--dest` staging and the packages).
@@ -20,9 +20,21 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent  # the repository root
 sys.path.insert(0, str(HERE / "install"))
 sys.path.insert(0, str(HERE / "install/bin"))
+import mgcore  # noqa: E402,F401  (puts material-boot-core on sys.path)
+import mgdetect  # noqa: E402
+import mgmigrate  # noqa: E402
 import mgrub  # noqa: E402
+import mgtheme  # noqa: E402
+from material_boot.events import (  # noqa: E402,F401  (the install log and the --progress json stream)
+    LineEvents,
+    Tee,
+    open_log,
+)
 
-MIN_RUNTIME = (3, 8)  # this installer and the installed tools
+MIN_RUNTIME = (3, 9)  # this installer and the installed tools (the shared code of material-boot-core needs 3.9)
+# Run by the unified installer (the GRUB part, install/part_grub.py): it has already shown the notice, applied the policy and asked, and it writes the state
+# record itself (with the core's version, which is not this program's), so this program only detects and does the work.
+UNIFIED = os.environ.get("MATERIAL_BOOT_UNIFIED") == "1"
 MIN_BUILD = (3, 9)  # the build venv: materialyoucolor has no Python 3.8 wheel
 PMS = ("dnf", "apt-get", "pacman", "zypper", "apk", "xbps-install")
 # package-manager commands that install the build and runtime dependencies (the same sets as the shell installer)
@@ -67,66 +79,6 @@ PYTHON_PACKAGES = {
     "xbps-install": ["python3"],
 }
 STYLES = ("rail", "clean", "list", "split", "full")
-
-
-class LineEvents:
-    """File-like stand-in for sys.stdout/sys.stderr in --progress json mode: every printed line becomes a 'log' event."""
-
-    def __init__(self, emit, level):
-        self.emit, self.level, self.buf = emit, level, ""
-
-    def write(self, text):
-        self.buf += text
-        *lines, self.buf = self.buf.split("\n")
-        for ln in lines:
-            if ln.strip():
-                self.emit("log", text=ln.rstrip(), level=self.level)
-        return len(text)
-
-    def flush(self):
-        if self.buf.strip():
-            self.emit("log", text=self.buf.rstrip(), level=self.level)
-        self.buf = ""
-
-    def isatty(self):
-        return False
-
-
-class Tee:
-    """Copies everything printed to the terminal into the install log too (colour codes stripped)."""
-
-    def __init__(self, real, logf):
-        self.real, self.logf, self.buf = real, logf, ""
-
-    def write(self, text):
-        self.real.write(text)
-        self.buf += text.replace("\r", "\n")
-        *lines, self.buf = self.buf.split("\n")
-        for ln in lines:
-            ln = re.sub(r"\x1b\[[0-9;]*m", "", ln).rstrip()
-            if ln.strip():
-                self.logf.write(time.strftime("%F %T ") + ln + "\n")
-        self.logf.flush()
-        return len(text)
-
-    def flush(self):
-        self.real.flush()
-
-    def __getattr__(self, name):
-        return getattr(self.real, name)
-
-
-def open_log():
-    """The persistent install log: $MG_INSTALL_LOG, else /var/log/material-grub/install.log. None when it cannot be written
-    (no root, read-only /var): logging is never a reason to fail an install."""
-    path = Path(os.environ.get("MG_INSTALL_LOG", "/var/log/material-grub/install.log"))
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists() and path.stat().st_size > 1_000_000:  # keep one old log, the file never grows without bound
-            os.replace(path, str(path) + ".1")
-        return open(path, "a", errors="replace")
-    except OSError:
-        return None
 
 
 class Installer:
@@ -174,6 +126,7 @@ class Installer:
         self.pm = ""
         self.build_dir = None
         self.runtime_py = "python3"
+        self.found = None  # mgdetect.Finding of an install that was already there (set by existing_install)
         self.json = False  # --progress json: one JSON object per line on stdout (for the GUI)
         self.out = sys.stdout
         self.logf = None
@@ -427,7 +380,97 @@ class Installer:
     def py_has(self, py, module):
         return subprocess.run([py, "-c", f"import {module}"], capture_output=True).returncode == 0
 
+    # ------------------------------------------------------------ an install that is already there
+    def existing_install(self, root=""):
+        """Detect an install that is already here (`root` is only for tests), say what was found, refuse what must not happen (a downgrade, a source install over a
+        package's files) and, in a terminal, ask before updating. Packages and --yes go on without asking; the notice is in the install log either way."""
+        target = VERSION_TEXT()
+        how = "package" if self.from_package else "source"
+        f = self.found = mgdetect.detect(root, target)
+        if f.kind == "none" or UNIFIED:
+            return f
+        lines = mgdetect.notice(f, target)
+        if mgdetect.adopting(f, how):
+            lines.append("This package takes over the files of that install; your settings are kept.")
+        ctx = mgmigrate.context(root)
+        todo = mgmigrate.plan(ctx, mgmigrate.steps_for(f.version, target))
+        for _st, what in todo:
+            lines += [f"Will change in your files: {w}" for w in what]
+        if todo:
+            lines.append(
+                "A copy of every file that is changed is kept in "
+                + str(mgmigrate.backup_dir(root, f.version, target))
+                + "."
+            )
+        if self.json:  # one structured event (its `msg` is the headline, so a plain log view shows it), the rest as ordinary info lines
+            self.emit("existing_install", found=f.as_dict(), notice=lines, msg=lines[0])
+            for ln in lines[1:]:
+                self.info(ln)
+        else:
+            print(f"\n{self.B}An existing install was found{self.Z}")
+            for ln in lines:
+                print(f"      {ln}")
+        ok, msg = mgdetect.policy(f, target, how, self.force)
+        if not ok:
+            self.die(msg)
+        interactive = not (self.tuimode == "no" or self.yes or not (sys.stdin.isatty() and sys.stdout.isatty()))
+        if interactive and not self.dry:
+            try:
+                answer = input("      Continue? [Y/n] ").strip().lower()
+            except EOFError:
+                answer = ""
+            if answer in ("n", "no"):
+                print("      Nothing was changed.")
+                sys.exit(0)
+        return f
+
+    def after_install(self, root=""):
+        """After the files are in: run the migration steps (the user's files are backed up first and restored if a step fails) and write the state record.
+        Never fails the install: the theme itself is already in place."""
+        target = VERSION_TEXT()
+        f = self.found
+        before = f.version if f is not None and f.kind != "none" else None
+        try:
+            ctx = mgmigrate.context(root, mgmigrate.backup_dir(root, before, target))
+            for st, status, detail in mgmigrate.run(ctx, mgmigrate.steps_for(before, target), emit=self.info):
+                if status == "done":
+                    self.ok(f"{st.title}")
+                elif status == "failed":
+                    self.warn(f"update step '{st.id}' failed: {detail}")
+            now = mgdetect.detect(root, target)
+            how = "immutable" if self.imm else "source"
+            if self.from_package:
+                how = mgdetect.owner_of(Path(root or "/") / mgdetect.FILES["package"])
+                how = how if how.startswith("package:") else "package:unknown"
+            if UNIFIED:  # the unified installer records the part (with the core's version at the top and its own history): only what it does not know of is added
+                if (Path(root or "/") / "usr/share/material-grub-gui").is_dir():
+                    st = mgdetect.read(root) or {"state": mgdetect.STATE_VERSION, "parts": {}}
+                    st.setdefault("parts", {})["gui"] = target
+                    mgdetect.write(root, st)
+                return
+            parts = {"core": target, "grub": target}
+            if (Path(root or "/") / "usr/share/material-grub-gui").is_dir():
+                parts["gui"] = target
+            for k, v in now.parts.items():
+                if k not in ("core", "grub", "gui"):
+                    parts[k] = v
+            mgdetect.record(root, target, how, "immutable" if self.imm else "normal", parts, previous=before)
+        except Exception as e:  # a record or a migration problem is a warning, never a failed install
+            self.warn(f"could not finish the update bookkeeping ({type(e).__name__}: {e}); the theme is installed")
+
     # ------------------------------------------------------------ steps
+    def check_core(self):
+        """The installed tools import material-boot-core from its place on the system (/usr/share/material-boot/lib), never from a checkout. A real install
+        without it would leave a material-grub that cannot start, so it is refused here, before anything is touched. The build-only modes need nothing."""
+        if self.ventoy or self.stage or self.preview or self.dry or self.uninstall:
+            return
+        if mgcore.system() is None:
+            self.die(
+                "material-boot-core is not installed on this system. Material GRUB shares its code with the other Material Boot parts, and the installed "
+                "tools look for it in /usr/share/material-boot/lib. Install the package `material-boot-core` (or run the installer from the Material Boot "
+                "bundle, which installs it first), then run this again."
+            )
+
     def check_system(self):
         print(f"\n{self.B}Material GRUB installer{self.Z}")
         self.step("Checking the system")
@@ -814,16 +857,26 @@ class Installer:
             self.die("several resolutions (--res A,B) are only supported with --ventoy")
         out = []
         for r in self.res.split(","):
-            try:
+            if (
+                r == "basic"
+            ):  # the theme that fits any screen: no size to build for (the bundle of 1080p supplies its fonts)
+                s = "1920x1080"
+            elif mgtheme.parse_mode(r) is None:
+                self.die(f"Bad resolution '{r}' (expected WxH, for example 1366x768, or `basic`).")
+            else:
                 s = mgrub.snap(r)
-            except ValueError:
-                self.die(f"Bad resolution '{self.res}' (expected WxH).")
             if s not in out:
                 out.append(s)
         self.build_res = ",".join(out)
-        if self.build_res != self.res:
-            self.info(f"{self.res} is not a built-in size: using the {self.build_res} theme")
-        self.info(f"supported: {' '.join(mgrub.RESOLUTIONS)} (others snap to the closest aspect ratio)")
+        if self.res == "basic":
+            self.info("the basic theme will be used: a plain list that fits any screen size")
+        elif self.build_res != self.res:
+            self.info(
+                f"{self.res}: a theme is written for exactly that size (pictures and fonts of the {self.build_res} bundle)"
+            )
+        self.info(
+            f"built-in sizes: {' '.join(mgrub.RESOLUTIONS)} (any other WxH gets a theme written for exactly that size)"
+        )
 
     # ------------------------------------------------------------ build
     def build(self):
@@ -943,7 +996,7 @@ class Installer:
 
     # ------------------------------------------------------------ install
     def prepare_runtime_python(self):
-        """The interpreter the installed hooks will use: python3 when it is 3.8+ with Pillow, else this one, else a venv with Pillow."""
+        """The interpreter the installed hooks will use: python3 when it is 3.9+ with Pillow, else this one, else a venv with Pillow."""
         p3 = shutil.which("python3")
         v = self.py_version(p3) if p3 else None
         if v and v >= MIN_RUNTIME and self.py_has(p3, "PIL"):
@@ -1021,7 +1074,7 @@ class Installer:
                     "--pkg",
                     self.dist,
                     "--res",
-                    self.build_res,
+                    self.res,  # the sizes asked for (or detected), not the built-in ones they snap to: the tool writes a theme for exactly each
                 ]
             )
             if r.returncode != 0:
@@ -1080,6 +1133,8 @@ class Installer:
     def grub_install(self):
         self.write_seed()
         step_cmd = ["sh", HERE / "install/install.sh", "--res", self.res, "--pkg", self.dist]
+        if self.from_package:
+            step_cmd.append("--no-register")  # the package ships and owns the part's manifest
         if self.imm:
             step_cmd.append("--immutable")
         self.step("Installing into GRUB")
@@ -1090,6 +1145,7 @@ class Installer:
         r = self.run(step_cmd + self.confset_args())
         if r.returncode != 0:
             sys.exit(r.returncode)
+        self.after_install()
         self.step("Finished")
         print(f"      {self.G}Material GRUB is installed.{self.Z} Total time: {self.elapsed()}\n")
         print("      Reboot to see it. The theme re-applies itself when kernels or boot entries change.")
@@ -1151,6 +1207,9 @@ class Installer:
 
     def run_all(self):
         self.check_system()
+        self.check_core()
+        if not (self.ventoy or self.stage or self.preview):
+            self.existing_install()
         self.questions()
         self.immutable_notice()
         self.environment_info()

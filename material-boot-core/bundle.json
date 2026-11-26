@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "comment": "The parts one bundle carries, pinned. `ref` is a tag for a release (scripts/build_bundle.py --release refuses anything else); the branches below are for development builds until the three repositories are tagged. Each part's repository keeps its manifest in material-boot-part.json at its root.",
+  "parts": {
+    "grub": {"repo": "LucaCraft89/material-grub", "ref": "release/0.8.0"},
+    "plymouth": {"repo": "LucaCraft89/material-plymouth", "ref": "main"}
+  }
+}

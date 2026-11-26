@@ -28,6 +28,6 @@ whole scene. Selection changes swap the scene, which gives the whole-screen colo
 | Countdown / raw-name text coloured per entry | Colours in `theme.txt` are global, so they are neutral. |
 | Peeking neighbour entries | `boot_menu` only draws whole items. |
 | Reading the UEFI logo live at boot | GRUB has no BGRT reader; it is converted whenever the config is regenerated. |
-| One `theme.txt` for every resolution | Sizes are in pixels; a bundle per resolution is generated, GRUB scales the scenes. |
+| One `theme.txt` for every resolution | Sizes are in pixels; a `theme.txt` is written at config time for the exact screen size (`install/bin/mgtheme.py`, positions relative to the centre), with the pictures of the closest bundle. |
 
 

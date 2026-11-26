@@ -1,0 +1,37 @@
+{
+  "manifest": 2,
+  "name": "grub",
+  "title": "Material GRUB theme",
+  "version": "0.7.1",
+  "summary": "Material You boot menu theme for GRUB",
+  "core_api": 2,
+  "core_min": "1.0.0",
+  "entry": "install/part_grub.py",
+  "commands": {
+    "apply": "render the theme again and install it (after a change of scheme, style or seed)",
+    "doctor": "check the install and say what is wrong",
+    "preview": "render the menu to a picture without installing",
+    "ventoy": "put the theme on a Ventoy stick"
+  },
+  "menu": [["Apply the GRUB theme", "Render the theme again and install it", ["grub", "apply"]]],
+  "conf": ["STYLE", "COOKIE", "LOGO", "HINTS", "SCHEME"],
+  "install": {
+    "default": true,
+    "needs": [],
+    "package": "material-grub",
+    "layouts": ["normal", "immutable"],
+    "options": [
+      {"name": "res", "takes": "value", "summary": "resolution WxH (default: detected)"},
+      {"name": "mode", "takes": "value", "summary": "Ventoy stick mode: dynamic or snapshot"},
+      {"name": "ventoy", "takes": "value", "summary": "install on the Ventoy stick mounted at this path"},
+      {"name": "stage-only", "takes": "flag", "summary": "build the theme and stop before GRUB is touched"},
+      {"name": "pkg", "takes": "value", "summary": "install an already built theme directory"},
+      {"name": "dist-out", "takes": "value", "summary": "copy the built theme to this directory (with stage-only)"},
+      {"name": "immutable", "takes": "flag", "summary": "use the immutable-system layout"},
+      {"name": "with-gui", "takes": "flag", "summary": "also install the graphical editor"},
+      {"name": "no-deps", "takes": "flag", "summary": "do not install build dependencies"},
+      {"name": "keep-build", "takes": "flag", "summary": "keep the temporary build directory"}
+    ]
+  },
+  "hooks": ["detect", "plan", "install", "uninstall", "verify", "doctor"]
+}

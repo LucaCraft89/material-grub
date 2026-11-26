@@ -113,9 +113,6 @@ if __name__ == "__main__":
     (PKG / "scheme.txt").write_text(B.R.SCHEME + "\n")
     (PKG / "palettes.json").write_text(json.dumps({k: v for k, v in B.R.PAL.items()}))
     shutil.copytree(ROOT / "install/bin", PKG / "bin", ignore=shutil.ignore_patterns("__pycache__"))
-    shutil.copytree(
-        ROOT / "vendor/materialyoucolor", PKG / "bin/materialyoucolor", ignore=shutil.ignore_patterns("__pycache__")
-    )  # pure-Python colour science for mgpalette.py
     shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
     shutil.copy(
         ROOT / "install/ventoy_sticks.py", PKG / "bin/ventoy_sticks.py"

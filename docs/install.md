@@ -47,10 +47,31 @@ sudo ./install.sh --uninstall       # remove the theme and hooks
 
 The installer always builds the theme from source (there are no prebuilt downloads); `--pkg DIR` installs a package you built elsewhere, which is how immutable hosts without build tools work.
 
+## Requirement: material-boot-core
+
+Material GRUB shares its code with the other Material Boot parts through **material-boot-core**: the colour palettes, the scene renderer, the settings, overrides and presets, the state record and the migrations. The installed tools import it from `/usr/share/material-boot/lib` and **refuse to start without it**, with a message that says what to install. A real install (`sudo ./install.sh`) checks for it first, before touching anything; `--dry-run`, `--preview`, `--stage-only`, Ventoy sticks and `--uninstall` do not need it on the system.
+
+- **Packages:** `material-boot-core` is its own package (rpm, deb, Arch). Material GRUB's packages will require it once both are released.
+- **Source, today:** install the core from its repository first (it is a few commands: lay its files out like its package does, then build its shared data):
+
+  ```sh
+  git clone https://github.com/LucaCraft89/material-boot-core.git
+  sudo sh material-boot-core/packaging/common/install-tree.sh material-boot-core /     # lays the core out like its package does
+  sudo material-boot core install --from-package --only core --yes                      # builds its shared data on this machine
+  ```
+
+- **The bundle** (one tarball with the core and the parts, `install.sh` at its root) installs the core first, then whichever parts you choose.
+- **From a checkout** (development, CI): put `material-boot-core` next to the `material-grub` directory or inside it, or set `MATERIAL_LIB` to the directory that holds `material_boot/`. The tools run from the checkout find it; an installed system does not use that, it looks in `/usr/share/material-boot/lib`.
+- **Python 3.9 or newer** is needed (the shared code needs it); the installer finds one or installs it, as before.
+- Immutable systems (ostree, bootc) do not have a place for the core yet; that layout is not designed. Until it is, do not take this version for them.
+
 ## Supported resolutions
 
 `1280x720`, `1920x1080`, `1920x1200`, `2560x1080`, `2560x1440`, `2880x1800`, `3440x1440`, `3840x1080`, `3840x1600`, `3840x2160`, `5120x1440`, `5120x2160`.
-Anything else snaps to the closest aspect ratio. The scene sets are 16:9, 16:10, 21:9 and 32:9; screens at least 1800 px high use a 2160-high set
+Any other `WxH` (for example `1366x768` or `1600x900`) gets a theme written for exactly that size, using the fonts and pictures of the closest built-in
+size, and every position in it is relative to the centre of the screen: if the firmware picks a near-by mode the theme stays together in the middle
+instead of sitting in a corner. 4:3 and 5:4 screens use the 16:10 scenes (squeezed). When no usable mode is known (`GRUB_GFXMODE=keep`, a typo) the
+**basic theme** is used: a plain list and countdown that fits any screen. `--res basic` asks for it. The scene sets are 16:9, 16:10, 21:9 and 32:9; screens at least 1800 px high use a 2160-high set
 (four times the pixels, about 20 MB per set). The installer builds only the set for the resolution it detects (or `--res`), so after
 switching monitors or `GRUB_GFXMODE`, run `sudo ./install.sh --res WxH` again.
 
@@ -83,3 +104,15 @@ files are never edited. Systems without `blscfg` (Debian, Ubuntu, Arch: classic 
 
 
 Immutable systems (Silverblue, Bazzite, ...): [immutable.md](immutable.md). Ventoy sticks: [ventoy.md](ventoy.md). Diagnosing problems: `sudo material-grub doctor`.
+
+## Updating and existing installs
+
+The installer and the packages always check for an install that is already there (the same check as `material-grub doctor`):
+
+- **A notice first.** For example: *Found Material GRUB 0.7.1, a source install: style list, scheme dark, 3 customised entries, GUI installed. This will update it to 1.0.0. Your settings are kept.* In a terminal it asks `Continue? [Y/n]`; `--yes`, scripts, `--progress json` (an `existing_install` event) and the packages' scriptlets go on without asking and write the notice to `/var/log/material-grub/install.log`. `--dry-run` prints the notice and the changes it would make.
+- **Your settings are kept:** `/etc/material-grub.conf`, `/etc/material-grub/` (overrides, icons, presets). An update only adds what is new (new options appear in the conf as commented samples); a file it changes is copied first to `/var/backups/material-grub/upgrade-<from>-to-<to>-<time>/`, and put back if that step fails.
+- **A record of what is installed:** `/var/lib/material-grub/state.json` (the parts and their versions, and how it was installed: package, source or immutable). Installs from before it existed are recognised by their files and get a record at their next install or update.
+- **What it refuses:** installing an *older* version over a newer one (newer options and presets may not be understood; `--force` overrides), and a *source* install over files a package owns (it would fight your package manager; update the package instead, `--force` overrides). A *package* installed over a source install takes it over and keeps your settings.
+- **Pieces that are missing** (a hook, the path unit, the theme) are named in the notice and put back by the install.
+- **Ventoy sticks** cannot be touched while they are unplugged: run `material-grub ventoy` again with the stick plugged in after an update.
+
