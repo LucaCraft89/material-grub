@@ -3,6 +3,7 @@
 Needs: dist/material-grub (scripts/package.py; its scheme decides dark or light), qemu-system-x86_64, OVMF, mtools, genisoimage, Pillow, network once (Ventoy download, see tests/ventoy_smoke.py).
 usage: scripts/make_ventoy_screenshots.py [--extras]  -> docs/screenshots/ventoy/<style>-<scheme>-<n>.png (two per style); --extras also writes the F5 tools menu, the F3 tree view and the boot-mode menu (dark only)"""
 
+import os
 import shutil
 import socket
 import subprocess
@@ -10,6 +11,10 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+# Documentation screenshots must not carry the logo of whatever machine they were made on (the cookie showed a Dell logo): with no firmware logo the theme
+# draws the Linux penguin, the same everywhere. A maintainer who wants a real logo in a one-off picture sets MG_BGRT_IMAGE to it.
+os.environ.setdefault("MG_BGRT_IMAGE", "/nonexistent/bgrt")
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tests"))
