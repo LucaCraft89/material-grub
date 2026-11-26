@@ -103,6 +103,33 @@ jobs:
         if: always()
         with: {name: "boot-${{ matrix.scheme }}-${{ matrix.style }}", path: build/ci-shots/}
 
+  unified-boot:
+    # What the UNIFIED installer installs, booted: a bundle of this checkout and the core is built, `material-boot core install` runs from it in this Fedora
+    # container (a fake /boot with BLS entries and a few static ones), the grub.cfg it wrote and the theme it installed are put on a virtual ESP and booted in
+    # QEMU + OVMF with real GRUB: the screen must be the size asked for, the theme drawn (not the basic fallback), the picture must follow the selection.
+    # (The jobs above boot the theme the package tools assemble; this one boots the installer's own files.) Software emulation, so long waits.
+    name: Boot what the unified installer installed (QEMU)
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:latest
+    steps:
+      - run: dnf install -y qemu-system-x86-core edk2-ovmf grub2-tools grub2-tools-extra grub2-efi-x64-modules librsvg2-tools python3-pillow python3-pip git
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4     # material-boot-core: builds the bundle and is what the installer installs
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
+      - run: git config --global --add safe.directory "$PWD" && git config --global --add safe.directory "$PWD/material-boot-core"
+      - name: Build a bundle of this checkout and the core
+        run: |
+          printf '{"format": 1, "parts": {"grub": {"repo": "LucaCraft89/material-grub", "ref": "x"}}}' > build-bundle.json
+          python3 material-boot-core/scripts/build_bundle.py --out build/bundle --config build-bundle.json --part grub=.
+      - name: Install through the unified installer and export what would be booted
+        run: |
+          mkdir -p build/out
+          BUNDLE="$PWD/build/bundle/material-boot-$(cat material-boot-core/VERSION)" SRC="$PWD" OUT="$PWD/build/out" sh tests/containers/installed_tree.sh
+      - run: BOOT_WAIT=90 KEY_WAIT=4 python3 tests/boot_installed.py build/out/tree 1920x1080
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: "unified-boot", path: build/installed-shots/}
+
   resolution:
     # A screen with no built-in size (1360x768): the theme must fill it, stay centred when the firmware picks a near-by mode, and fall back to the basic theme.
     name: Boot on an awkward screen size
