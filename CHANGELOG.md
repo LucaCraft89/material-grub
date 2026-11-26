@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+Groundwork for optional parts from other packages (the first is the Plymouth boot splash, in its own repository). Nothing changes without one.
+
+**New**
+- **Optional parts (plugins):** another package can install one manifest and add a sub-command (`material-grub plymouth ...`), a menu entry and a line in `help`, `version` and `doctor`; a part that is missing, broken or written for another plugin API is reported, never fatal. See `docs/plugins.md`.
+- **Updates know about existing installs:** the installer and the packages detect an install that is already there (and how it was made), show a notice before changing anything, keep the settings, back up the files an update changes (restored if a step fails), refuse a downgrade and a source install over a package's files (`--force` overrides), and record what is installed in `/var/lib/material-grub/state.json`. `material-grub doctor` shows the same detection. See `docs/install.md`.
+- Runtime options `PLYMOUTH`, `PLYMOUTH_BAR` and `PLYMOUTH_MOTION` in `/etc/material-grub.conf` (validated, kept in presets); they do nothing until the Plymouth part is installed.
+
+**Changed**
+- **Material GRUB now uses material-boot-core** for the code it shares with the other Material Boot parts: the palettes, the scene renderer, the conf, overrides and presets, the state record and the migrations moved there (about 2,000 lines fewer here; the old module names stay and point at the core). **The core is a requirement**: the installed tools import it from `/usr/share/material-boot/lib` and say what to install when it is missing; `sudo ./install.sh` checks for it before it touches anything. See `docs/install.md`.
+- **Python 3.9 or newer is needed** (it was documented as 3.8, but the colour library the tools import never worked on 3.8). `install.sh` looks for 3.9+.
+- The package no longer carries its own copy of the colour library (the core has it).
+
 **Fixed**
 - **Documentation screenshots showed a Dell logo in the cookie.** `make_screenshots.py` and `make_ventoy_screenshots.py` built the theme on the maintainer's own machine and so baked in its firmware logo. They now pin the no-logo case (the Linux penguin, the same everywhere); set `MG_BGRT_IMAGE` to make a one-off picture with a real logo. The pictures already committed under `docs/screenshots/` still have it until they are regenerated.
 - **The theme filled only a corner of the screen, with gray edges at the bottom and right** (seen on a 1366x768 laptop). Every size that was not a built-in one was snapped to the nearest bundle (1366x768 -> 1280x720), so the theme was drawn for 1280x720 on a bigger screen, in pixels. Now a theme is written for exactly the screen size (the fonts and pictures of the closest bundle, a `theme.txt` for the real width and height) and every position is relative to the centre of the screen, so a firmware that picks a near-by mode (1360x768 for 1366x768) gets a centred theme, not one in a corner. GRUB is asked for `WxH,auto`, so it still has a fallback mode.

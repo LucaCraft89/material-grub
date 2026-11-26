@@ -13,6 +13,7 @@
     material-grub update [--check]    version and how to update
     material-grub uninstall           remove Material GRUB (root)
     material-grub version | help
+    material-grub <part> ...          an optional part from another package, when it is installed (material-grub plymouth ...; docs/plugins.md)
 
 Commands that write system files ask for root themselves (through sudo, when you are in a terminal).
 """
@@ -23,6 +24,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -31,6 +33,7 @@ sys.path.insert(
 )  # a checkout keeps ventoy_sticks.py in install/; the installed package has it in bin/
 
 import mgoverrides  # noqa: E402
+import mgplugins  # noqa: E402
 import mgrub  # noqa: E402
 import mgseeds  # noqa: E402
 
@@ -413,14 +416,61 @@ def c_uninstall(argv):
     return run(["sh", script])
 
 
+def core():
+    """What an optional part (a plugin) gets to work with: the plugin API version and the helpers of this command. See docs/plugins.md."""
+    return SimpleNamespace(
+        api=mgplugins.CORE_API,
+        version=version(),
+        pkg=PKG,
+        say=say,
+        run=run,
+        elevate=elevate,
+        conf_path=lambda: os.environ.get("MATERIAL_CONF", "/etc/material-grub.conf"),
+        state_dir=lambda: Path(os.environ.get("MATERIAL_STATE_DIR", "/var/lib/material-grub")),
+        lib=Path(sys.modules["material_boot"].__file__)
+        .resolve()
+        .parent.parent,  # the core that is running, and the data it is to use (this package's: one scheme)
+        data=PKG,
+    )
+
+
+# optional parts that are known by name, so that asking for one that is not installed gets an answer instead of "unknown command"
+KNOWN_PARTS = {"plymouth": ("the Plymouth boot splash", "material-plymouth")}
+
+
 def c_version(argv):
     say(f"material-grub {version()}")
+    for p in mgplugins.usable(COMMANDS):
+        say(f"{p.name} {p.version}")
     return 0
 
 
 def c_help(argv):
     say("\n".join((__doc__ or "").strip("\n").split("\n")[1:]).split("Commands that write")[0].strip("\n"))
+    found = mgplugins.discover(COMMANDS)
+    if found:
+        say("\nOptional parts installed:")
+        for p in found:
+            say(
+                f"  material-grub {p.name:<10}{p.title}"
+                + (f": {p.summary}" if p.summary else "")
+                + (f"  [{p.problem}]" if p.problem else "")
+            )
     return 0
+
+
+def c_part(name, argv):
+    """`material-grub <name> ...` for an optional part: run its plugin, or say why it cannot be run."""
+    p = mgplugins.find(name, COMMANDS)
+    if p is None:
+        title, pkg = KNOWN_PARTS[name]
+        say(f"material-grub: {title} is an optional part and it is not installed (package: {pkg}).")
+        say("It adds the `material-grub " + name + "` commands; nothing else changes without it.")
+        return 1
+    if p.problem:
+        say(f"material-grub: cannot use '{name}': {p.problem}")
+        return 1
+    return mgplugins.run(p, argv, core())
 
 
 COMMANDS = {
@@ -540,20 +590,26 @@ def sub_conf():
     return ["conf", r] if "=" in r else None
 
 
+def menu_items():
+    """The menu: the built-in entries, then those of the installed optional parts, then Quit."""
+    return MENU[:-1] + [m for p in mgplugins.usable(COMMANDS) for m in p.menu] + MENU[-1:]
+
+
 def menu():
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         return c_help([])
+    items = menu_items()
     title = f"Material GRUB {version()}"
     use_curses = os.environ.get("TERM", "dumb") not in ("dumb", "")
     while True:
         try:
-            i = pick(MENU, title) if use_curses else pick_plain(MENU, title)
+            i = pick(items, title) if use_curses else pick_plain(items, title)
         except Exception:  # no usable curses: fall back to prompts
             use_curses = False
             continue
-        if i is None or MENU[i][2] is None:
+        if i is None or items[i][2] is None:
             return 0
-        args = MENU[i][2]
+        args = items[i][2]
         if args[0] == "@colour":
             args = sub_colour()
         elif args[0] == "@presets":
@@ -579,6 +635,8 @@ def main(argv=None):
     if cmd in ("-V", "--version"):
         return c_version(rest)
     fn = COMMANDS.get(cmd)
+    if fn is None and (cmd in KNOWN_PARTS or mgplugins.find(cmd, COMMANDS)):
+        return c_part(cmd, rest)
     if fn is None:
         say(f"material-grub: unknown command '{cmd}'\n")
         c_help([])

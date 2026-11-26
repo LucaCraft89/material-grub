@@ -16,6 +16,7 @@ One command for everything. Run it alone for a menu (a terminal UI; arrows and E
 | `material-grub ventoy [STICK] [options]` | theme a Ventoy stick; without `STICK` the mounted one is found ([ventoy.md](ventoy.md)) |
 | `material-grub update [--check]` | the installed version, a look at GitHub when you ask, and how to update |
 | `sudo material-grub uninstall` | remove Material GRUB (your settings in `/etc` stay) |
-| `material-grub version`, `help` | |
+| `material-grub <part> ...` | an optional part from another package when it is installed, for example `material-grub plymouth ...` ([plugins.md](plugins.md)); without it the command says so |
+| `material-grub version`, `help` | `version` also lists the installed parts |
 
 Commands that write system files ask for root themselves: in a terminal they re-run through `sudo` (your password or fingerprint), otherwise they tell you to run `sudo material-grub ...`. It is the only command that is installed: `apply`, `gui` and the rest are subcommands (since 0.7.1; earlier versions also installed `material-grub-apply` and `material-grub-gui`, which an update removes).

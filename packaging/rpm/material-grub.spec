@@ -8,6 +8,7 @@ License:        MIT
 URL:            https://github.com/LucaCraft89/material-grub
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 BuildArch:      noarch
+Requires:       material-boot-core >= 1.0.0
 Requires:       grub2-tools
 Requires:       grub2-tools-extra
 Requires:       librsvg2-tools
@@ -44,7 +45,8 @@ sh packaging/common/install-gui-tree.sh . %{buildroot}
 :
 
 %posttrans
-/usr/share/material-grub-src/install.sh --from-package || :
+if command -v material-boot >/dev/null 2>&1; then material-boot core install --from-package --only grub --yes || :
+else /usr/share/material-grub-src/install.sh --from-package || :; fi
 
 %preun
 if [ $1 -eq 0 ]; then sh /usr/share/material-grub-src/install/uninstall.sh || :; fi
@@ -54,6 +56,7 @@ if [ $1 -eq 0 ]; then sh /usr/share/material-grub-src/install/uninstall.sh || :;
 %doc README.md
 %config(noreplace) %{_sysconfdir}/material-grub.conf
 %{_datadir}/material-grub-src
+%{_datadir}/material-boot/plugins.d/grub.json
 
 %files gui
 %{_datadir}/material-grub-gui

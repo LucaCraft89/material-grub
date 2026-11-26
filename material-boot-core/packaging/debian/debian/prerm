@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+case "$1" in
+  remove) /usr/bin/material-boot core install --from-package --uninstall --only core --yes || true ;;
+esac
+#DEBHELPER#
+exit 0

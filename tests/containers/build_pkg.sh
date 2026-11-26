@@ -5,7 +5,7 @@ set -e
 fmt=$1
 V=$(cat /src/VERSION)
 W=/tmp/build; rm -rf $W; mkdir -p $W
-tar -C /src --exclude=./dist --exclude=./build --exclude=./.git --exclude='__pycache__' --transform "s,^\.,material-grub-$V," -czf $W/material-grub-$V.tar.gz .
+tar -C /src --exclude=./dist --exclude=./build --exclude=./.git --exclude=./material-boot-core --exclude=./old --exclude='__pycache__' --transform "s,^\.,material-grub-$V," -czf $W/material-grub-$V.tar.gz .
 cd $W
 case $fmt in
   rpm)
