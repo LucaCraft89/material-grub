@@ -311,6 +311,34 @@ jobs:
           docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/old:/old:ro" -v "$PWD/build/pkg:/pkg:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/upgrade_smoke.sh ${{ matrix.fmt }}
       - run: cat build/out/upgrade-${{ matrix.fmt }}.txt; grep -q "^ALL OK" build/out/upgrade-${{ matrix.fmt }}.txt
 
+  release-bump:
+    # A REAL version bump, through the package manager's ordinary upgrade (no --replacepkgs, no --reinstall): 1.0.0 is installed with the core, the person makes
+    # settings, then 1.0.1 (this checkout with scripts/bump_version.py 1.0.1 applied) is installed over it. Settings, record, manifest and commands must follow.
+    name: A real version bump 1.0.0 to 1.0.1 (${{ matrix.fmt }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {fmt: rpm,  image: "registry.fedoraproject.org/fedora:latest"}
+          - {fmt: deb,  image: "docker.io/library/debian:stable"}
+          - {fmt: arch, image: "docker.io/library/archlinux:latest"}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with: {repository: LucaCraft89/material-boot-core, ref: "${{ vars.MATERIAL_CORE_REF || 'main' }}", path: material-boot-core}
+      - name: The next version, a copy of this checkout with the version bumped
+        run: |
+          mkdir next && git archive HEAD | tar -x -C next
+          python3 next/scripts/bump_version.py 1.0.1
+      - run: |
+          mkdir -p build/old build/pkg build/out
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/old:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
+          docker run --rm -v "$PWD/next:/src:ro" -v "$PWD/build/pkg:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
+          docker run --rm -v "$PWD/material-boot-core:/src:ro" -v "$PWD/build/pkg:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/old:/old:ro" -v "$PWD/build/pkg:/pkg:ro" -v "$PWD/build/out:/out" "${{ matrix.image }}" sh /src/tests/containers/release_bump_smoke.sh ${{ matrix.fmt }}
+      - run: cat build/out/bump-${{ matrix.fmt }}.txt; grep -q "^ALL OK" build/out/bump-${{ matrix.fmt }}.txt
+
   ventoy:
     # Real Ventoy 1.1.18 (downloaded, sha256 checked) booted in QEMU/OVMF with the theme installed; ISOs are then added, renamed and removed WITHOUT running the installer again.
     # Software emulation on the runner, so the script waits 4x longer.
