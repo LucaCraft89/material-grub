@@ -1,34 +1,17 @@
 # Optional parts (plugins)
 
-Some parts of Material GRUB live in their own packages and repositories. The first is [material-plymouth](https://github.com/LucaCraft89/material-plymouth), the boot splash that continues this theme. A part is **never required and never installed by this package**: without it nothing changes, and `material-grub` behaves exactly as before.
+Material GRUB is one **part** of Material Boot, next to [material-plymouth](https://github.com/LucaCraft89/material-plymouth) (the boot splash that continues this theme) and whatever comes next. The parts share [material-boot-core](https://github.com/LucaCraft89/material-boot-core): the palettes, the scene renderer, the settings, the overrides, the presets, the state record, the installer and the plugin loader.
 
-When a part is installed it adds a sub-command (`material-grub plymouth ...`), a line in `material-grub help`, `version` and `doctor`, and entries in the menu. A part that is not installed has none of these; asking for a known part that is missing says so and exits with status 1.
+When a part is installed it adds a sub-command (`material-boot plymouth ...`, and `material-grub plymouth ...` through this command), a line in `help`, `version` and `doctor`, and entries in the menu. A part that is not installed has none of them.
 
-## The contract (plugin API 1)
+**The contract is the core's: plugin API 2.** It is documented once, where the code is: [material-boot-core/docs/plugins.md](https://github.com/LucaCraft89/material-boot-core/blob/main/docs/plugins.md) (the manifest, the hooks `detect`, `plan`, `install`, `verify`, `uninstall`, `migrate`, `doctor`, the `core` object and the context a hook gets) and [docs/installer.md](https://github.com/LucaCraft89/material-boot-core/blob/main/docs/installer.md) (how `material-boot core install` runs the parts).
 
-A part announces itself by installing **one manifest** in a plugin directory (`/usr/share/material-boot/plugins.d/` or `/usr/local/share/material-boot/plugins.d/`; `$MATERIAL_PLUGIN_PATH` overrides both, for tests and checkouts):
+## How Material GRUB is a part
 
-```json
-{
-  "manifest": 1,
-  "name": "plymouth",
-  "title": "Plymouth boot splash",
-  "version": "0.1.0",
-  "core_api": 1,
-  "entry": "/usr/share/material-plymouth/bin/mgplugin.py",
-  "summary": "boot splash that continues the GRUB theme",
-  "menu": [["Apply the Plymouth theme", "Render it and rebuild the initramfs", ["plymouth", "apply"]]]
-}
-```
+- `material-boot-part.json` (the manifest) and `install/part_grub.py` (the entry file and the hooks). The hooks run this repository's own installer, `install/installer.py` (the program `sudo ./install.sh` runs), so the two ways of installing do the same thing: a test installs with both and compares every file. Design and findings: [plans/g2-grub-part.md](plans/g2-grub-part.md).
+- `install.sh` puts the manifest in `/usr/share/material-boot/plugins.d/grub.json` and the entry next to the tools; the packages ship the manifest as one of their own files.
+- This front end, `material-grub`, keeps its own commands, messages and exit codes (the polkit helper, the path unit and the GUI parse them); for the parts of other packages it uses the core's loader, and its own command names stay reserved: a part cannot take `apply`, `doctor` or any other built-in name.
 
-- `name` is the sub-command (2 to 20 characters: a letter, then lowercase letters, digits or `-`). A built-in command name is refused.
-- `core_api` must equal the plugin API of the installed `material-grub` (`mgplugins.CORE_API`, 1 today). A part written for another API is **not run**; `doctor` and `help` say which of the two to update.
-- `entry` is the absolute path of a Python file that defines `main(argv, core) -> int`. `argv` is what follows the part's name on the command line. The part has its own sub-commands and parses them itself, so each part stays as modular as `material-grub` is.
-- `core` gives the part what it needs from `material-grub`: `api`, `version`, `pkg` (the package directory), `say(text)`, `run(cmd)`, `elevate(argv, paths)` (re-run through sudo when a path is not writable) and `conf_path()`. The part reads the shared settings through the modules of the installed package (`mgrub`, `mgoverrides`, ...), which is the contract that will move into a shared library later.
-- `menu` (optional) adds entries to the `material-grub` menu: `[title, description, [command words]]`.
+## Writing a part
 
-A broken manifest, a missing entry file or a part that crashes never breaks `material-grub`: it is a warning in `doctor`, an error message for that one command, and everything else keeps working.
-
-## Settings the parts share
-
-The runtime options of a part live in the same `/etc/material-grub.conf` as the theme's, so `material-grub conf`, presets and the GUI see them. Plymouth's three are `PLYMOUTH=on|off`, `PLYMOUTH_BAR=indeterminate|progress` and `PLYMOUTH_MOTION=full|calm|off`; they do nothing until the part is installed. Style, scheme, colours and per-entry overrides are the theme's own and are shared by every part.
+Read the core's `docs/plugins.md`, put a `material-boot-part.json` at the root of the repository, give the entry file `main(argv, core)` and the hooks, and test it with `MATERIAL_PLUGIN_PATH` pointing at a directory that holds the manifest. material-plymouth is the worked example (its hooks are tested on fake machines and through the real `material-boot core install`).

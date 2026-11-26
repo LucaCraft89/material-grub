@@ -148,6 +148,18 @@ Ultrawide (2560×1080):
 
 <sub>All screenshots are real GRUB output, captured in QEMU + OVMF with `make screenshots`. The Dell logo is this author's firmware logo.</sub>
 
+## The boot splash (Plymouth)
+
+[material-plymouth](https://github.com/LucaCraft89/material-plymouth) continues the theme after GRUB hands over: the same colours, the same distro, the same shapes, and a wavy loading bar. These are recordings of the real theme **playing in Plymouth** (not mock-ups), one per style, Fedora's look with the default colours.
+
+| rail | clean |
+|---|---|
+| ![rail](https://raw.githubusercontent.com/LucaCraft89/material-plymouth/main/docs/animations/rail.gif) | ![clean](https://raw.githubusercontent.com/LucaCraft89/material-plymouth/main/docs/animations/clean.gif) |
+| **list** | **split** |
+| ![list](https://raw.githubusercontent.com/LucaCraft89/material-plymouth/main/docs/animations/list.gif) | ![split](https://raw.githubusercontent.com/LucaCraft89/material-plymouth/main/docs/animations/split.gif) |
+
+They are made by `scripts/make_animations.py` in that repository, and its CI plays every style again and checks that each recording moves.
+
 ## Supported distros
 
 Entries are matched by name and GRUB class; each distro gets its own colour, logo and name. The samples below are rendered from the theme code and kept in sync by CI.
