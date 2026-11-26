@@ -82,8 +82,32 @@ def main():
     (stick / "ISO").mkdir()
     for n in ("Fedora-Workstation-44.iso", "ubuntu-24.04.iso"):
         (stick / "ISO" / n).write_bytes(b"")
+    # a stand-in for the optional Plymouth part: a manifest and an entry whose `preview` draws a flat picture of the size it is asked for
+    (tmp / "plugins").mkdir()
+    (tmp / "plugins/plymouth.json").write_text(
+        json.dumps(
+            {
+                "manifest": 2,
+                "name": "plymouth",
+                "title": "Plymouth boot splash",
+                "version": "0.9.9",
+                "core_api": 2,
+                "entry": str(tmp / "plymouth_entry.py"),
+                "summary": "test double",
+            }
+        )
+    )
+    (tmp / "plymouth_entry.py").write_text(
+        "from PIL import Image\n"
+        "def main(argv, core):\n"
+        "    if argv[0] != 'preview':\n        return 2\n"
+        "    w, h = (int(v) for v in argv[argv.index('--size') + 1].split('x'))\n"
+        "    Image.new('RGB', (w, h), (30, 60, 90)).save(argv[2])\n"
+        "    return 0\n"
+    )
     os.environ.update(
         {
+            "MATERIAL_PLUGIN_PATH": str(tmp / "plugins"),
             "MATERIAL_PKG": str(PKG),
             "MATERIAL_STATE_DIR": str(tmp / "state"),
             "MATERIAL_CONF": str(tmp / "mg.conf"),
@@ -231,6 +255,16 @@ def main():
         expect(page.locator(".card.high h3", has_text="E2E look")).to_be_visible()
         shot(page, "08-presets-light")
 
+        # --- the boot splash page (it exists only because the Plymouth part is installed)
+        page.get_by_role("button", name="Boot splash").first.click()
+        shots_ready = "() => { const i = [...document.querySelectorAll('.ply-shot img')]; return i.length === 3 && i.every((x) => x.complete && x.naturalWidth > 0); }"
+        page.wait_for_function(shots_ready, timeout=30000)
+        check(page.locator(".ply-shot img").count() == 3, "the boot splash page does not show its three previews")
+        page.get_by_role("button", name="Calm", exact=True).click()
+        page.wait_for_function(shots_ready, timeout=30000)
+        check(page.locator(".chip.dirty").count() == 1, "changing the motion did not mark unsaved changes")
+        shot(page, "08b-boot-splash-light")
+
         # --- apply: a slow fake apply so the progress dialog can be captured
         os.environ["FAKE_APPLY_SLEEP"] = "4"
         page.get_by_role("button", name="Apply to GRUB", exact=True).click()
@@ -246,6 +280,7 @@ def main():
         root = tmp / "root"
         conf = (root / "etc/material-grub.conf").read_text()
         check("STYLE=rail" in conf, "the conf was not written by the helper: " + conf)
+        check("PLYMOUTH_MOTION=calm" in conf, "the boot splash setting was not written by the helper: " + conf)
         ov = json.loads((root / "etc/material-grub/overrides.json").read_text())
         check(ov["seed"] == {"mode": "single", "color": "#7E57C2"}, f"seed not saved: {ov['seed']}")
         check(any(r.get("name") == "Work laptop" for r in ov["entries"]), "the entry name was not saved")

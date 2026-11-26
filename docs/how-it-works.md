@@ -23,8 +23,8 @@ whole scene. Selection changes swap the scene, which gives the whole-screen colo
 
 | Wish | Reality |
 |---|---|
-| Animated colour transitions / spring motion | No animation engine; scene changes are instant. |
-| Wavy (M3 Expressive) progress bar | The bar is a stretched 9-slice image; it is a flat rounded pill instead. |
+| Animated colour transitions / spring motion | No animation engine; scene changes are instant. The boot splash (the optional Plymouth part) animates the shapes and the cookie. |
+| Wavy (M3 Expressive) progress bar | The bar is a stretched 9-slice image; it is a flat rounded pill instead. It exists in the boot splash that follows (the optional Plymouth part), which can animate. |
 | Countdown / raw-name text coloured per entry | Colours in `theme.txt` are global, so they are neutral. |
 | Peeking neighbour entries | `boot_menu` only draws whole items. |
 | Reading the UEFI logo live at boot | GRUB has no BGRT reader; it is converted whenever the config is regenerated. |

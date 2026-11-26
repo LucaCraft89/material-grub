@@ -23,6 +23,7 @@ const ICONS = {
   style: "M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z",
   entries: "M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z",
   colours: "M12 3a9 9 0 100 18c1.1 0 1.6-.8 1.3-1.7-.4-1 .3-2.3 1.7-2.3H17a4 4 0 004-4c0-5-4-10-9-10zM7.5 12a1.3 1.3 0 110-2.6 1.3 1.3 0 010 2.6zm3-3.5a1.3 1.3 0 110-2.6 1.3 1.3 0 010 2.6zm4 0a1.3 1.3 0 110-2.6 1.3 1.3 0 010 2.6z",
+  plymouth: "M3 4h18v12H3zm2 2v8h14V6zm4 12h6v2H9z",
   ventoy: "M7 3h10v7H7zm-2 9h14v9H5zm4 2v2h2v-2zm4 0v2h2v-2z",
   presets: "M6 3h12v18l-6-4-6 4z",
   update: "M12 5V1L7 6l5 5V7a5 5 0 11-5 5H5a7 7 0 107-7z",

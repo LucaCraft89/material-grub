@@ -7,6 +7,9 @@ value is validated again here, because the caller is an unprivileged program.
 
   apply   {"verb": "apply", "conf": {...}, "overrides": {...}, "icons": {"name.png": "<base64>"}}
           backs up the current files, writes icons, overrides.json and the runtime options, runs `material-grub apply`, restores the backup if that fails.
+  plymouth {"verb": "plymouth", "action": "apply"|"remove", "cmdline": true|false}
+          runs `material-grub plymouth apply|remove` (the optional Plymouth part, when it is installed). Only with "cmdline": true may it edit the kernel command line
+          or the mkinitcpio hooks; without it apply passes --no-cmdline.
   update  {"verb": "update"}  updates Material GRUB through the system's package manager (package installs) or reruns the installer (source installs)
 
 Only when NOT running as root (the tests) may MG_HELPER_ROOT point all paths into a scratch directory; as root the environment is ignored.
@@ -49,13 +52,25 @@ if MODS is None:
     sys.exit(1)
 sys.path.insert(0, str(MODS))
 import mgoverrides  # noqa: E402
+import mgplugins  # noqa: E402
 import mgrub  # noqa: E402
 
 TEST = os.geteuid() != 0 and os.environ.get("MG_HELPER_ROOT")
 ROOT = Path(os.environ["MG_HELPER_ROOT"]) if TEST else Path("/")
 MAX_ICON = 4 * 1024 * 1024
 MAX_REQUEST = 64 * 1024 * 1024
-CONF_KEYS = ("STYLE", "COOKIE", "LOGO", "HINTS", "RAW_NAME", "COUNTDOWN", "TIMEOUT")
+CONF_KEYS = (
+    "STYLE",
+    "COOKIE",
+    "LOGO",
+    "HINTS",
+    "RAW_NAME",
+    "COUNTDOWN",
+    "TIMEOUT",
+    "PLYMOUTH",
+    "PLYMOUTH_BAR",
+    "PLYMOUTH_MOTION",
+)
 t0 = time.time()
 
 
@@ -140,6 +155,22 @@ def restore(d):
         shutil.copytree(d / "icons", ICONS)
 
 
+def plymouth_usable():
+    """True when the optional Plymouth part is installed and its manifest is valid for this material-grub."""
+    try:
+        rec = mgplugins.find("plymouth")
+    except Exception:
+        return False
+    return rec is not None and rec.problem is None
+
+
+def plymouth_args(action, cmdline):
+    """The `material-grub plymouth ...` words: never --yes unless the person ticked the box that allows editing the kernel command line."""
+    if action == "remove":
+        return ["plymouth", "remove", "--yes"]
+    return ["plymouth", "apply", "--if-changed", "--yes" if cmdline else "--no-cmdline"]
+
+
 def verb_apply(req):
     conf = req.get("conf", {})
     if not isinstance(conf, dict) or any(k not in CONF_KEYS or not mgrub._conf_ok(k, str(v)) for k, v in conf.items()):
@@ -159,10 +190,13 @@ def verb_apply(req):
         ic = r.get("icon", "")
         if ic.startswith("file:") and ic[5:] not in icons and not (ICONS / ic[5:]).is_file():
             die(f"the picture {ic[5:]} was not sent and is not installed")
-    emit("step", n=1, total=4, msg="Saving a backup of the current settings")
+    with_ply = plymouth_usable()
+    total = 5 if with_ply else 4
+    cmdline = req.get("plymouth_cmdline") is True
+    emit("step", n=1, total=total, msg="Saving a backup of the current settings")
     b = backup()
     emit("ok", msg=f"backup in {b}")
-    emit("step", n=2, total=4, msg="Writing your customisations")
+    emit("step", n=2, total=total, msg="Writing your customisations")
     try:
         if icons:
             ICONS.mkdir(parents=True, exist_ok=True)
@@ -175,19 +209,35 @@ def verb_apply(req):
         restore(b)
         die(f"could not write the settings ({e}); the previous ones are back")
     emit("ok", msg="settings written")
-    emit("step", n=3, total=4, msg="Applying to GRUB (rebuilding grub.cfg and the scenes)")
+    emit("step", n=3, total=total, msg="Applying to GRUB (rebuilding grub.cfg and the scenes)")
     if APPLY:
         rc = run([APPLY, "apply"], "material-grub apply")
     else:
         rc = 1
     if rc != 0:
-        emit("step", n=4, total=4, msg="Going back to the previous settings")
+        emit("step", n=total, total=total, msg="Going back to the previous settings")
         restore(b)
         if APPLY:
             run([APPLY, "apply"], "re-applying the previous settings")
         die("applying failed; your previous settings are back (see the log above)", rc or 1)
-    emit("step", n=4, total=4, msg="Done")
-    emit("ok", msg="Material GRUB is updated. The new menu shows on the next boot.")
+    note = ""
+    if with_ply:
+        # GRUB first, then the boot splash: a Plymouth problem puts Plymouth back by itself and must not undo the menu that was just applied
+        emit("step", n=4, total=total, msg="Applying to the Plymouth boot splash (rebuilding the initramfs)")
+        rc = run([APPLY, *plymouth_args("apply", cmdline)], "material-grub plymouth apply") if APPLY else 1
+        if rc != 0:
+            emit(
+                "warn",
+                msg="The boot menu was updated, but the Plymouth boot splash could not be applied. Plymouth put everything back as it was (see the log above).",
+            )
+            note = " The boot splash was NOT changed."
+        elif not cmdline:
+            emit(
+                "warn",
+                msg="The kernel command line was not edited (you did not allow it), so Plymouth shows only if 'splash' is already on it.",
+            )
+    emit("step", n=total, total=total, msg="Done")
+    emit("ok", msg="Material GRUB is updated. The new menu shows on the next boot." + note)
     emit("done", rc=0, ok=True, elapsed=f"{int(time.time() - t0)}s")
 
 
@@ -225,7 +275,26 @@ def installed_by(tool):
     return shutil.which(q[0]) is not None and subprocess.run(q, capture_output=True).returncode == 0
 
 
-VERBS = {"apply": verb_apply, "update": verb_update}
+def verb_plymouth(req):
+    action = req.get("action")
+    if action not in ("apply", "remove"):
+        die("the Plymouth request must be apply or remove")
+    if not plymouth_usable():
+        die("the Plymouth part of Material GRUB is not installed")
+    emit("step", n=1, total=2, msg="Rebuilding the initramfs" if action == "apply" else "Taking the boot splash out")
+    rc = (
+        run([APPLY, *plymouth_args(action, req.get("cmdline") is True)], f"material-grub plymouth {action}")
+        if APPLY
+        else 1
+    )
+    if rc != 0:
+        die("Plymouth reported a problem and put everything back as it was (see the log above)", rc or 1)
+    emit("step", n=2, total=2, msg="Done")
+    emit("ok", msg="the boot splash is " + ("applied" if action == "apply" else "removed"))
+    emit("done", rc=0, ok=True, elapsed=f"{int(time.time() - t0)}s")
+
+
+VERBS = {"apply": verb_apply, "update": verb_update, "plymouth": verb_plymouth}
 
 
 def main():

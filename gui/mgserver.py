@@ -30,6 +30,7 @@ import mgpaths
 PKG, MODS = mgpaths.setup()
 import mgcustom  # noqa: E402, F401  (imported early: a broken install fails at start, not on the first preview)
 import mgoverrides  # noqa: E402
+import mgplymouth  # noqa: E402
 import mgpresets  # noqa: E402
 import mgstate  # noqa: E402
 
@@ -201,7 +202,7 @@ class App:
             with self.lock:
                 self.job_busy = False
 
-    def apply_request(self, draft):
+    def apply_request(self, draft, plymouth_cmdline=False):
         clean, errs = mgstate.check_draft(draft)
         if errs:
             raise ValueError("; ".join(errs))
@@ -210,7 +211,13 @@ class App:
             ic = r.get("icon", "")
             if ic.startswith("file:") and (self.staging / ic[5:]).is_file():
                 icons[ic[5:]] = base64.b64encode((self.staging / ic[5:]).read_bytes()).decode()
-        return {"verb": "apply", "conf": clean["conf"], "overrides": clean["overrides"], "icons": icons}
+        return {
+            "verb": "apply",
+            "conf": clean["conf"],
+            "overrides": clean["overrides"],
+            "icons": icons,
+            "plymouth_cmdline": plymouth_cmdline,
+        }
 
 
 def install_kind():
@@ -637,10 +644,50 @@ def api_ventoy_apply(h, q, g):
     return h.send(200, {"job": job.id})
 
 
+def api_plymouth_preview(h, q, g):
+    """A still of the Plymouth boot splash for the unsaved draft: {draft, screen: boot|password|shutdown, size: "1280x720"}. 404 when the part is not installed."""
+    if not mgstate.plymouth_info()["installed"]:
+        return h.fail(404, "the Plymouth part is not installed")
+    req = h.json_body()
+    draft, errs = mgstate.check_draft(req.get("draft", {}))
+    if errs:
+        return h.fail(400, "; ".join(errs))
+    screen, size = req.get("screen", "boot"), req.get("size", "1280x720")
+    if screen not in mgplymouth.SCREENS:
+        return h.fail(400, "unknown screen")
+    try:
+        mgplymouth.parse_size(size)
+        png = mgplymouth.still(MODS, draft, screen, size, icon_dirs=(cfg_icons(), h.app.staging))
+    except ValueError as e:
+        return h.fail(400, str(e))
+    except RuntimeError as e:
+        return h.fail(500, str(e))
+    return h.send(200, png, "image/png")
+
+
+def api_plymouth_run(h, q, g):
+    """Apply or remove the boot splash alone: {action: apply|remove, cmdline: bool}, as a job with the usual progress events."""
+    req = h.json_body()
+    if req.get("action") not in ("apply", "remove"):
+        return h.fail(400, "the action must be apply or remove")
+    if not mgstate.plymouth_info()["installed"]:
+        return h.fail(404, "the Plymouth part is not installed")
+    try:
+        job = h.app.start_job({"verb": "plymouth", "action": req["action"], "cmdline": req.get("cmdline") is True})
+    except RuntimeError as e:
+        return h.fail(409, str(e))
+    return h.send(200, {"job": job.id})
+
+
+def cfg_icons():
+    """Where the installed pictures for custom entries live (the helper writes them there)."""
+    return Path(os.environ.get("MG_HELPER_ROOT") or "/") / "etc/material-grub/icons"
+
+
 def api_apply(h, q, g):
     req = h.json_body()
     try:
-        job = h.app.start_job(h.app.apply_request(req.get("draft", {})))
+        job = h.app.start_job(h.app.apply_request(req.get("draft", {}), req.get("plymouth_cmdline") is True))
     except RuntimeError as e:
         return h.fail(409, str(e))
     return h.send(200, {"job": job.id})
@@ -765,6 +812,8 @@ ROUTES = {
     ("GET", "/api/ventoy/icon"): api_ventoy_icon_get,
     ("POST", "/api/ventoy/apply"): api_ventoy_apply,
     ("POST", "/api/preview"): api_preview,
+    ("POST", "/api/plymouth/preview"): api_plymouth_preview,
+    ("POST", "/api/plymouth/run"): api_plymouth_run,
     ("POST", "/api/icon"): api_icon_upload,
     ("POST", "/api/apply"): api_apply,
     ("POST", "/api/update/check"): api_update_check,

@@ -232,3 +232,10 @@ dialog::backdrop { background: color-mix(in srgb, #000 55%, transparent); backdr
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* Boot splash page: three stills side by side */
+.ply-shot { margin: 0; }
+.ply-shot .frame { position: relative; border-radius: var(--r-l); overflow: hidden; background: var(--c-surface-container-highest); aspect-ratio: 16 / 9; box-shadow: 0 6px 18px color-mix(in srgb, #000 22%, transparent); }
+.ply-shot .frame img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.ply-shot .frame.loading::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: linear-gradient(90deg, transparent, var(--c-primary), transparent); animation: sweep 1s linear infinite; }
+.ply-shot figcaption { margin-top: 6px; text-align: center; }
