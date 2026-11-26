@@ -13,6 +13,7 @@ echo "== lint (when ruff / shellcheck are installed; CI always runs them)"
 if command -v ruff >/dev/null 2>&1; then ruff check . && ruff format --check . && echo "ok ruff"; else echo "skip ruff (not installed)"; fi
 if command -v shellcheck >/dev/null 2>&1; then shellcheck -x --severity=warning install.sh install/*.sh install/05_material install/15_material_menu install/90_material_system tests/run.sh packaging/common/*.sh && echo "ok shellcheck"; else echo "skip shellcheck (not installed)"; fi
 echo "== unit tests"
+python3 tests/test_core_link.py
 python3 tests/test_mgrub.py
 python3 tests/test_overrides.py
 python3 tests/test_presets.py
@@ -22,10 +23,13 @@ python3 tests/test_custom.py
 python3 tests/test_customise.py
 python3 tests/test_cli.py
 python3 tests/test_plugins.py
+python3 tests/test_grub_part.py
+python3 tests/test_upgrade.py
 python3 tests/test_gui_server.py
 python3 tests/test_monitors.py
 python3 tests/test_tui.py
 python3 tests/test_ventoy.py
+python3 tests/test_mgtheme.py
 python3 tests/test_grubscript.py
 python3 tests/test_safety.py
 python3 tests/test_dryrun.py

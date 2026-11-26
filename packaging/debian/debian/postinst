@@ -1,7 +1,9 @@
 #!/bin/sh
 set -e
 case "$1" in
-  configure) /usr/share/material-grub-src/install.sh --from-package || true ;;   # never fails the dpkg run
+  configure)   # never fails the dpkg run: the part is installed through the unified installer (the core is a dependency), the old way if the command is missing
+    if command -v material-boot >/dev/null 2>&1; then material-boot core install --from-package --only grub --yes || true
+    else /usr/share/material-grub-src/install.sh --from-package || true; fi ;;
 esac
 #DEBHELPER#
 exit 0

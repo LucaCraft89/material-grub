@@ -9,7 +9,7 @@ Rules-Requires-Root: no
 
 Package: material-grub
 Architecture: all
-Depends: ${misc:Depends}, grub-common, librsvg2-bin, python3 (>= 3.9), python3-venv, python3-pip, python3-pil
+Depends: ${misc:Depends}, material-boot-core (>= 1.0.0), grub-common, librsvg2-bin, python3 (>= 3.9), python3-venv, python3-pip, python3-pil
 Description: Material 3 Expressive GRUB theme, built from source on your machine
  The package contains the sources only. The theme is rendered when the package is
  installed or updated, with the same safety nets as the installer: the new

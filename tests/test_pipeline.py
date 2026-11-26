@@ -207,8 +207,9 @@ class Pipeline(unittest.TestCase):
             a.getpixel((960, 5)) != b.getpixel((960, 5)), True, "peek band shows the neighbour's own colour"
         )
         th = (self.boot / "grub2/themes/material/theme.txt").read_text()
-        self.assertIn("left = 1686", th)
-        self.assertIn("top = 176", th)
+        # every position is relative to the screen's centre now (a mode GRUB cannot set must not leave the theme in a corner): 1686 = 960 + 726, 176 = 540 - 364
+        self.assertIn("left = 50%+726", th)
+        self.assertIn("top = 50%-364", th)
 
     def test_list_style(
         self,

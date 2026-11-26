@@ -20,7 +20,7 @@
 #            --seed '#RRGGBB'  one seed colour for every entry (single-colour theme); --seed-mode multi|single  switch back and forth without changing the colour
 #            --with-gui  also install the optional graphical editor (material-grub-gui; source installs, needs the gui/ folder; packages have their own material-grub-gui package)
 #            --progress json  machine-readable output for the GUI: one JSON object per line (step, info, ok, warn, error, progress, log, done); never asks anything
-#   The logic is install/installer.py (Python 3.8+, standard library only); this file finds a Python 3.8+ (installing one with the
+#   The logic is install/installer.py (Python 3.9+, standard library only); this file finds a Python 3.9+ (installing one with the
 #   distribution's package manager when needed, which takes root) and hands over.
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -32,10 +32,10 @@ done
 
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
-# A Python 3.8 or newer: $MG_INSTALLER_PY, else python3, else the versioned names.
-py_ok() { "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1; }
+# A Python 3.9 or newer: $MG_INSTALLER_PY, else python3, else the versioned names.
+py_ok() { "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' >/dev/null 2>&1; }
 find_python() {
-  for c in "${MG_INSTALLER_PY:-}" python3 python3.14 python3.13 python3.12 python3.11 python3.10 python3.9 python3.8; do
+  for c in "${MG_INSTALLER_PY:-}" python3 python3.14 python3.13 python3.12 python3.11 python3.10 python3.9; do
     [ -n "$c" ] || continue
     command -v "$c" >/dev/null 2>&1 && py_ok "$c" && { command -v "$c"; return 0; }
   done
@@ -44,10 +44,10 @@ find_python() {
 
 PY=$(find_python) || PY=""
 if [ -z "$PY" ]; then
-  [ "$(id -u)" -eq 0 ] || die "Python 3.8 or newer is needed and could not be found; run with sudo so the installer can install it: sudo ./install.sh"
+  [ "$(id -u)" -eq 0 ] || die "Python 3.9 or newer is needed and could not be found; run with sudo so the installer can install it: sudo ./install.sh"
   PM=""
   for p in dnf apt-get pacman zypper apk xbps-install; do command -v "$p" >/dev/null 2>&1 && { PM=$p; break; }; done
-  [ -n "$PM" ] || die "Python 3.8 or newer is needed and no supported package manager was found (dnf, apt, pacman, zypper, apk, xbps). Install Python 3.8+ and run again."
+  [ -n "$PM" ] || die "Python 3.9 or newer is needed and no supported package manager was found (dnf, apt, pacman, zypper, apk, xbps). Install Python 3.9+ and run again."
   # candidates in order: the plain name first, then versioned packages (RHEL 8 family ships Python 3.6 as python3)
   case $PM in
     dnf)          PKGS="python3 python3.12 python3.11 python39 python3.9" ;;
@@ -58,7 +58,7 @@ if [ -z "$PY" ]; then
     xbps-install) PKGS="python3" ;;
   esac
   for pkg in $PKGS; do
-    printf 'Python 3.8+ not found: installing %s with %s ...\n' "$pkg" "$PM"
+    printf 'Python 3.9+ not found: installing %s with %s ...\n' "$pkg" "$PM"
     case $PM in
       dnf)          dnf install -y "$pkg" || true ;;
       apt-get)      DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" || true ;;
@@ -70,6 +70,6 @@ if [ -z "$PY" ]; then
     PY=$(find_python) && break
     PY=""
   done
-  [ -n "$PY" ] || die "could not install a Python 3.8 or newer with $PM. Install one by hand and run again."
+  [ -n "$PY" ] || die "could not install a Python 3.9 or newer with $PM. Install one by hand and run again."
 fi
 exec "$PY" "$HERE/install/installer.py" "$@"

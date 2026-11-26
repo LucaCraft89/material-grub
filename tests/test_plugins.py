@@ -1,4 +1,5 @@
-"""Optional parts (plugins): manifests, discovery, dispatch through `material-grub <part>`, the menu, help, version and doctor. stdlib only.
+"""Optional parts (plugins, plugin API 2: the loader is the core's, tested there): discovery by this front end, dispatch through `material-grub <part>`, the names it
+reserves, the menu, help, version and doctor. Needs material-boot-core (next to the checkout, or MATERIAL_LIB).
 usage: python3 tests/test_plugins.py"""
 
 import json
@@ -52,7 +53,7 @@ class Base(unittest.TestCase):
 
     def manifest(self, name="plymouth", **kw):
         m = {
-            "manifest": 1,
+            "manifest": 2,
             "name": name,
             "title": "Plymouth boot splash",
             "version": "0.1.0",
@@ -75,41 +76,16 @@ class Base(unittest.TestCase):
 class Manifests(Base):
     def read(self, **kw):
         self.manifest(**kw)
-        return mgplugins.read_manifest(self.plug / f"{kw.get('name', 'plymouth')}.json", reserved=("doctor", "apply"))
+        return mgplugins.read_manifest(self.plug / f"{kw.get('name', 'plymouth')}.json")
 
     def test_a_good_manifest(self):
         p = self.read()
         self.assertIsNone(p.problem)
-        self.assertEqual((p.name, p.version, p.entry), ("plymouth", "0.1.0", str(self.entry)))
-        self.assertEqual(p.menu, [("Plymouth status", "Is it applied?", ["plymouth", "status"])])
+        self.assertEqual((p.name, p.version), ("plymouth", "0.1.0"))
 
-    def test_every_way_a_manifest_can_be_wrong_is_a_sentence_not_a_crash(self):
-        for kw, word in (
-            ({"core_api": 99}, "plugin API"),
-            ({"core_api": None}, "plugin API"),
-            ({"manifest": 2}, "manifest version"),
-            ({"entry": "relative.py"}, "entry file"),
-            ({"entry": str(self.d / "gone.py")}, "entry file"),
-            ({"name": "Bad Name"}, "name"),
-            ({"name": "apply"}, "built-in"),
-        ):
-            with self.subTest(kw=kw):
-                p = self.read(**kw)
-                self.assertIsNone(p.entry)
-                self.assertIn(word, p.problem)
-
-    def test_unreadable_files(self):
-        (self.plug / "plymouth.json").write_text("{not json")
-        self.assertIn("cannot read", mgplugins.read_manifest(self.plug / "plymouth.json").problem)
-        (self.plug / "plymouth.json").write_text("[1, 2]")
-        self.assertIn("object", mgplugins.read_manifest(self.plug / "plymouth.json").problem)
-        (self.plug / "plymouth.json").write_text(" " * (mgplugins.MAX_MANIFEST + 1))
-        self.assertIn("too large", mgplugins.read_manifest(self.plug / "plymouth.json").problem)
-
-    def test_a_bad_menu_is_dropped_not_fatal(self):
-        p = self.read(menu=[["only one"], "x", ["t", "d", []], ["ok", "fine", ["plymouth", "apply"]], ["n", "d", [1]]])
-        self.assertIsNone(p.problem)
-        self.assertEqual(p.menu, [("ok", "fine", ["plymouth", "apply"])])
+    def test_a_plugin_of_the_old_api_is_refused_with_the_reason(self):
+        p = self.read(core_api=1)
+        self.assertIn("update whichever of the two is older", p.problem)
 
     def test_discovery(self):
         self.assertEqual(mgplugins.discover(), [])
@@ -119,6 +95,10 @@ class Manifests(Base):
         found = mgplugins.discover()
         self.assertEqual([p.name for p in found], ["plymouth", "zeta"])
         self.assertEqual([p.name for p in mgplugins.usable()], ["plymouth"])
+        self.manifest("apply")
+        self.assertEqual(
+            [p.name for p in mgplugins.usable(("apply",))], ["plymouth"], "a part cannot take a built-in name"
+        )
 
     def test_first_directory_wins_and_no_dirs_means_none(self):
         other = self.d / "other"
@@ -147,7 +127,7 @@ class Dispatch(Base):
         self.manifest()
         rc, out = self.mg("plymouth", "apply", "--yes")
         self.assertEqual(rc, 0)
-        self.assertIn("called ['apply', '--yes'] api=1", out)
+        self.assertIn("called ['apply', '--yes'] api=2", out)
 
     def test_exit_status_comes_from_the_plugin(self):
         self.manifest()
@@ -158,7 +138,7 @@ class Dispatch(Base):
         self.manifest()
         rc, out = self.mg("plymouth", "crash")
         self.assertEqual(rc, 1)
-        self.assertIn("the plymouth plugin failed", out)
+        self.assertIn("the plymouth part failed", out)
         self.assertNotIn("Traceback", out)
 
     def test_a_plugin_that_cannot_be_imported(self):
@@ -173,7 +153,7 @@ class Dispatch(Base):
         self.assertIn("no main", out)
 
     def test_an_incompatible_plugin_is_refused_with_the_reason(self):
-        self.manifest(core_api=2)
+        self.manifest(core_api=1)
         rc, out = self.mg("plymouth", "apply")
         self.assertEqual(rc, 1)
         self.assertIn("plugin API", out)
@@ -190,7 +170,7 @@ class Dispatch(Base):
         self.assertIn("material-grub plymouth", self.mg("help")[1])
         self.assertIn("plymouth 0.1.0", self.mg("version")[1])
         self.manifest(core_api=9)
-        self.assertIn("plugin API", self.mg("help")[1])
+        self.assertIn("update whichever", self.mg("help")[1])
         self.assertNotIn("plymouth 0.1.0", self.mg("version")[1])
 
     def test_menu_items(self):

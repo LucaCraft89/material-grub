@@ -20,6 +20,22 @@ if [ -f /var/lib/material-grub/env ] && grep -q '^MG_IMMUTABLE=1' /var/lib/mater
 fi
 rm -f /usr/bin/material-grub-gui /usr/libexec/material-grub-gui-helper /usr/share/polkit-1/actions/org.material-grub.gui.policy /usr/share/applications/material-grub-gui.desktop; rm -rf /usr/share/material-grub-gui   # the optional GUI (source installs; a package removes its own files)
 rm -f /usr/local/bin/material-grub /usr/local/sbin/material-grub /usr/local/bin/material-grub-apply /usr/local/sbin/material-grub-apply
+rm -f /usr/share/material-boot/plugins.d/grub.json     # the part's manifest for `material-boot`
+if [ -f /var/lib/material-grub/state.json ]; then     # the record of what is installed: forget GRUB, keep the other parts' entries (the core's)
+  python3 - <<'PY' || rm -f /var/lib/material-grub/state.json
+import json, os
+f = "/var/lib/material-grub/state.json"
+d = json.load(open(f))
+parts = d.get("parts")
+if isinstance(parts, dict):
+    parts.pop("grub", None)
+if isinstance(parts, dict) and parts:
+    json.dump(d, open(f + ".new", "w"), indent=2, sort_keys=True)
+    os.replace(f + ".new", f)
+else:
+    os.remove(f)
+PY
+fi
 rm -rf /usr/share/material-grub /etc/grub.d/05_material /etc/grub.d/15_material_menu /etc/grub.d/90_material_system /usr/libexec/material-grub-postprocess /etc/systemd/system/material-grub.* /boot/grub2/themes/material /boot/grub/themes/material
 if command -v grub2-mkconfig >/dev/null; then grub2-mkconfig -o /boot/grub2/grub.cfg; else grub-mkconfig -o /boot/grub/grub.cfg; fi
 echo "(your /etc/material-grub.conf and /etc/material-grub/ with your overrides, icons and presets were kept; the GUI was removed too)"
