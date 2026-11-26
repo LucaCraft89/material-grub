@@ -2,7 +2,7 @@
   "manifest": 2,
   "name": "grub",
   "title": "Material GRUB theme",
-  "version": "0.7.1",
+  "version": "1.0.0",
   "summary": "Material You boot menu theme for GRUB",
   "core_api": 2,
   "core_min": "1.0.0",
