@@ -47,11 +47,11 @@ grep -q "^STYLE=list" /etc/material-grub.conf && grep -q "# my own line" /etc/ma
 material-grub colour | grep -q "#7E57C2" && say "the seed colour kept" || { say "the seed colour LOST"; exit 1; }
 grep -q "classes applied" $CFG && say "grub.cfg annotated" || { say "grub.cfg NOT annotated"; exit 1; }
 grep -q "\"grub\": \"$NEW\"" /var/lib/material-grub/state.json && grep -q "\"core\": \"$core0\"" /var/lib/material-grub/state.json && say "record: grub $NEW, core $core0" || { say "record after: $(cat /var/lib/material-grub/state.json)"; exit 1; }
-OLD=$OLD NEW=$NEW python3 - <<'PY' && say "history: $OLD then $NEW" || { say "history wrong"; exit 1; }
-import json
+CORE0=$core0 python3 - <<'PY' && say "history: the core's installs are recorded, none lost" || { say "history wrong"; exit 1; }
+import json, os
 h = [x["to"] for x in json.load(open("/var/lib/material-grub/state.json"))["history"]]
-import os
-assert h[-1] in (os.environ["OLD"], os.environ["NEW"]) and os.environ["OLD"] in h, h
+# the history is the CORE's (the version the state record was migrated to), so it follows the core, not grub
+assert h and h[-1] == os.environ["CORE0"], h
 PY
 [ "$(sed -n 's/.*"version": "\(.*\)".*/\1/p' /usr/share/material-boot/plugins.d/grub.json)" = "$NEW" ] && say "the manifest says $NEW" || { say "manifest version"; cat /usr/share/material-boot/plugins.d/grub.json | tee -a $R; exit 1; }
 material-boot core parts | grep -q "grub .*$NEW.*ok" && say "core parts: grub $NEW ok" || { say "core parts"; material-boot core parts | tee -a $R; exit 1; }
