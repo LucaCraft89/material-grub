@@ -312,9 +312,9 @@ jobs:
       - run: cat build/out/upgrade-${{ matrix.fmt }}.txt; grep -q "^ALL OK" build/out/upgrade-${{ matrix.fmt }}.txt
 
   release-bump:
-    # A REAL version bump, through the package manager's ordinary upgrade (no --replacepkgs, no --reinstall): 1.0.0 is installed with the core, the person makes
-    # settings, then 1.0.1 (this checkout with scripts/bump_version.py 1.0.1 applied) is installed over it. Settings, record, manifest and commands must follow.
-    name: A real version bump 1.0.0 to 1.0.1 (${{ matrix.fmt }})
+    # A REAL version bump, through the package manager's ordinary upgrade (no --replacepkgs, no --reinstall): this checkout's version is installed with the core, the person makes
+    # settings, then the next patch version (this checkout with scripts/bump_version.py applied) is installed over it. Settings, record, manifest and commands must follow.
+    name: A real version bump, patch + 1 (${{ matrix.fmt }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -330,7 +330,7 @@ jobs:
       - name: The next version, a copy of this checkout with the version bumped
         run: |
           mkdir next && git archive HEAD | tar -x -C next
-          python3 next/scripts/bump_version.py 1.0.1
+          python3 next/scripts/bump_version.py "$(awk -F. '{print $1"."$2"."$3+1}' VERSION)"   # this version with the patch number + 1
       - run: |
           mkdir -p build/old build/pkg build/out
           docker run --rm -v "$PWD:/src:ro" -v "$PWD/build/old:/out" "${{ matrix.image }}" sh /src/tests/containers/build_pkg.sh ${{ matrix.fmt }}
