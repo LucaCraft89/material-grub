@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 (2026-11-27)
 
-Groundwork for optional parts from other packages (the first is the Plymouth boot splash, in its own repository). Nothing changes without one.
+Material GRUB is now one part of Material Boot: it uses the shared `material-boot-core`, installs together with the optional Plymouth boot splash through one installer (the bundle attached to the material-boot-core release), and takes optional parts from other packages. The old commands keep working, and nothing changes without a part.
 
 **New**
 - **Optional parts (plugins):** another package can install one manifest and add a sub-command (`material-grub plymouth ...`), a menu entry and a line in `help`, `version` and `doctor`; a part that is missing, broken or written for another plugin API is reported, never fatal. See `docs/plugins.md`.
