@@ -46,12 +46,25 @@ OVMF = next(
 MIB = 1 << 20
 
 
+def download(url, dest, tries=5, wait=3):
+    """urlretrieve with retries: the upstream host answers 502/504 now and then (a CI run failed on it)."""
+    for n in range(1, tries + 1):
+        try:
+            urllib.request.urlretrieve(url, dest)
+            return
+        except OSError as e:  # URLError and HTTPError are OSErrors
+            if n == tries:
+                raise
+            print(f"Ventoy download failed ({e}); retry {n}/{tries - 1}", file=sys.stderr)
+            time.sleep(wait * n)
+
+
 def fetch():
     """efi.img (Ventoy's 32 MiB boot partition) and boot.img (its MBR boot code)."""
     CACHE.mkdir(parents=True, exist_ok=True)
     tgz = CACHE / f"ventoy-{VER}-linux.tar.gz"
     if not tgz.exists() or hashlib.sha256(tgz.read_bytes()).hexdigest() != SHA:
-        urllib.request.urlretrieve(URL, tgz)
+        download(URL, tgz)
         if hashlib.sha256(tgz.read_bytes()).hexdigest() != SHA:
             tgz.unlink()
             sys.exit("Ventoy download: checksum mismatch")
