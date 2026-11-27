@@ -31,6 +31,36 @@
       {"name": "with-gui", "takes": "flag", "summary": "also install the graphical editor"},
       {"name": "no-deps", "takes": "flag", "summary": "do not install build dependencies"},
       {"name": "keep-build", "takes": "flag", "summary": "keep the temporary build directory"}
+    ],
+    "questions": [
+      {
+        "id": "res", "title": "Screen resolution", "kind": "choice", "allow_text": true, "pattern": "[0-9]{3,5}x[0-9]{3,5}",
+        "help": "GRUB draws on the screen the firmware picks, usually your main monitor: choose that monitor's own resolution. Automatic reads it from your system. Any other size gets a theme written for exactly that size.",
+        "target": {"option": "res"},
+        "options": [
+          {"value": "", "label": "Detected automatically", "help": "Recommended: the installer reads your display's size."},
+          {"value": "1280x720", "label": "1280x720"},
+          {"value": "1920x1080", "label": "1920x1080"},
+          {"value": "1920x1200", "label": "1920x1200"},
+          {"value": "2560x1080", "label": "2560x1080"},
+          {"value": "2560x1440", "label": "2560x1440"},
+          {"value": "2880x1800", "label": "2880x1800"},
+          {"value": "3440x1440", "label": "3440x1440"},
+          {"value": "3840x1080", "label": "3840x1080"},
+          {"value": "3840x1600", "label": "3840x1600"},
+          {"value": "3840x2160", "label": "3840x2160"},
+          {"value": "5120x1440", "label": "5120x1440"},
+          {"value": "5120x2160", "label": "5120x2160"}
+        ]
+      },
+      {"id": "raw-name", "title": "Raw entry name line", "kind": "toggle", "default": true, "target": {"conf": "RAW_NAME"},
+       "help": "The small muted line at the bottom with the entry title exactly as GRUB sees it. Useful when something looks wrong."},
+      {"id": "countdown", "title": "Countdown bar", "kind": "toggle", "default": true, "target": {"conf": "COUNTDOWN"},
+       "help": "The 'Booting in N seconds' bar and label."},
+      {"id": "timeout", "title": "Timeout in seconds", "kind": "text", "pattern": "[0-9]*", "target": {"conf": "TIMEOUT"},
+       "help": "Seconds before the default entry boots. Leave empty to keep GRUB's own timeout (5 by default)."},
+      {"id": "gui", "title": "Graphical editor", "kind": "toggle", "default": false, "target": {"option": "with-gui"},
+       "help": "Also install the optional editor: a Material 3 page in your browser with a live preview, colours, names, icons, order and presets. It never runs as root."}
     ]
   },
   "hooks": ["detect", "plan", "install", "uninstall", "verify", "doctor"]
