@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 (2026-11-27)
+
+The questions the installer asks, now on Material Boot's installer screen.
+
+**New**
+- **The part declares its questions** (`install.questions` in `material-boot-part.json`; see material-boot-core's `docs/plugins.md`): the screen of `material-boot core install` (material-boot-core 1.1.0) asks the screen resolution (detected, a list of sizes, or typed), the raw entry name line, the countdown bar, the timeout, and whether to install the graphical editor. The answers reach the same options and settings as before (`--grub-res`, `--grub-with-gui`, `RAW_NAME`, `COUNTDOWN`, `TIMEOUT`).
+- With an older core the field is ignored, and the options work as flags exactly as in 1.0.x.
+
 ## 1.0.0 (2026-11-27)
 
 Material GRUB is now one part of Material Boot: it uses the shared `material-boot-core`, installs together with the optional Plymouth boot splash through one installer (the bundle attached to the material-boot-core release), and takes optional parts from other packages. The old commands keep working, and nothing changes without a part.

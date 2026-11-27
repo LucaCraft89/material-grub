@@ -47,6 +47,26 @@ class Manifest(unittest.TestCase):
         )
         self.assertEqual(self.p.warnings, [])
 
+    def test_the_questions_of_the_installer_screen_are_valid_and_their_targets_exist(self):
+        # the core reads install.questions (material-boot-core 1.1.0; an older core ignores the field): none may be dropped, and every target is real
+        if not hasattr(self.p, "questions"):
+            self.skipTest("this core is older than install.questions")
+        asked = json.loads(MANIFEST.read_text())["install"]["questions"]
+        self.assertEqual(
+            [q["id"] for q in self.p.questions], [q["id"] for q in asked], "a question was dropped as malformed"
+        )
+        options = {o["name"] for o in self.p.options}
+        for q in self.p.questions:
+            t = q["target"]
+            if "option" in t:
+                self.assertIn(t["option"], options, q["id"])
+            else:
+                self.assertIn(t["conf"], DEFAULTS, q["id"])  # a settings key the core knows
+        by = {q["id"]: q for q in self.p.questions}
+        self.assertEqual(by["res"]["options"][0]["value"], "")  # automatic is the first choice and passes nothing
+        self.assertTrue(all(o["value"] == "" or o["value"].count("x") == 1 for o in by["res"]["options"]))
+        self.assertIn("1920x1080", [o["value"] for o in by["res"]["options"]])
+
     def test_the_entry_file_defines_what_the_manifest_lists(self):
         entry = (MANIFEST.parent / self.m["entry"]).resolve()
         self.assertEqual(entry, (ROOT / "install/part_grub.py"))
