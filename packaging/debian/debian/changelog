@@ -1,3 +1,9 @@
+material-grub (1.2.0) unstable; urgency=medium
+
+  * The material-grub command is replaced by `material-boot grub`; the editor is the core's.
+
+ -- LucaCraft89 <noreply@users.noreply.github.com>  Sat, 28 Nov 2026 12:00:00 +0000
+
 material-grub (1.1.0) unstable; urgency=medium
 
   * Release 1.1.0.

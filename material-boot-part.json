@@ -2,10 +2,10 @@
   "manifest": 2,
   "name": "grub",
   "title": "Material GRUB theme",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "summary": "Material You boot menu theme for GRUB",
   "core_api": 2,
-  "core_min": "1.0.0",
+  "core_min": "1.2.0",
   "entry": "install/part_grub.py",
   "commands": {
     "apply": "render the theme again and install it (after a change of scheme, style or seed)",

@@ -1,14 +1,14 @@
 # Builds from source: the RPM ships the sources; the theme is rendered on the target machine in %posttrans
 # (install.sh --from-package), so nothing prebuilt is downloaded. COPR builds this spec from the tagged tarball.
 Name:           material-grub
-Version:        1.1.0
+Version:        1.2.0
 Release:        1%{?dist}
 Summary:        Material 3 Expressive GRUB theme, built from source on your machine
 License:        MIT
 URL:            https://github.com/LucaCraft89/material-grub
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 BuildArch:      noarch
-Requires:       material-boot-core >= 1.0.0
+Requires:       material-boot-core >= 1.2.0
 Requires:       grub2-tools
 Requires:       grub2-tools-extra
 Requires:       librsvg2-tools
@@ -47,6 +47,9 @@ if [ $1 -eq 0 ]; then sh /usr/share/material-grub-src/install/uninstall.sh || :;
 
 
 %changelog
+* Sat Nov 28 2026 LucaCraft89 <noreply@users.noreply.github.com> - 1.2.0-1
+- The material-grub command is replaced by `material-boot grub`; the editor is the core's.
+
 * Fri Nov 27 2026 LucaCraft89 <noreply@users.noreply.github.com> - 1.1.0-1
 - Release 1.1.0.
 
