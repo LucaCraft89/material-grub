@@ -2,7 +2,7 @@
 # Builds from source: the package ships the sources, and the theme is rendered on the target machine by the install script
 # (post_install / post_upgrade), so nothing prebuilt is ever downloaded. Not published on the AUR yet.
 pkgbase=material-grub
-pkgname=('material-grub' 'material-grub-gui')
+pkgname=('material-grub')
 pkgver=1.1.0
 pkgrel=1
 pkgdesc='Material 3 Expressive GRUB theme, built from source on your machine'
@@ -21,12 +21,4 @@ package_material-grub() {
   cd "$srcdir/$pkgbase-$pkgver"
   sh packaging/common/install-tree.sh . "$pkgdir"
   install -Dm644 "$srcdir/material-grub.hook" "$pkgdir/usr/share/libalpm/hooks/material-grub.hook"
-}
-
-package_material-grub-gui() {
-  pkgdesc='Optional graphical editor for the Material GRUB theme (a local web UI)'
-  depends=("material-grub=$pkgver" 'python-pillow' 'polkit')
-  optdepends=('librsvg: use your own SVG icons')
-  cd "$srcdir/$pkgbase-$pkgver"
-  sh packaging/common/install-gui-tree.sh . "$pkgdir"
 }

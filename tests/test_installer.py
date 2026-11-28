@@ -121,30 +121,27 @@ class InstallLog(unittest.TestCase):
                 del os.environ["MG_INSTALL_LOG"]
 
 
-class UninstallGui(unittest.TestCase):
-    def test_uninstall_removes_everything_the_gui_installer_writes(self):
-        tree = (ROOT / "packaging/common/install-gui-tree.sh").read_text()
-        un = (ROOT / "install/uninstall.sh").read_text()
-        import re
+class OldGui(unittest.TestCase):
+    """The graphical editor of 0.7.x and 1.1 (its own files, its own package) is gone: the editor is the core's (`material-boot ui`). An uninstall still
+    sweeps what an older install left behind."""
 
-        written = set(re.findall(r'"\$dest(/usr/[^"$ ]+)"', tree)) | {"/usr/share/material-grub-gui"}
-        wanted = {
+    def test_uninstall_still_removes_the_files_of_the_old_gui(self):
+        un = (ROOT / "install/uninstall.sh").read_text()
+        for path in (
             "/usr/bin/material-grub-gui",
             "/usr/libexec/material-grub-gui-helper",
             "/usr/share/polkit-1/actions/org.material-grub.gui.policy",
             "/usr/share/applications/material-grub-gui.desktop",
             "/usr/share/material-grub-gui",
-        }
-        for path in wanted:
-            self.assertIn(path, un.split("rm -f", 1)[1] if "rm -f" in un else "", path)
-        for path in written:
-            if any(w.startswith(path + "/") for w in wanted):
-                continue  # a shared parent directory (polkit's actions folder), not ours to remove
-            if "material-grub" in path or "polkit" in path:
-                self.assertTrue(
-                    any(w == path or path.startswith(w + "/") for w in wanted), f"{path} is installed but not removed"
-                )
+        ):
+            self.assertIn(path, un.split("rm -f", 1)[1], path)
         self.assertEqual(un.count("/usr/share/material-grub-gui"), 2)  # both the normal and the immutable branch
+
+    def test_the_installer_no_longer_installs_a_gui(self):
+        with self.assertRaises(SystemExit):
+            make(["--with-gui"])
+        self.assertFalse((ROOT / "gui").exists())
+        self.assertFalse((ROOT / "packaging/common/install-gui-tree.sh").exists())
 
 
 class Seed(unittest.TestCase):
@@ -156,15 +153,6 @@ class Seed(unittest.TestCase):
         for bad in (["--seed", "red"], ["--seed", "#12345"], ["--seed-mode", "rainbow"]):
             with self.assertRaises(SystemExit):
                 make(bad)
-
-    def test_gui_answer_sets_the_flag(self):
-        i = make([])
-        self.assertFalse(i.with_gui)
-        i.apply_answers({"GUI": "no"})
-        self.assertFalse(i.with_gui)
-        i.apply_answers({"GUI": "yes"})
-        self.assertTrue(i.with_gui)
-        self.assertTrue(make(["--with-gui"]).with_gui)
 
     def test_answers_and_overrides_file(self):
         sys.path.insert(0, str(ROOT / "install/bin"))

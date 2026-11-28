@@ -100,7 +100,6 @@ class Installer:
         self.res = ""
         self.scheme = "dark"
         self.scheme_set = False
-        self.with_gui = False  # --with-gui: also install the optional GUI (source installs; packages have their own material-grub-gui package)
         self.seed_mode = ""  # "", "multi" or "single": empty leaves overrides.json alone
         self.seed = ""
         self.style = ""
@@ -238,8 +237,6 @@ class Installer:
                 self.scheme_set = True
                 if self.scheme not in ("light", "dark"):
                     self.usage_error("--scheme must be light or dark")
-            elif o == "--with-gui":
-                self.with_gui = True
             elif o == "--seed":
                 self.seed = need(o, "a colour like #2E7D32").upper()
                 if not re.fullmatch(r"#[0-9A-F]{6}", self.seed):
@@ -442,17 +439,13 @@ class Installer:
             if self.from_package:
                 how = mgdetect.owner_of(Path(root or "/") / mgdetect.FILES["package"])
                 how = how if how.startswith("package:") else "package:unknown"
-            if UNIFIED:  # the unified installer records the part (with the core's version at the top and its own history): only what it does not know of is added
-                if (Path(root or "/") / "usr/share/material-grub-gui").is_dir():
-                    st = mgdetect.read(root) or {"state": mgdetect.STATE_VERSION, "parts": {}}
-                    st.setdefault("parts", {})["gui"] = target
-                    mgdetect.write(root, st)
+            if (
+                UNIFIED
+            ):  # the unified installer records the part (with the core's version at the top and its own history)
                 return
             parts = {"core": target, "grub": target}
-            if (Path(root or "/") / "usr/share/material-grub-gui").is_dir():
-                parts["gui"] = target
             for k, v in now.parts.items():
-                if k not in ("core", "grub", "gui"):
+                if k not in ("core", "grub"):
                     parts[k] = v
             mgdetect.record(root, target, how, "immutable" if self.imm else "normal", parts, previous=before)
         except Exception as e:  # a record or a migration problem is a warning, never a failed install
@@ -543,10 +536,6 @@ class Installer:
                 preset("STYLE", self.style)
             if self.scheme_set:
                 preset("SCHEME", self.scheme)
-            if self.with_gui or not (HERE / "gui/mgserver.py").is_file():
-                preset(
-                    "GUI", "yes" if self.with_gui else "no"
-                )  # given by a flag, or there is no gui/ folder to install from: not asked
             if self.seed_mode:
                 preset("SEED_MODE", self.seed_mode)
             if self.seed:
@@ -592,8 +581,6 @@ class Installer:
             self.style = a["STYLE"]
         if a.get("SCHEME"):
             self.scheme, self.scheme_set = a["SCHEME"], True
-        if a.get("GUI") == "yes":
-            self.with_gui = True
         if a.get("SEED_MODE"):
             self.seed_mode = a["SEED_MODE"]
         if a.get("SEED"):
@@ -1098,25 +1085,6 @@ class Installer:
             "      Change the style, scheme or resolutions: run this installer again.   Undo: ./install.sh --uninstall --ventoy MOUNTPOINT"
         )
 
-    def install_gui(self):
-        """--with-gui: copy the optional GUI (plain Python and web files, nothing is built) next to the theme. Needs root; the GUI never runs as root itself."""
-        tree = HERE / "packaging/common/install-gui-tree.sh"
-        if not tree.is_file() or not (HERE / "gui/mgserver.py").is_file():
-            self.warn(
-                "--with-gui: this copy has no gui/ folder (use a checkout of the repository, or your package manager's material-grub-gui package)"
-            )
-            return
-        if not self.root():
-            self.warn("--with-gui needs root: run it with sudo")
-            return
-        self.step("Installing the optional GUI")
-        if self.run(["sh", tree, HERE, "/"]).returncode != 0:
-            self.warn("the GUI could not be installed (the theme itself is fine)")
-            return
-        self.ok(
-            "installed: start it with `material-grub gui` (opens in your browser; changes ask for your password through polkit)"
-        )
-
     def write_seed(self):
         """--seed / --seed-mode and the TUI's colour answers go to overrides.json (the one place every tool reads), keeping the rest of the file."""
         if not self.seed_mode:
@@ -1271,8 +1239,6 @@ class Installer:
                 self.ventoy_install()
                 return 0
             self.grub_install()
-            if self.with_gui:
-                self.install_gui()
             return 0
         finally:
             if self.build_dir:

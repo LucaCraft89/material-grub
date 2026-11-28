@@ -1,6 +1,6 @@
-"""material-grub doctor: check the installation and print a report that can be pasted into a bug report. stdlib only.
+"""material-boot grub doctor: check the installation and print a report that can be pasted into a bug report. stdlib only.
 
-usage: material-grub doctor [--root DIR] [--json | --status-json]       (also: material-grub apply --status)
+usage: material-boot grub doctor [--root DIR] [--json | --status-json]       (also: material-boot grub apply --status)
 Exit status: 0 when nothing failed (warnings are fine), 1 when something failed.
 --json: the list of checks. --status-json: one object for the GUI (installed, version, style, scheme, health, checks).
 --root DIR looks at an installation staged under DIR (tests, `install.sh --dest`); systemd is not asked then.
@@ -129,7 +129,7 @@ class Doctor:
             self.add(
                 WARN,
                 "overrides",
-                "the order or hidden entries changed since grub.cfg was generated: run sudo material-grub apply",
+                "the order or hidden entries changed since grub.cfg was generated: run sudo material-boot grub apply",
             )
             return
         n = len(ov["entries"])
@@ -200,7 +200,7 @@ class Doctor:
                 self.add(
                     WARN,
                     "resolution",
-                    f"the theme was written by an older version (for {best}); run sudo material-grub apply to write it for exactly {want[0]}x{want[1]}",
+                    f"the theme was written by an older version (for {best}); run sudo material-boot grub apply to write it for exactly {want[0]}x{want[1]}",
                 )
             return
         if have == "auto":
@@ -214,7 +214,7 @@ class Doctor:
             self.add(
                 FAIL,
                 "resolution",
-                f"the theme is written for {have}, but GRUB_GFXMODE={gfx or 'not set'} asks for {want[0]}x{want[1]}: run sudo material-grub apply",
+                f"the theme is written for {have}, but GRUB_GFXMODE={gfx or 'not set'} asks for {want[0]}x{want[1]}: run sudo material-boot grub apply",
             )
             return
         native = mgtheme.native_mode(str(self.p("/sys/class/drm")))
@@ -222,7 +222,7 @@ class Doctor:
             self.add(
                 WARN,
                 "resolution",
-                f"the theme is written for {have} but your screen is {native[0]}x{native[1]}: if the menu does not fill the screen, set GRUB_GFXMODE={native[0]}x{native[1]} in /etc/default/grub and run sudo material-grub apply",
+                f"the theme is written for {have} but your screen is {native[0]}x{native[1]}: if the menu does not fill the screen, set GRUB_GFXMODE={native[0]}x{native[1]} in /etc/default/grub and run sudo material-boot grub apply",
             )
         else:
             self.add(
@@ -248,7 +248,7 @@ class Doctor:
         self.add(
             OK if MARK in text else FAIL,
             "grub.cfg annotated",
-            f"{cfg}" + ("" if MARK in text else " has not been processed: run sudo material-grub apply"),
+            f"{cfg}" + ("" if MARK in text else " has not been processed: run sudo material-boot grub apply"),
         )
         ok, msgs = mgsafe.check_script(cfg)
         self.add(OK if ok else FAIL, "grub.cfg valid", "passes the GRUB script check" if ok else "; ".join(msgs))
@@ -282,7 +282,7 @@ class Doctor:
             self.add(
                 FAIL,
                 "scenes",
-                f"{len(missing)} of {len(entries)} menu entries have no scene (first: {missing[0]}): run sudo material-grub apply",
+                f"{len(missing)} of {len(entries)} menu entries have no scene (first: {missing[0]}): run sudo material-boot grub apply",
             )
         else:
             self.add(OK, "scenes", f"every one of the {len(entries)} menu entries has a scene")
@@ -291,7 +291,7 @@ class Doctor:
         immutable = (self.p("/var/lib/material-grub/env").is_file()) and "MG_IMMUTABLE=1" in self.p(
             "/var/lib/material-grub/env"
         ).read_text()
-        want = [("/usr/local/bin/material-grub", True)]
+        want = []
         if immutable:
             want.append(("/var/lib/material-grub/postprocess", True))
         else:
@@ -345,14 +345,12 @@ class Doctor:
 
     def plugins(self):
         """Optional parts from other packages (material-plymouth): listed when present, a broken or incompatible one is a warning. Nothing is printed without any."""
-        import cmd_cli  # the names of the built-in commands, which a plugin may not take over
-
         dirs = (
             [self.p(d) for d in mgplugins.DEFAULT_DIRS]
             if self.root and "MATERIAL_PLUGIN_PATH" not in os.environ
             else None
         )
-        for pl in mgplugins.discover(cmd_cli.COMMANDS, dirs, self.root):
+        for pl in mgplugins.discover((), dirs, self.root):
             if pl.problem:
                 self.add(WARN, f"plugin {pl.name}", pl.problem)
             else:
@@ -407,7 +405,7 @@ class Doctor:
 
     def render(self):
         w = max(len(r[1]) for r in self.rows)
-        lines = ["material-grub doctor", ""]
+        lines = ["material-boot grub doctor", ""]
         for s, what, detail in self.rows:
             lines.append(f"  [{s:^4}] {what.ljust(w)}  {detail}")
         bad = sum(1 for r in self.rows if r[0] == FAIL)

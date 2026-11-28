@@ -442,27 +442,6 @@ def build_steps(presets, monitors, immutable, sticks=None):
             ],
         }
     )
-    if not immutable:
-        steps.append(
-            {
-                "id": "GUI",
-                "title": "Graphical editor",
-                "type": "choice",
-                "cur": 0,
-                "options": [
-                    opt(
-                        "no",
-                        "No, the terminal is enough",
-                        "Nothing extra is installed. You can still change everything later with `material-grub` (a menu) and its subcommands.",
-                    ),
-                    opt(
-                        "yes",
-                        "Yes, install the GUI",
-                        "An optional editor that opens in your browser: live preview, drag and drop ordering, colours, names and icons per entry, Ventoy sticks, presets. It never runs as root (changes ask for your password or fingerprint through polkit). Start it with `material-grub gui`.",
-                    ),
-                ],
-            }
-        )
     if immutable:
         steps.append(
             {
@@ -614,7 +593,6 @@ CHECK = {
     "TARGET": re.compile(r"^(grub|ventoy)$"),
     "MODE": re.compile(r"^(dynamic|snapshot)$"),
     "STICK": re.compile(r"^(dev:/dev/[A-Za-z0-9/_.-]+|/[^'\x00-\x1f]*)$"),
-    "GUI": re.compile(r"^(yes|no)$"),
     "SEED_MODE": re.compile(r"^(multi|single)$"),
     "SEED": re.compile(r"^#[0-9A-Fa-f]{6}$"),
     "RESX": re.compile(r"^([0-9]{3,5}x[0-9]{3,5}(,[0-9]{3,5}x[0-9]{3,5})*)?$"),
@@ -658,7 +636,6 @@ def command_line(a):
         f"--style {a['STYLE']}" if "STYLE" in a else "",
         f"--scheme {a['SCHEME']}" if "SCHEME" in a else "",
         f"--seed {a['SEED']}" if a.get("SEED_MODE") == "single" and a.get("SEED") else "",
-        "--with-gui" if a.get("GUI") == "yes" else "",
     ]
     if a.get("COOKIE") == "off":
         c.append("--no-cookie")
@@ -838,7 +815,6 @@ def run_curses(steps, presets, summary_screen=True):
                     "RES": "Res",
                     "STYLE": "Style",
                     "SCHEME": "Scheme",
-                    "GUI": "GUI",
                     "SEED_MODE": "Colours",
                     "SEED": "Seed",
                     "LOGO": "Logo",

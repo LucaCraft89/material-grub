@@ -116,6 +116,6 @@ if __name__ == "__main__":
     shutil.copy(ROOT / "scripts/bgrt-logo.py", PKG / "bin/bgrt-logo.py")
     shutil.copy(
         ROOT / "install/ventoy_sticks.py", PKG / "bin/ventoy_sticks.py"
-    )  # `material-grub ventoy` finds the stick with it
+    )  # `material-boot grub ventoy` finds the stick with it
     shutil.copy(ROOT / "VERSION", PKG / "VERSION")
     print("package at", PKG)

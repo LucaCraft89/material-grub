@@ -1,5 +1,4 @@
-"""Optional parts (plugins, plugin API 2: the loader is the core's, tested there): discovery by this front end, dispatch through `material-grub <part>`, the names it
-reserves, the menu, help, version and doctor. Needs material-boot-core (next to the checkout, or MATERIAL_LIB).
+"""Optional parts (plugins, plugin API 2: the loader and the dispatch are the core's, tested there): discovery by this part's own tools and the rows of its doctor. Needs material-boot-core (next to the checkout, or MATERIAL_LIB).
 usage: python3 tests/test_plugins.py"""
 
 import json
@@ -12,7 +11,7 @@ import unittest.mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CLI = ROOT / "install/bin/cmd_cli.py"
+DOCTOR = ROOT / "install/bin/material-grub-doctor"
 sys.path.insert(0, str(ROOT / "install/bin"))
 import mgplugins  # noqa: E402
 
@@ -68,7 +67,11 @@ class Base(unittest.TestCase):
 
     def mg(self, *a):
         r = subprocess.run(
-            [sys.executable, str(CLI), *a], capture_output=True, text=True, env=self.env, stdin=subprocess.DEVNULL
+            [sys.executable, str(DOCTOR), *a[1:]],
+            capture_output=True,
+            text=True,
+            env=self.env,
+            stdin=subprocess.DEVNULL,
         )
         return r.returncode, r.stdout + r.stderr
 
@@ -108,80 +111,6 @@ class Manifests(Base):
         found = mgplugins.discover(dirs=[self.plug, other])
         self.assertEqual([p.version for p in found], ["1.0"])
         self.assertEqual(mgplugins.discover(dirs=[self.d / "missing"]), [])
-
-
-class Dispatch(Base):
-    def test_not_installed_says_so(self):
-        rc, out = self.mg("plymouth", "apply")
-        self.assertEqual(rc, 1)
-        self.assertIn("optional part", out)
-        self.assertIn("material-plymouth", out)
-        self.assertNotIn("Traceback", out)
-
-    def test_unknown_commands_are_still_unknown(self):
-        rc, out = self.mg("nonsense")
-        self.assertEqual(rc, 2)
-        self.assertIn("unknown command", out)
-
-    def test_runs_the_plugin_with_the_rest_of_the_arguments(self):
-        self.manifest()
-        rc, out = self.mg("plymouth", "apply", "--yes")
-        self.assertEqual(rc, 0)
-        self.assertIn("called ['apply', '--yes'] api=2", out)
-
-    def test_exit_status_comes_from_the_plugin(self):
-        self.manifest()
-        self.assertEqual(self.mg("plymouth", "three")[0], 3)
-        self.assertEqual(self.mg("plymouth", "exit")[0], 7)
-
-    def test_a_crashing_plugin_is_reported_as_the_plugins(self):
-        self.manifest()
-        rc, out = self.mg("plymouth", "crash")
-        self.assertEqual(rc, 1)
-        self.assertIn("the plymouth part failed", out)
-        self.assertNotIn("Traceback", out)
-
-    def test_a_plugin_that_cannot_be_imported(self):
-        self.manifest()
-        self.entry.write_text("raise SyntaxError('nope')\n")
-        rc, out = self.mg("plymouth", "apply")
-        self.assertEqual(rc, 1)
-        self.assertIn("cannot load", out)
-        self.entry.write_text("x = 1\n")
-        rc, out = self.mg("plymouth", "apply")
-        self.assertEqual(rc, 1)
-        self.assertIn("no main", out)
-
-    def test_an_incompatible_plugin_is_refused_with_the_reason(self):
-        self.manifest(core_api=1)
-        rc, out = self.mg("plymouth", "apply")
-        self.assertEqual(rc, 1)
-        self.assertIn("plugin API", out)
-
-    def test_a_plugin_cannot_take_over_a_builtin_command(self):
-        self.manifest("apply")
-        rc, out = self.mg("apply", "--status")
-        self.assertNotIn("called", out)
-
-    def test_help_and_version_list_installed_parts_only(self):
-        self.assertNotIn("Optional parts installed", self.mg("help")[1])
-        self.assertEqual(self.mg("version")[1].strip().count("\n"), 0)
-        self.manifest()
-        self.assertIn("material-grub plymouth", self.mg("help")[1])
-        self.assertIn("plymouth 0.1.0", self.mg("version")[1])
-        self.manifest(core_api=9)
-        self.assertIn("update whichever", self.mg("help")[1])
-        self.assertNotIn("plymouth 0.1.0", self.mg("version")[1])
-
-    def test_menu_items(self):
-        import cmd_cli
-
-        base = [m[0] for m in cmd_cli.menu_items()]
-        self.assertEqual(base[-1], "Quit")
-        self.assertNotIn("Plymouth status", base)
-        self.manifest()
-        items = [m[0] for m in cmd_cli.menu_items()]
-        self.assertEqual(items[-2:], ["Plymouth status", "Quit"])
 
 
 class Doctor(Base):

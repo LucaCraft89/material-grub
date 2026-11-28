@@ -1,10 +1,10 @@
-"""material-grub preview: render the menu scenes for the chosen style, scheme and resolution as a web page. No root, no VM, nothing installed.
+"""material-boot grub preview: render the menu scenes for the chosen style, scheme and resolution as a web page. No root, no VM, nothing installed.
 
 Reads the real boot entries read-only (grub.cfg, else /boot/loader/entries; a sample list when neither is readable), renders every scene with
 the same code the installer uses into a scratch directory, and writes a self-contained HTML contact sheet plus the PNGs.
 It is a render of the scenes, not GRUB itself: how the real GRUB menu behaves is tested by the QEMU jobs in CI.
 
-usage: material-grub preview [--pkg DIR] [--res WxH] [--style rail|clean|list|split] [--out DIR] [--sample] [--no-open]
+usage: material-boot grub preview [--pkg DIR] [--res WxH] [--style rail|clean|list|split] [--out DIR] [--sample] [--no-open]
 """
 
 import base64
@@ -149,7 +149,7 @@ def main(argv=None):
     pkg = Path(arg("--pkg", os.environ.get("MATERIAL_PKG", "/usr/share/material-grub")))
     if not (pkg / "res").is_dir():
         sys.exit(
-            f"material-grub preview: {pkg} is not a theme package (build one with ./install.sh --preview, or pass --pkg DIR)"
+            f"material-boot grub preview: {pkg} is not a theme package (build one with ./install.sh --preview, or pass --pkg DIR)"
         )
     res = arg("--res") or "1920x1080"
     avail = sorted(p.name for p in (pkg / "res").iterdir())
@@ -215,7 +215,7 @@ def main(argv=None):
         (out / "index.html").write_text(page(cards, meta))
     finally:
         shutil.rmtree(work, ignore_errors=True)
-    print(f"material-grub preview: {len(cards)} scenes written to {out}")
+    print(f"material-boot grub preview: {len(cards)} scenes written to {out}")
     print(f"  open {out / 'index.html'}")
     if "--no-open" not in sys.argv and (
         os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY") or sys.platform == "darwin"

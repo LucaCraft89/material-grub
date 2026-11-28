@@ -1,5 +1,6 @@
 #!/bin/sh
 # /etc/kernel/postinst.d and postrm.d: a kernel was added or removed. Re-applies the theme through the same safety nets; never fails the kernel package.
-[ -x /usr/local/bin/material-grub ] || exit 0
-/usr/local/bin/material-grub apply >/dev/null 2>&1 || true
+for mb in /usr/bin/material-boot /usr/local/bin/material-boot; do
+  [ -x "$mb" ] && { "$mb" grub apply >/dev/null 2>&1 || true; exit 0; }
+done
 exit 0

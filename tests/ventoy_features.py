@@ -75,7 +75,7 @@ def make_stage(work, style, mode):
 
 
 def retheme(stage):
-    """Re-run the Ventoy tool on the stick (what `material-grub ventoy` does) after the overrides changed."""
+    """Re-run the Ventoy tool on the stick (what `material-boot grub ventoy` does) after the overrides changed."""
     r = subprocess.run(
         [sys.executable, str(PKG / "bin/material-grub-ventoy"), str(stage), "--pkg", str(PKG), "--res", "1920x1080"],
         capture_output=True,
@@ -220,8 +220,16 @@ def run_gui(work):
     """Customise the stick in the GUI (Chrome), let the GUI write it, then boot what it wrote."""
     from playwright.sync_api import expect, sync_playwright
 
-    sys.path.insert(0, str(ROOT / "tests"))
-    from gui_e2e import find_browser
+    def find_browser():
+        for c in (
+            os.environ.get("GUI_BROWSER"),
+            "/usr/bin/google-chrome",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium",
+        ):
+            if c and os.path.exists(c):
+                return c
+        sys.exit("no Chrome or Chromium found (set GUI_BROWSER=/path/to/chrome)")
 
     stage = make_stage(work, "list", "dynamic")
     from PIL import Image
@@ -233,6 +241,8 @@ def run_gui(work):
     os.environ.update(
         {
             "MATERIAL_PKG": str(PKG),
+            "MATERIAL_GRUB_PKG": str(PKG),  # the editor draws the stick with GRUB's built package
+            "MATERIAL_GRUB_MODULES": str(ROOT / "install/bin"),
             "MATERIAL_STATE_DIR": str(tmp / "state"),
             "MATERIAL_CONF": str(tmp / "mg.conf"),
             "MATERIAL_OVERRIDES": str(tmp / "overrides.json"),
@@ -240,8 +250,14 @@ def run_gui(work):
             "XDG_CACHE_HOME": str(tmp / "cache"),
         }
     )
-    sys.path.insert(0, str(ROOT / "gui"))
-    import mgserver
+    core = os.environ.get("MATERIAL_LIB") or str(
+        ROOT / "material-boot-core"
+    )  # the editor is the core's (material_boot/ui)
+    sys.path.insert(0, core)
+    os.environ.setdefault(
+        "MATERIAL_DATA", str(PKG)
+    )  # the built GRUB package has the same palettes, classes and fonts as the shared data
+    from material_boot.ui import server as mgserver
 
     srv = mgserver.make_server(0)
     threading.Thread(target=srv.serve_forever, daemon=True).start()

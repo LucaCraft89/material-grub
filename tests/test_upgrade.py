@@ -27,8 +27,9 @@ def make_install(
     conf="STYLE=list\nSCHEME=dark\n",
     overrides=None,
     gui=False,
+    old_command=False,
 ):
-    """A plausible installed system under `root`, the way 0.7.x leaves it."""
+    """A plausible installed system under `root`, the way the current version leaves it (old_command: with the `material-grub` command 1.1 and older put on PATH)."""
     files = mgdetect.IMMUTABLE_FILES if layout == "immutable" else mgdetect.FILES
     for key, rel in files.items():
         if key in drop:
@@ -36,6 +37,9 @@ def make_install(
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(version + "\n" if key == "package" else "#!/bin/sh\n")
+    if old_command:
+        (root / "usr/local/bin").mkdir(parents=True, exist_ok=True)
+        (root / "usr/local/bin/material-grub").write_text("#!/bin/sh\n")
     if layout == "immutable":
         (root / "var/lib/material-grub").mkdir(parents=True, exist_ok=True)
         (root / "var/lib/material-grub/env").write_text("MG_IMMUTABLE=1\n")
@@ -155,9 +159,13 @@ class Detection(Base):
         self.assertEqual((f.layout, f.how, f.version), ("immutable", "immutable", "0.7.1"))
 
     def test_old_command_names_are_noticed(self):
-        make_install(self.r)
+        make_install(self.r, old_command=True)
         (self.r / "usr/local/bin/material-grub-apply").write_text("#!/bin/sh\n")
-        self.assertEqual(self.detect().old_names, ["usr/local/bin/material-grub-apply"])
+        self.assertEqual(self.detect().old_names, ["usr/local/bin/material-grub", "usr/local/bin/material-grub-apply"])
+
+    def test_a_current_install_has_no_old_names(self):
+        make_install(self.r)
+        self.assertEqual(self.detect().old_names, [])
 
     def test_what_the_user_has_is_summarised(self):
         make_install(
@@ -223,7 +231,7 @@ class Notice(Base):
         self.assertEqual(mgdetect.notice(self.detect(), "1.0.0"), [])
 
     def test_the_notice_says_what_happens(self):
-        make_install(self.r, drop=("hook15",), gui=True)
+        make_install(self.r, drop=("hook15",), gui=True, old_command=True)
         (self.r / "usr/local/bin/material-grub-apply").write_text("x")
         text = "\n".join(mgdetect.notice(self.detect(), "1.0.0"))
         for word in (
@@ -617,14 +625,16 @@ class InstallerGlue(Base):
             self.run_glue(inst, inst.after_install, str(self.r))
         self.assertEqual(mgdetect.read(str(self.r))["parts"]["core"], "1.0.0")
 
-    def test_a_merged_usr_local_sbin_is_not_a_leftover(self):
-        make_install(self.r)  # puts the command in usr/local/bin
+    def test_a_merged_usr_local_sbin_lists_the_old_command_once(self):
+        make_install(self.r, old_command=True)
         (self.r / "usr/local/sbin").symlink_to("bin")
-        self.assertEqual(self.detect().old_names, [])
+        self.assertEqual(self.detect().old_names, ["usr/local/bin/material-grub"])
         (self.r / "usr/local/sbin").unlink()
         (self.r / "usr/local/sbin").mkdir()
         (self.r / "usr/local/sbin/material-grub").write_text("#!/bin/sh\n")
-        self.assertEqual(self.detect().old_names, ["usr/local/sbin/material-grub"])
+        self.assertEqual(
+            self.detect().old_names, ["usr/local/bin/material-grub", "usr/local/sbin/material-grub"]
+        )  # two real files: both are listed
 
     def test_a_failing_migration_is_a_warning_not_a_failed_install(self):
         make_install(self.r)

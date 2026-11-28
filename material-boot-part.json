@@ -28,7 +28,6 @@
       {"name": "pkg", "takes": "value", "summary": "install an already built theme directory"},
       {"name": "dist-out", "takes": "value", "summary": "copy the built theme to this directory (with stage-only)"},
       {"name": "immutable", "takes": "flag", "summary": "use the immutable-system layout"},
-      {"name": "with-gui", "takes": "flag", "summary": "also install the graphical editor"},
       {"name": "no-deps", "takes": "flag", "summary": "do not install build dependencies"},
       {"name": "keep-build", "takes": "flag", "summary": "keep the temporary build directory"}
     ],
@@ -58,9 +57,7 @@
       {"id": "countdown", "title": "Countdown bar", "kind": "toggle", "default": true, "target": {"conf": "COUNTDOWN"},
        "help": "The 'Booting in N seconds' bar and label."},
       {"id": "timeout", "title": "Timeout in seconds", "kind": "text", "pattern": "[0-9]*", "target": {"conf": "TIMEOUT"},
-       "help": "Seconds before the default entry boots. Leave empty to keep GRUB's own timeout (5 by default)."},
-      {"id": "gui", "title": "Graphical editor", "kind": "toggle", "default": false, "target": {"option": "with-gui"},
-       "help": "Also install the optional editor: a Material 3 page in your browser with a live preview, colours, names, icons, order and presets. It never runs as root."}
+       "help": "Seconds before the default entry boots. Leave empty to keep GRUB's own timeout (5 by default)."}
     ]
   },
   "hooks": ["detect", "plan", "install", "uninstall", "verify", "doctor"]

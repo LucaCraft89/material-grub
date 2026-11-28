@@ -1,6 +1,6 @@
 """Is Material GRUB already installed here, which version, how, and what is the right thing to do about it? stdlib only.
 
-The installer, the packages' scriptlets (they run the installer) and `material-grub doctor` all ask this module, so they never disagree.
+The installer, the packages' scriptlets (they run the installer) and `material-boot grub doctor` all ask this module, so they never disagree.
 
   detect(root, target)           -> Finding: what is installed under `root` ("" is the real system), against the version about to be installed
   notice(finding, target)        -> the lines the user is shown before anything changes
@@ -30,7 +30,6 @@ from material_boot.state import (  # noqa: F401  (the state record, the lenient 
 # relative to the root of the system; a normal (non-immutable) install
 FILES = {
     "package": "usr/share/material-grub/VERSION",
-    "command": "usr/local/bin/material-grub",
     "hook05": "etc/grub.d/05_material",
     "hook15": "etc/grub.d/15_material_menu",
     "hook90": "etc/grub.d/90_material_system",
@@ -39,11 +38,16 @@ FILES = {
 }
 IMMUTABLE_FILES = {
     "package": "var/lib/material-grub/pkg/VERSION",
-    "command": "usr/local/bin/material-grub",
     "postprocess": "var/lib/material-grub/postprocess",
     "path unit": "etc/systemd/system/material-grub.path",
 }
-OLD_NAMES = ("usr/local/bin/material-grub-apply", "usr/local/sbin/material-grub-apply", "usr/local/sbin/material-grub")
+# what older versions put on PATH: the `material-grub` command itself went away in 1.2.0 (`material-boot grub ...` replaced it), the rest earlier
+OLD_NAMES = (
+    "usr/local/bin/material-grub",
+    "usr/local/bin/material-grub-apply",
+    "usr/local/sbin/material-grub-apply",
+    "usr/local/sbin/material-grub",
+)
 
 
 class Finding:
@@ -89,9 +93,10 @@ def detect(root="", target=None, owner=None):
     present = {k: (r / v).exists() for k, v in files.items()}
     conf = r / "etc/material-grub.conf"
     theme = any((r / d).is_dir() for d in ("boot/grub2/themes/material", "boot/grub/themes/material"))
-    # (a merged /usr/local/sbin is a link to /usr/local/bin: the command we install there is not a leftover)
-    here = (r / "usr/local/bin/material-grub").resolve() if (r / "usr/local/bin/material-grub").exists() else None
-    f.old_names = [n for n in OLD_NAMES if (r / n).exists() and (here is None or (r / n).resolve() != here)]
+    f.old_names = []
+    for n in OLD_NAMES:  # (a merged /usr/local/sbin is a link to /usr/local/bin: the same file is listed once)
+        if (r / n).exists() and (r / n).resolve() not in [(r / m).resolve() for m in f.old_names]:
+            f.old_names.append(n)
     # The state record is shared with the other parts (the core writes its own version at the top of it): one that names parts and not this one says nothing
     # about GRUB, and the version that counts is the one recorded for it.
     sp = (f.state or {}).get("parts")

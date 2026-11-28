@@ -1,4 +1,4 @@
-"""Starts the INSTALLED GUI (`material-grub gui`, from the package) in a distro container and talks to it like a browser would: the token, the state,
+"""Starts the INSTALLED editor (`material-boot ui`, from the core package, with this GRUB package) in a distro container and talks to it like a browser would: the token, the state,
 a live preview PNG for every style, the security checks. stdlib only. usage: python3 gui_probe.py"""
 
 import json
@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 
 proc = subprocess.Popen(
-    ["material-grub", "gui", "--no-browser", "--idle", "0"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    ["material-boot", "ui", "--no-browser", "--idle", "0"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
 )
 url = None
 t = time.time()
@@ -23,7 +23,7 @@ while time.time() - t < 30 and url is None:
         url = base
 if url is None:
     proc.kill()
-    sys.exit("the GUI did not start")
+    sys.exit("the editor did not start")
 
 
 def call(method, path, body=None, auth=True, headers=None):
@@ -71,7 +71,7 @@ try:
     if call("POST", "/api/apply", {"draft": {"conf": {"STYLE": "neon"}}})[0] != 400:
         fail.append("a bad draft was not refused")
     page = call("GET", "/", auth=False, headers={"Cookie": f"mg={token}"})
-    if page[0] != 200 or b"Material GRUB" not in page[1]:
+    if page[0] != 200 or b"Material Boot" not in page[1]:
         fail.append("the page did not load with the cookie")
     font = call("GET", "/fonts/GoogleSansFlex-VF.ttf")
     if font[0] != 200 or len(font[1]) < 100000:
@@ -79,5 +79,5 @@ try:
 finally:
     proc.terminate()
 if fail:
-    sys.exit("GUI PROBE FAILED:\n  " + "\n  ".join(fail))
-print("GUI PROBE OK")
+    sys.exit("EDITOR PROBE FAILED:\n  " + "\n  ".join(fail))
+print("EDITOR PROBE OK")

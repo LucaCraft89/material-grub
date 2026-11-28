@@ -53,7 +53,7 @@ grep -q '"grub"' /var/lib/material-grub/state.json && say "state record names gr
 $MB core parts | grep -q "grub .*ok" && say "material-boot core parts lists grub as usable" || { say "grub is not a usable part:"; $MB core parts | tee -a $R; exit 1; }
 $MB grub version 2>&1 | grep -q "material-grub" && say "material-boot grub version: ok" || { say "material-boot grub version FAILED"; exit 1; }
 $MB core doctor > /tmp/doctor.txt 2>&1 && say "core doctor: ok" || { say "core doctor FAILED"; cat /tmp/doctor.txt | tee -a $R; exit 1; }
-material-grub doctor > /tmp/doctor2.txt 2>&1 && say "material-grub doctor: ok" || { say "material-grub doctor FAILED"; cat /tmp/doctor2.txt | tee -a $R; exit 1; }
+material-boot grub doctor > /tmp/doctor2.txt 2>&1 && say "material-boot grub doctor: ok" || { say "material-boot grub doctor FAILED"; cat /tmp/doctor2.txt | tee -a $R; exit 1; }
 
 say "== removal through the unified installer"
 $MB core install --bundle $B --uninstall --only grub --yes > /tmp/un.log 2>&1 && say "uninstall: ok" || { say "uninstall FAILED"; tail -30 /tmp/un.log | tee -a $R; exit 1; }

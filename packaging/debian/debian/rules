@@ -6,7 +6,6 @@ override_dh_auto_install:
 	sh packaging/common/install-tree.sh . debian/material-grub
 	install -D -m755 packaging/debian/kernel-hook debian/material-grub/etc/kernel/postinst.d/zz-material-grub
 	install -D -m755 packaging/debian/kernel-hook debian/material-grub/etc/kernel/postrm.d/zz-material-grub
-	sh packaging/common/install-gui-tree.sh . debian/material-grub-gui
 
 override_dh_auto_build:
 override_dh_auto_test:

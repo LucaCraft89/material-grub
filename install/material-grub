@@ -1,8 +1,0 @@
-#!/bin/sh
-# material-grub: the one command. `material-grub` alone opens a menu; `material-grub help` lists the subcommands
-# (doctor, apply, gui, preview, colour, presets, overrides, conf, ventoy, update, uninstall, version). The code is bin/cmd_cli.py.
-PKG=/usr/share/material-grub; PY=python3
-[ -f /var/lib/material-grub/env ] && . /var/lib/material-grub/env
-[ -n "$MATERIAL_PKG" ] && PKG=$MATERIAL_PKG; [ -n "$MATERIAL_PY" ] && PY=$MATERIAL_PY
-MG_CLI_SELF=$0; export MG_CLI_SELF
-exec "$PY" "$PKG/bin/cmd_cli.py" "$@"

@@ -22,8 +22,8 @@ if [ "$IMM" = 1 ]; then
   echo "    - copying the theme package to $DEST (immutable layout: nothing is written under /usr)"
   rm -rf "$DEST"; install -d "$DEST"; cp -a "$PKG/." "$DEST/"; chmod +x "$DEST/bin/"*
   install -m755 "$HERE/postprocess.sh" "$ST/postprocess"
-  install -m755 "$HERE/uninstall.sh" "$ST/uninstall.sh"     # `material-grub uninstall`
-  rm -f "$D/usr/local/sbin/material-grub-apply" "$D/usr/local/bin/material-grub-apply" "$D/usr/local/sbin/material-grub"; install -d "$D/usr/local/bin"; install -m755 "$HERE/material-grub" "$D/usr/local/bin/material-grub"   # the one command (older versions also had material-grub-apply)
+  install -m755 "$HERE/uninstall.sh" "$ST/uninstall.sh"     # `material-boot grub uninstall`
+  rm -f "$D/usr/local/sbin/material-grub-apply" "$D/usr/local/bin/material-grub-apply" "$D/usr/local/sbin/material-grub" "$D/usr/local/bin/material-grub"   # the old command (<= 1.1): `material-boot grub` replaced it
   TO=5; [ -f /etc/default/grub ] && TO=$(sed -n 's/^GRUB_TIMEOUT=\([0-9]\{1,\}\).*/\1/p' /etc/default/grub | head -n1); TO=${TO:-5}
   { echo "MATERIAL_PKG=$DEST"; echo "MATERIAL_PY=$PY"; echo "MG_IMMUTABLE=1"; echo "MG_RES=${RES:-1920x1080}"; echo "MG_TIMEOUT=$TO"; } > "$ST/env"
   install -m644 "$HERE"/systemd/immutable/* "$D/etc/systemd/system/"
@@ -34,7 +34,7 @@ else
   install -d "$D/usr/share/material-grub" "$D/usr/libexec" "$D/etc/grub.d" "$D/etc/systemd/system"
   cp -a "$PKG/." "$D/usr/share/material-grub/"
   chmod +x "$D/usr/share/material-grub/bin/"*
-  install -m755 "$HERE/uninstall.sh" "$D/usr/share/material-grub/uninstall.sh"     # `material-grub uninstall`
+  install -m755 "$HERE/uninstall.sh" "$D/usr/share/material-grub/uninstall.sh"     # `material-boot grub uninstall`
   if [ "$REGISTER" = 1 ] && [ -f "$HERE/part_grub.py" ] && [ -f "$HERE/../material-boot-part.json" ]; then     # (a package ships its own manifest: --no-register) the part's manifest and entry for `material-boot` (plugin API 2): the same files whoever installs
     install -d "$D/usr/share/material-boot/plugins.d"
     install -m644 "$HERE/part_grub.py" "$D/usr/share/material-grub/bin/part_grub.py"
@@ -42,7 +42,7 @@ else
   fi
   echo "    - installing GRUB hooks (05_material, 15_material_menu, 90_material_system) and the systemd path unit"
   install -m755 "$HERE/postprocess.sh" "$D/usr/libexec/material-grub-postprocess"
-  rm -f "$D/usr/local/sbin/material-grub-apply" "$D/usr/local/bin/material-grub-apply" "$D/usr/local/sbin/material-grub"; install -d "$D/usr/local/bin"; install -m755 "$HERE/material-grub" "$D/usr/local/bin/material-grub"   # the one command (older versions also had material-grub-apply)
+  rm -f "$D/usr/local/sbin/material-grub-apply" "$D/usr/local/bin/material-grub-apply" "$D/usr/local/sbin/material-grub" "$D/usr/local/bin/material-grub"   # the old command (<= 1.1): `material-boot grub` replaced it
   install -m755 "$HERE/05_material" "$D/etc/grub.d/05_material"
   install -m755 "$HERE/15_material_menu" "$D/etc/grub.d/15_material_menu"
   install -m755 "$HERE/90_material_system" "$D/etc/grub.d/90_material_system"

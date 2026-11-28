@@ -32,19 +32,19 @@ MK=$(command -v grub2-mkconfig || command -v grub-mkconfig); $MK -o $CFG >/dev/n
 
 say "== $OLD with the core"
 base > /tmp/b.log 2>&1 && say "install: ok" || { say "install FAILED"; tail -30 /tmp/b.log | tee -a $R; exit 1; }
-material-grub version | grep -q "^material-grub $OLD" && say "version $OLD" || { say "wrong version"; material-grub version | tee -a $R; exit 1; }
-material-grub doctor > /tmp/d0.txt 2>&1 && say "doctor: ok" || { say "doctor FAILED"; cat /tmp/d0.txt | tee -a $R; exit 1; }
-material-grub conf STYLE=list >/dev/null; material-grub colour '#7E57C2' --apply > /tmp/c0.log 2>&1 && say "settings made: style list, one seed colour" || { say "colour FAILED"; tail -20 /tmp/c0.log | tee -a $R; exit 1; }
+material-boot version | grep -q "^grub $OLD" && say "version $OLD" || { say "wrong version"; material-boot version | tee -a $R; exit 1; }
+material-boot grub doctor > /tmp/d0.txt 2>&1 && say "doctor: ok" || { say "doctor FAILED"; cat /tmp/d0.txt | tee -a $R; exit 1; }
+material-boot core conf STYLE=list >/dev/null; material-boot core colour '#7E57C2' --apply > /tmp/c0.log 2>&1 && say "settings made: style list, one seed colour" || { say "colour FAILED"; tail -20 /tmp/c0.log | tee -a $R; exit 1; }
 echo "# my own line" >> /etc/material-grub.conf
 grep -q "\"grub\": \"$OLD\"" /var/lib/material-grub/state.json && say "record says grub $OLD" || { say "record before: $(cat /var/lib/material-grub/state.json)"; exit 1; }
 
 core0=$(sed -n 's/.*"core": "\([^"]*\)".*/\1/p' /var/lib/material-grub/state.json | head -n1)  # the core stays as it was
 say "== the update to $NEW"
 up > /tmp/u.log 2>&1 && say "package manager: ok" || { say "package manager FAILED"; tail -40 /tmp/u.log | tee -a $R; exit 1; }
-material-grub version | grep -q "^material-grub $NEW" && say "version $NEW" || { say "version after: $(material-grub version)"; exit 1; }
-material-grub doctor > /tmp/d1.txt 2>&1 && say "doctor: ok" || { say "doctor FAILED after the update"; cat /tmp/d1.txt | tee -a $R; exit 1; }
+material-boot version | grep -q "^grub $NEW" && say "version $NEW" || { say "version after: $(material-boot version)"; exit 1; }
+material-boot grub doctor > /tmp/d1.txt 2>&1 && say "doctor: ok" || { say "doctor FAILED after the update"; cat /tmp/d1.txt | tee -a $R; exit 1; }
 grep -q "^STYLE=list" /etc/material-grub.conf && grep -q "# my own line" /etc/material-grub.conf && say "settings kept (style, own line)" || { say "settings LOST"; exit 1; }
-material-grub colour | grep -q "#7E57C2" && say "the seed colour kept" || { say "the seed colour LOST"; exit 1; }
+material-boot core colour | grep -q "#7E57C2" && say "the seed colour kept" || { say "the seed colour LOST"; exit 1; }
 grep -q "classes applied" $CFG && say "grub.cfg annotated" || { say "grub.cfg NOT annotated"; exit 1; }
 grep -q "\"grub\": \"$NEW\"" /var/lib/material-grub/state.json && grep -q "\"core\": \"$core0\"" /var/lib/material-grub/state.json && say "record: grub $NEW, core $core0" || { say "record after: $(cat /var/lib/material-grub/state.json)"; exit 1; }
 CORE0=$core0 python3 - <<'PY' && say "history: the core's installs are recorded, none lost" || { say "history wrong"; exit 1; }
@@ -55,5 +55,5 @@ assert h and h[-1] == os.environ["CORE0"], h
 PY
 [ "$(sed -n 's/.*"version": "\(.*\)".*/\1/p' /usr/share/material-boot/plugins.d/grub.json)" = "$NEW" ] && say "the manifest says $NEW" || { say "manifest version"; cat /usr/share/material-boot/plugins.d/grub.json | tee -a $R; exit 1; }
 material-boot core parts | grep -q "grub .*$NEW.*ok" && say "core parts: grub $NEW ok" || { say "core parts"; material-boot core parts | tee -a $R; exit 1; }
-material-grub apply > /tmp/a1.log 2>&1 && say "apply after the update: ok" || { say "apply FAILED"; tail -20 /tmp/a1.log | tee -a $R; exit 1; }
+material-boot grub apply > /tmp/a1.log 2>&1 && say "apply after the update: ok" || { say "apply FAILED"; tail -20 /tmp/a1.log | tee -a $R; exit 1; }
 say "ALL OK"

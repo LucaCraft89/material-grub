@@ -15,13 +15,3 @@ Description: Material 3 Expressive GRUB theme, built from source on your machine
  installed or updated, with the same safety nets as the installer: the new
  grub.cfg is validated, rolled back if it is not valid, and the failure is
  reported without failing the package transaction.
-
-Package: material-grub-gui
-Architecture: all
-Depends: ${misc:Depends}, material-grub (= ${source:Version}), python3 (>= 3.9), python3-pil, pkexec | policykit-1
-Recommends: librsvg2-bin
-Description: Optional graphical editor for the Material GRUB theme
- A local web UI (it opens in your browser) to switch styles, recolour, rename,
- reorder and hide boot entries, edit Ventoy sticks, save presets and update,
- with a live preview. It never runs as root itself: changes go through polkit.
- Not installed with the theme.

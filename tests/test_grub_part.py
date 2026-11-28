@@ -93,7 +93,7 @@ class Arguments(unittest.TestCase):
     def test_the_installers_options_and_the_shared_look_become_the_engines_options(self):
         a = part_grub.engine_args(
             ctx(
-                options={"res": "1920x1080", "stage-only": True, "with-gui": True},
+                options={"res": "1920x1080", "stage-only": True},
                 conf={"STYLE": "list", "SCHEME": "light", "COOKIE": "off", "LOGO": "on", "HINTS": "off"},
             )
         )
@@ -101,7 +101,7 @@ class Arguments(unittest.TestCase):
         for want in (["--res", "1920x1080"], ["--style", "list"], ["--scheme", "light"]):
             i = a.index(want[0])
             self.assertEqual(a[i : i + 2], want)
-        for flag in ("--stage-only", "--with-gui", "--no-cookie", "--no-hints"):
+        for flag in ("--stage-only", "--no-cookie", "--no-hints"):
             self.assertIn(flag, a)
         for flag in ("--cookie", "--logo", "--no-logo", "--hints", "--immutable", "--from-package", "--progress"):
             self.assertNotIn(flag, a)
@@ -295,7 +295,7 @@ class InstalledCopy(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             with mock.patch.object(part_grub, "ENGINE", Path("/nonexistent/installer.py")):
                 with mock.patch.object(part_grub, "HERE", Path(t)):
-                    with self.assertRaisesRegex(RuntimeError, "material-grub uninstall"):
+                    with self.assertRaisesRegex(RuntimeError, "material-boot grub uninstall"):
                         part_grub.hook_uninstall(ctx())
 
 

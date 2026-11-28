@@ -6,7 +6,6 @@ installer collected, so that both entry points do the same thing and the tests o
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -29,7 +28,6 @@ from material_boot.conf import (
 FLAGS = {
     "stage-only": "--stage-only",
     "immutable": "--immutable",
-    "with-gui": "--with-gui",
     "no-deps": "--no-deps",
     "keep-build": "--keep-build",
 }
@@ -195,10 +193,10 @@ def hook_uninstall(ctx):
         return {"changed": False}
     if ENGINE.is_file():
         rc, _ = run_engine(ctx, ["--yes", "--no-tui", "--uninstall"] + (["--progress", "json"] if ctx.json else []))
-    else:  # the installed copy: the script the installer put next to it (`material-grub uninstall` runs the same one)
+    else:  # the installed copy: the script the installer put next to it (`material-boot grub uninstall` runs the same one)
         script = HERE / "uninstall.sh"
         if not script.is_file():
-            raise RuntimeError(f"{script} is missing: remove Material GRUB with `material-grub uninstall`")
+            raise RuntimeError(f"{script} is missing: remove Material GRUB with `material-boot grub uninstall`")
         rc, _ = run_cmd(ctx, ["sh", str(script)], events=False)
     if rc:
         raise RuntimeError(
@@ -208,24 +206,16 @@ def hook_uninstall(ctx):
 
 
 def hook_doctor(ctx):
-    exe = _material_grub()
-    if not exe:
-        return [("info", "the material-grub command is not installed here, so its checks were not run")]
-    r = subprocess.run([exe, "doctor"], capture_output=True, text=True)
+    """The checks of `material-boot grub doctor` (run as a child: its output is the rows, its exit status the verdict)."""
+    r = subprocess.run([sys.executable, str(BIN / "cmd_grub.py"), "doctor"], capture_output=True, text=True)
     out = [ln for ln in r.stdout.splitlines() if ln.strip()]
     return [("fail" if r.returncode else "ok", ln) for ln in out] or [
-        ("fail" if r.returncode else "ok", "material-grub doctor printed nothing")
+        ("fail" if r.returncode else "ok", "material-boot grub doctor printed nothing")
     ]
 
 
-def _material_grub():
-    return shutil.which("material-grub")
-
-
 def main(argv, core):
-    """`material-boot grub <command>`: the commands are material-grub's own, run by its own front end (same messages and exit codes)."""
-    exe = _material_grub()
-    if not exe:
-        print("Material GRUB is not installed: run `material-boot core install --with grub`.", file=sys.stderr)
-        return 1
-    return subprocess.run([exe, *argv]).returncode
+    """`material-boot grub <command>`: apply, doctor, preview, ventoy, uninstall (install/bin/cmd_grub.py)."""
+    import cmd_grub
+
+    return cmd_grub.main_quiet(list(argv))
