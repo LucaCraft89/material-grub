@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0 (2026-11-28)
+
+**Breaking, and shipped as a minor release on the maintainer's call (by semantic versioning it is a major change):** the `material-grub` command and the graphical editor of this package are gone.
+
+**Changed**
+- **`material-grub` is replaced by `material-boot grub ...`** (`apply`, `doctor`, `preview`, `ventoy`, `uninstall`); the look commands are `material-boot core colour | conf | presets | overrides`, the editor is `material-boot ui`. An old word prints where it went. The code is `install/bin/cmd_grub.py` (it was `cmd_cli.py`).
+- **The kernel hooks call `material-boot grub apply`** (the Debian kernel hook, the Arch pacman hook); Plymouth rebuilds `grub.cfg` the same way.
+- **The editor moved to material-boot-core** (`material-boot ui`) and edits GRUB, Plymouth and Ventoy in one place. The `material-grub-gui` package, `gui/`, `--with-gui` and the installer's "graphical editor" question are removed.
+- The installer removes the old command from `/usr/local/bin` (the core backs it up first, together with the old editor); `doctor` and the notice list it as a leftover until then.
+- GRUB reports its steps through the shared progress view of the installer (a live clock on long steps, the engine's own banner is no longer shown).
+- Needs material-boot-core 1.2.0 or newer.
+
+**Fixed**
+- Nothing in the installer or the hooks needs the `material-grub` command any more (the editor's helper, the Debian kernel hook, the Arch hook and Plymouth called it).
+
 ## 1.1.0 (2026-11-27)
 
 The questions the installer asks, now on Material Boot's installer screen.

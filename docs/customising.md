@@ -2,8 +2,8 @@
 
 Two layers, both applied without a rebuild (only the dark/light scheme and the resolution are build choices):
 
-- **Runtime options** in `/etc/material-grub.conf`: `STYLE`, `COOKIE`, `LOGO`, `HINTS`, `RAW_NAME`, `COUNTDOWN`, `TIMEOUT`, and, for the optional Plymouth part ([plugins.md](plugins.md)), `PLYMOUTH`, `PLYMOUTH_BAR`, `PLYMOUTH_MOTION` (they do nothing without it). Apply with `sudo material-grub apply` (the path unit also re-applies when the file changes). `sudo ./install.sh --no-hints` writes `HINTS=off` for you.
-- **Overrides** in `/etc/material-grub/overrides.json`: one colour for the whole theme, a colour, name and icon per entry, hiding entries, and the order of the menu. The [GUI](gui.md) edits this file with a live preview; you can also write it by hand. `sudo material-grub apply` applies it, and `material-grub doctor` checks it.
+- **Runtime options** in `/etc/material-grub.conf`: `STYLE`, `COOKIE`, `LOGO`, `HINTS`, `RAW_NAME`, `COUNTDOWN`, `TIMEOUT`, and, for the optional Plymouth part ([plugins.md](plugins.md)), `PLYMOUTH`, `PLYMOUTH_BAR`, `PLYMOUTH_MOTION` (they do nothing without it). Apply with `sudo material-boot grub apply` (the path unit also re-applies when the file changes). `sudo ./install.sh --no-hints` writes `HINTS=off` for you.
+- **Overrides** in `/etc/material-grub/overrides.json`: one colour for the whole theme, a colour, name and icon per entry, hiding entries, and the order of the menu. The [editor](gui.md) edits this file with a live preview; you can also write it by hand. `sudo material-boot grub apply` applies it, and `material-boot grub doctor` checks it.
 
 ## overrides.json
 
@@ -33,7 +33,7 @@ Pictures of each of these in real GRUB: [showcase.md](showcase.md).
 
 ## Presets
 
-A preset is the whole look (style, options, overrides, the pictures) saved under a name, in the GUI's *Presets* page, as a JSON file you can move to another machine. Dark/light and the resolution are not part of it.
+A preset is the whole look (style, options, overrides, the pictures) saved under a name, in the editor's *Presets* page, as a JSON file you can move to another machine. Dark/light and the resolution are not part of it.
 
 ## Ventoy sticks
 

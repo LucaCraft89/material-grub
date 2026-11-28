@@ -43,7 +43,7 @@ material-boot grub doctor > /tmp/d1.txt 2>&1 && say "doctor: ok" || { say "docto
 grep -q "^STYLE=list" /etc/material-grub.conf && grep -q "# my own line" /etc/material-grub.conf && say "settings kept (style, own line)" || { say "settings LOST"; cat /etc/material-grub.conf | tee -a $R; exit 1; }
 material-boot core colour | grep -q "#7E57C2" && say "the seed colour kept" || { say "the seed colour LOST"; exit 1; }
 grep -q "classes applied" $CFG && say "grub.cfg annotated" || { say "grub.cfg NOT annotated"; exit 1; }
-[ ! -e /usr/local/bin/material-grub ] && ! command -v material-grub >/dev/null 2>&1 && say "the old material-grub command is gone" || { say "the old material-grub command is still there"; ls -l /usr/local/bin | tee -a $R; exit 1; }
+hash -r 2>/dev/null; [ ! -e /usr/local/bin/material-grub ] && ! command -v material-grub >/dev/null 2>&1 && say "the old material-grub command is gone" || { say "the old material-grub command is still there"; ls -l /usr/local/bin | tee -a $R; exit 1; }
 material-boot core parts | grep -q "grub .*ok" && say "material-boot core parts lists grub" || { say "grub is not a part"; material-boot core parts | tee -a $R; exit 1; }
 grep -q '"core"' /var/lib/material-grub/state.json && grep -q '"grub"' /var/lib/material-grub/state.json && say "state record names the core and grub" || { say "state record is wrong"; cat /var/lib/material-grub/state.json | tee -a $R; exit 1; }
 material-boot core conf | grep -q "STYLE=list" && say "the core reads the same settings" || { say "the core does not see STYLE=list"; material-boot core conf | tee -a $R; exit 1; }

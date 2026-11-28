@@ -40,6 +40,7 @@ A plain `dnf upgrade`, `pacman -Syu` or `apt upgrade` installs the new sources a
 rollback on failure. `/etc/material-grub.conf` is never overwritten. The repositories that serve the updates are set up by the maintainer
 (COPR project, apt repository with a signing key; the AUR when registrations reopen).
 
-## The optional GUI package
+## The editor
 
-`material-grub-gui` is a second package built from the same source (`%package gui` in the spec, a second stanza in `debian/control`, `package_material-grub-gui()` in the PKGBUILD). It ships finished files (`packaging/common/install-gui-tree.sh`, nothing is built on the target machine), depends on `material-grub` of the same version, and the theme package never depends on it, recommends it or installs it. The CI package jobs check that: the theme alone has no `/usr/bin/material-grub-gui`, and installing the GUI package afterwards works and its helper refuses an unknown request.
+The graphical editor used to be a second package, `material-grub-gui`. Since 1.2.0 it is `material-boot ui` and ships in the **material-boot-core** package, which obsoletes `material-grub-gui` (rpm `Obsoletes`, deb `Replaces`/`Breaks`, Arch `replaces`). This repository no longer builds a GUI package.
+

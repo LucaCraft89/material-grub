@@ -10,7 +10,7 @@ When a part is installed it adds a sub-command (`material-boot plymouth ...`, an
 
 - `material-boot-part.json` (the manifest) and `install/part_grub.py` (the entry file and the hooks). The hooks run this repository's own installer, `install/installer.py` (the program `sudo ./install.sh` runs), so the two ways of installing do the same thing: a test installs with both and compares every file. Design and findings: [plans/g2-grub-part.md](plans/g2-grub-part.md).
 - `install.sh` puts the manifest in `/usr/share/material-boot/plugins.d/grub.json` and the entry next to the tools; the packages ship the manifest as one of their own files.
-- This front end, `material-grub`, keeps its own commands, messages and exit codes (the polkit helper, the path unit and the GUI parse them); for the parts of other packages it uses the core's loader, and its own command names stay reserved: a part cannot take `apply`, `doctor` or any other built-in name.
+- The `material-grub` front end is gone (1.2.0): the core's dispatcher runs every part as `material-boot <part> ...` (the GRUB part's commands are in `install/bin/cmd_grub.py`).
 
 ## Writing a part
 

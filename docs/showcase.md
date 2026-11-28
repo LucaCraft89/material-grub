@@ -1,10 +1,10 @@
 # Showcase: customised menus and the GUI
 
-Every picture on this page is produced by the test suite: the menus are real GRUB screenshots (QEMU + OVMF, see `tests/boot_features.py`), the GUI shots come from a real browser run (`tests/gui_e2e.py`). Both run in CI on every change. How to do it yourself: [usage.md](usage.md), [customising.md](customising.md), [gui.md](gui.md).
+Every picture on this page is produced by the test suite: the menus are real GRUB screenshots (QEMU + OVMF, see `tests/boot_features.py`), the GUI shots come from a real browser run (`material-boot-core's tests/ui_e2e.py`). Both run in CI on every change. How to do it yourself: [usage.md](usage.md), [customising.md](customising.md), [gui.md](gui.md).
 
 ## One colour for the whole theme
 
-`material-grub colour '#7E57C2'` (or the installer's *Colours* step, or the GUI): every entry uses the Material 3 palette of one seed colour. Here lavender, in the four styles.
+`material-boot core colour '#7E57C2'` (or the installer's *Colours* step, or the GUI): every entry uses the Material 3 palette of one seed colour. Here lavender, in the four styles.
 
 <table>
 <tr>
@@ -77,7 +77,7 @@ Ventoy 1.1.18 does not show a `menu_alias` in its list (not even on a plain stic
 
 ## The GUI
 
-A local web UI in your browser (`material-grub gui`), Material 3 Expressive with a forest-green seed and Google Sans Flex. The live preview on the right is drawn by the same code that writes your real menu.
+A local web UI in your browser (`material-boot ui`), Material 3 Expressive with a forest-green seed and Google Sans Flex. The live preview on the right is drawn by the same code that writes your real menu.
 
 | | |
 |---|---|
