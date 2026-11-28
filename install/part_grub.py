@@ -75,12 +75,28 @@ def need_engine():
         )
 
 
-def run_cmd(ctx, cmd):
-    """Run a command of the engine. In a json run its events are relayed through ctx.progress (stdout is the event stream); otherwise it prints as it always did.
-    Returns (exit status, the lines it printed when they were captured)."""
+def to_view(ev):
+    """An event of the engine as an event of the one view (docs/plans/ux.md 3.1): its steps are the steps, its warnings and errors stay what they are, and
+    everything else it says (the checks, the ok lines, its own banner, the output of the programs it runs) is detail: shown with -v, always in the log."""
+    kind = ev.get("event")
+    text = str(ev.get("msg") or ev.get("text") or "").strip()
+    if not text:
+        return None
+    if kind == "step":
+        return {"event": "step", "text": text}
+    if kind in ("warn", "error"):
+        return {"event": kind, "text": text}
+    if kind == "log" and ev.get("level") in ("warn", "error"):
+        return {"event": "warn", "text": text}
+    return {"event": "detail", "text": text}
+
+
+def run_cmd(ctx, cmd, events=True):
+    """Run a command of the engine and relay what it reports through ctx.progress; its own text never reaches the screen. A json run (the editor) gets the engine's
+    events as they are, since the editor reads them; a text run gets them as events of the one view. Returns (exit status, the lines it printed)."""
     env = dict(os.environ, MATERIAL_BOOT_UNIFIED="1")
-    if not ctx.json:
-        return subprocess.run(cmd, env=env).returncode, []
+    if events and "--progress" not in cmd:
+        cmd = list(cmd) + ["--progress", "json"]
     p = subprocess.Popen(cmd, env=env, stdout=subprocess.PIPE, text=True)
     lines = []
     for line in p.stdout:
@@ -89,11 +105,17 @@ def run_cmd(ctx, cmd):
             ev = json.loads(line)
         except ValueError:
             ev = None
-        if isinstance(ev, dict) and "event" in ev:
-            if ev["event"] != "done":  # the core says when everything is done
-                ctx.progress(ev)
-        else:
-            ctx.progress({"event": "log", "text": line.rstrip("\n")})
+        if events and isinstance(ev, dict) and "event" in ev:
+            if ev["event"] == "done":  # the core says when everything is done
+                continue
+            ctx.progress(ev if ctx.json else to_view(ev))
+        elif line.strip():
+            ctx.progress(
+                {"event": "log", "text": line.rstrip("\n")}
+                if ctx.json
+                else {"event": "detail", "text": line.rstrip("\n")}
+            )
+    p.stdout.close()
     return p.wait(), lines
 
 
@@ -133,10 +155,24 @@ def _capture(ctx, args):
 def hook_install(ctx):
     if ctx.dry_run:
         return {"changed": False, "notes": hook_plan(ctx)}
-    rc, _ = run_engine(ctx, engine_args(ctx))
+    rc, lines = run_engine(ctx, engine_args(ctx))
     if rc:
+        said = []
+        for x in lines[-60:]:
+            try:
+                e = json.loads(x)
+                said.append(
+                    str(e.get("msg") or e.get("text") or "")
+                    if e.get("event") in ("warn", "error", "log", "info")
+                    else ""
+                )
+            except ValueError:
+                said.append(x)
+        tail = [t for t in said if t.strip()][-8:]
         raise RuntimeError(
-            f"the Material GRUB installer failed (exit status {rc}); its output is above, and GRUB was left working as before"
+            f"the Material GRUB installer failed (exit status {rc}), and GRUB was left working as before. The last lines it printed:\n  "
+            + "\n  ".join(tail)
+            + "\nThe whole run is in /var/log/material-boot/install.log; -v shows it as it happens."
         )
     if ctx.options.get(
         "stage-only"
@@ -163,9 +199,11 @@ def hook_uninstall(ctx):
         script = HERE / "uninstall.sh"
         if not script.is_file():
             raise RuntimeError(f"{script} is missing: remove Material GRUB with `material-grub uninstall`")
-        rc, _ = run_cmd(ctx, ["sh", str(script)])
+        rc, _ = run_cmd(ctx, ["sh", str(script)], events=False)
     if rc:
-        raise RuntimeError(f"the uninstall failed (exit status {rc}); its output is above")
+        raise RuntimeError(
+            f"the uninstall failed (exit status {rc}); the whole run is in /var/log/material-boot/install.log (-v shows it as it happens)"
+        )
     return {"changed": True}
 
 

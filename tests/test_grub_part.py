@@ -167,6 +167,106 @@ class Events(unittest.TestCase):
         self.assertEqual(len(lines), 3)
 
 
+class ViewEvents(unittest.TestCase):
+    """A text run: the engine is started on its event stream and what it reports reaches the one view as steps and details; its own banner is never printed."""
+
+    ENGINE = """
+import json, sys
+def ev(**k): print(json.dumps(k), flush=True)
+ev(event='info', msg='Material GRUB installer')
+ev(event='step', n=1, total=3, msg='Checking the system')
+ev(event='info', msg='distribution: Fedora')
+ev(event='step', n=2, total=3, msg='Rendering the theme')
+ev(event='ok', msg='rendered 112 scene images')
+ev(event='log', text='Generating grub configuration file ...', level='info')
+ev(event='log', text='grub-mkconfig warned about something', level='warn')
+ev(event='warn', msg='one entry has no icon')
+print('a line that is not json')
+ev(event='done', rc=0)
+"""
+
+    def run_text(self, fake_source, **kw):
+        with tempfile.TemporaryDirectory() as t:
+            fake = Path(t) / "installer.py"
+            fake.write_text(fake_source)
+            got = []
+            c = ctx(json=False, progress=got.append, **kw)
+            with mock.patch.object(part_grub, "ENGINE", fake):
+                with mock.patch("sys.stdout", new=io.StringIO()) as out:
+                    rc, lines = part_grub.run_engine(c, [])
+        return rc, got, out.getvalue(), lines
+
+    def test_the_steps_are_steps_and_the_rest_is_detail(self):
+        rc, got, printed, _ = self.run_text(self.ENGINE)
+        self.assertEqual(rc, 0)
+        self.assertEqual(printed, "")  # the engine's own text never reaches the screen
+        self.assertEqual(
+            [e["text"] for e in got if e["event"] == "step"], ["Checking the system", "Rendering the theme"]
+        )
+        details = [e["text"] for e in got if e["event"] == "detail"]
+        for words in (
+            "Material GRUB installer",
+            "distribution: Fedora",
+            "rendered 112 scene images",
+            "Generating grub configuration file ...",
+            "a line that is not json",
+        ):
+            self.assertIn(words, details)
+
+    def test_warnings_stay_warnings(self):
+        _rc, got, _p, _l = self.run_text(self.ENGINE)
+        warns = [e["text"] for e in got if e["event"] == "warn"]
+        self.assertEqual(sorted(warns), ["grub-mkconfig warned about something", "one entry has no icon"])
+
+    def test_done_is_left_to_the_core(self):
+        _rc, got, _p, _l = self.run_text(self.ENGINE)
+        self.assertFalse([e for e in got if e["event"] == "done"])
+
+    def test_the_engine_is_started_on_the_event_stream(self):
+        seen = []
+        real = subprocess.Popen
+
+        def spy(cmd, *a, **k):
+            seen.append(cmd)
+            return real(cmd, *a, **k)
+
+        with mock.patch.object(subprocess, "Popen", spy):
+            self.run_text(self.ENGINE)
+        self.assertEqual(seen[0][-2:], ["--progress", "json"])
+
+    def test_the_editors_stream_is_the_engines_events_as_they_are(self):
+        with tempfile.TemporaryDirectory() as t:
+            fake = Path(t) / "installer.py"
+            fake.write_text(self.ENGINE)
+            got = []
+            with mock.patch.object(part_grub, "ENGINE", fake):
+                part_grub.run_engine(ctx(json=True, progress=got.append), [])
+        self.assertEqual(
+            [e["event"] for e in got][:4], ["info", "step", "info", "step"]
+        )  # untranslated: the editor reads these kinds
+        self.assertEqual(got[1]["msg"], "Checking the system")
+
+    def test_a_failure_shows_the_last_lines_the_engine_said_and_where_the_log_is(self):
+        failing = "import json\nprint(json.dumps({'event': 'step', 'msg': 'Installing into GRUB'}))\nprint(json.dumps({'event': 'error', 'msg': 'grub-mkconfig failed: syntax error in /boot/grub2/grub.cfg', 'code': 3}))\nraise SystemExit(3)\n"
+        with tempfile.TemporaryDirectory() as t:
+            fake = Path(t) / "installer.py"
+            fake.write_text(failing)
+            with mock.patch.object(part_grub, "ENGINE", fake):
+                with mock.patch("sys.stdout", new=io.StringIO()):
+                    with self.assertRaises(RuntimeError) as e:
+                        part_grub.hook_install(ctx(json=False, progress=lambda ev: None))
+        text = str(e.exception)
+        self.assertIn("exit status 3", text)
+        self.assertIn("grub-mkconfig failed: syntax error", text)
+        self.assertIn("/var/log/material-boot/install.log", text)
+
+    def test_the_translation(self):
+        self.assertEqual(part_grub.to_view({"event": "step", "msg": "A"}), {"event": "step", "text": "A"})
+        self.assertEqual(part_grub.to_view({"event": "ok", "msg": "B"}), {"event": "detail", "text": "B"})
+        self.assertEqual(part_grub.to_view({"event": "error", "msg": "C", "code": 2}), {"event": "error", "text": "C"})
+        self.assertIsNone(part_grub.to_view({"event": "info", "msg": "  "}))
+
+
 class InstalledCopy(unittest.TestCase):
     """The copy install.sh leaves in /usr/share/material-grub/bin has no engine: it can detect, verify, doctor and uninstall, and says so for the rest."""
 
@@ -183,9 +283,13 @@ class InstalledCopy(unittest.TestCase):
             (Path(t) / "uninstall.sh").write_text("#!/bin/sh\n")
             with mock.patch.object(part_grub, "ENGINE", Path("/nonexistent/installer.py")):
                 with mock.patch.object(part_grub, "HERE", Path(t)):
-                    with mock.patch.object(part_grub, "run_cmd", lambda c, cmd: calls.append(cmd) or (0, [])):
+                    with mock.patch.object(
+                        part_grub, "run_cmd", lambda c, cmd, events=True: calls.append((cmd, events)) or (0, [])
+                    ):
                         self.assertEqual(part_grub.hook_uninstall(ctx()), {"changed": True})
-        self.assertEqual(calls, [["sh", str(Path(t) / "uninstall.sh")]])
+        self.assertEqual(
+            calls, [(["sh", str(Path(t) / "uninstall.sh")], False)]
+        )  # a shell script has no event stream: its lines are details
 
     def test_uninstall_without_the_script_says_what_to_do(self):
         with tempfile.TemporaryDirectory() as t:
